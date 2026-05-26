@@ -1,0 +1,15 @@
+[Unit]
+Description=Bisped webcmslight FrankenPHP server
+After=network.target bisped-mariadb.service
+Wants=bisped-mariadb.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/funboy/bisped.net
+ExecStart=/home/funboy/bisped.net/runtime/bin/frankenphp php-server --root /home/funboy/bisped.net/public --listen 127.0.0.1:4000 --access-log
+Restart=always
+RestartSec=3
+TimeoutStartSec=30
+
+[Install]
+WantedBy=default.target

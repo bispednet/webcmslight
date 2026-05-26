@@ -32,6 +32,77 @@ CREATE TABLE IF NOT EXISTS admin_nonces (
     FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(190) NULL UNIQUE,
+    display_name VARCHAR(190) NULL,
+    avatar_url VARCHAR(500) NULL,
+    status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_identities (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    provider ENUM('google','password','evm_wallet','solana_wallet') NOT NULL,
+    provider_subject VARCHAR(255) NOT NULL,
+    provider_email VARCHAR(190) NULL,
+    metadata_json JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_subject (provider, provider_subject),
+    INDEX idx_user_identities_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_wallets (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    chain ENUM('evm','solana') NOT NULL,
+    address VARCHAR(120) NOT NULL,
+    label VARCHAR(120) NULL,
+    is_admin_allowed TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_chain_address (chain, address),
+    INDEX idx_user_wallets_user (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_roles (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    role_key ENUM('admin','commesso','cliente') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_role (user_id, role_key),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS auth_nonces (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    provider ENUM('evm_wallet','solana_wallet') NOT NULL,
+    address VARCHAR(120) NOT NULL,
+    nonce CHAR(64) NOT NULL UNIQUE,
+    message TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    consumed_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_auth_nonce_lookup (provider, address, nonce)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS auth_audit_log (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    provider VARCHAR(40) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    result ENUM('success','failure') NOT NULL,
+    reason VARCHAR(255) NULL,
+    ip_address VARBINARY(16) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_auth_audit_user (user_id),
+    INDEX idx_auth_audit_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS audit_log (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     admin_address VARCHAR(64) NOT NULL,

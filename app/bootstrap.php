@@ -57,10 +57,18 @@ if (PHP_SAPI !== 'cli' && session_status() !== PHP_SESSION_ACTIVE) {
 
 \App\Core\Logger::init(BASE_PATH . '/storage/logs/app.log', (bool)($config['app']['debug'] ?? false));
 
-try {
-$GLOBALS['pdo'] = \App\Core\Database::connection();
-} catch (\Throwable $e) {
-    http_response_code(500);
-    echo 'DB error: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
-    exit;
+if (!defined('BISPED_SKIP_DB_BOOTSTRAP')) {
+    try {
+    $GLOBALS['pdo'] = \App\Core\Database::connection();
+    } catch (\Throwable $e) {
+        \App\Core\Logger::error('Database bootstrap failure', ['error' => $e->getMessage()]);
+        http_response_code(503);
+        if (PHP_SAPI === 'cli') {
+            fwrite(STDERR, 'Database unavailable' . PHP_EOL);
+            exit(1);
+        }
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Servizio momentaneamente non disponibile</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#050505;color:#fff;font-family:system-ui,sans-serif}.box{max-width:620px;padding:32px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(135deg,rgba(229,9,20,.18),rgba(255,255,255,.05))}h1{margin:0 0 12px;font-size:32px}p{color:#c9c9c9;line-height:1.6}</style></head><body><main class="box"><h1>Servizio momentaneamente non disponibile</h1><p>Stiamo ripristinando la connessione ai servizi interni. Riprova tra poco o contatta Bisped se hai una richiesta urgente.</p></main></body></html>';
+        exit;
+    }
 }

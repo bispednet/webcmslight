@@ -1,6 +1,9 @@
 <?php
 use App\Core\View;
 use App\Support\AdminMode;
+use App\Support\Session;
+
+Session::ensureStarted();
 
 $settings = $settings ?? [];
 $siteName = $settings['site_name'] ?? 'Bisped';
@@ -42,6 +45,10 @@ $ctaItems = $navMap['header_cta'] ?? [$defaultCta];
 $ctaItem = $ctaItems[0] ?? $defaultCta;
 
 $mobileItems = array_merge($primaryItems, $moreItems);
+$userName = $_SESSION['user_name'] ?? null;
+$userRole = $_SESSION['user_role'] ?? null;
+$accountUrl = $userRole === 'admin' || $userRole === 'commesso' ? '/admin/dashboard' : '/area-clienti';
+$accountLabel = $userName ? ($userRole === 'admin' ? 'Admin' : ($userRole === 'commesso' ? 'Banco' : 'Area clienti')) : 'Login';
 
 $linkAttributes = static function (array $item): string {
     $attrs = '';
@@ -91,9 +98,14 @@ $linkAttributes = static function (array $item): string {
                 <?php endif; ?>
             </nav>
             <div class="hidden md:flex items-center gap-4">
+                <a href="/it/" class="rounded-full border border-stroke bg-glass px-3 py-2 text-xs font-black uppercase tracking-widest text-txt transition hover:border-pri hover:text-pri">IT</a>
+                <a href="/en/" class="rounded-full border border-stroke bg-glass px-3 py-2 text-xs font-black uppercase tracking-widest text-txt transition hover:border-pri hover:text-pri">EN</a>
                 <button type="button" data-theme-toggle class="rounded-full border border-stroke bg-glass px-3 py-2 text-xs font-black uppercase tracking-widest text-txt transition hover:border-pri hover:text-pri">
                     <span class="theme-toggle-label"></span>
                 </button>
+                <a href="<?= htmlspecialchars($userName ? $accountUrl : '/login', ENT_QUOTES, 'UTF-8'); ?>" class="rounded-full border border-stroke bg-glass px-4 py-2 text-xs font-black uppercase tracking-widest text-txt transition hover:border-pri hover:text-pri">
+                    <?= htmlspecialchars($accountLabel, ENT_QUOTES, 'UTF-8'); ?>
+                </a>
                 <a<?= $linkAttributes($ctaItem); ?> class="bg-pri text-white font-black py-2 px-4 rounded-full hover:bg-pri-700 transition-transform ease-in-out duration-200 hover:-translate-y-0.5">
                     <?= htmlspecialchars($ctaItem['label'] ?? $defaultCta['label'], ENT_QUOTES, 'UTF-8'); ?>
                 </a>
@@ -112,9 +124,16 @@ $linkAttributes = static function (array $item): string {
                     <?= htmlspecialchars($item['label'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
                 </a>
             <?php endforeach; ?>
+            <div class="flex items-center justify-center gap-3">
+                <a href="/it/" class="rounded-full border border-stroke px-4 py-2 text-xs font-black uppercase tracking-widest text-txt">IT</a>
+                <a href="/en/" class="rounded-full border border-stroke px-4 py-2 text-xs font-black uppercase tracking-widest text-txt">EN</a>
+            </div>
             <button type="button" data-theme-toggle class="mx-auto rounded-full border border-stroke px-5 py-2 text-xs font-black uppercase tracking-widest text-txt">
                 <span class="theme-toggle-label"></span>
             </button>
+            <a href="<?= htmlspecialchars($userName ? $accountUrl : '/login', ENT_QUOTES, 'UTF-8'); ?>" class="mx-auto rounded-full border border-stroke px-5 py-2 text-xs font-black uppercase tracking-widest text-txt">
+                <?= htmlspecialchars($accountLabel, ENT_QUOTES, 'UTF-8'); ?>
+            </a>
             <a<?= $linkAttributes($ctaItem); ?> class="mt-4 bg-pri text-white font-black py-3 rounded-full hover:bg-pri-700 transition-colors">
                 <?= htmlspecialchars($ctaItem['label'] ?? $defaultCta['label'], ENT_QUOTES, 'UTF-8'); ?>
             </a>

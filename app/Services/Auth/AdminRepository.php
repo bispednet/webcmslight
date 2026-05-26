@@ -59,6 +59,34 @@ final class AdminRepository
         ];
     }
 
+    public function ensureBridgeAdmin(string $name, ?string $email, string $subject): array
+    {
+        if ($email) {
+            $admin = $this->findByEmail($email);
+            if ($admin) {
+                return $admin;
+            }
+        }
+
+        $wallet = '0x' . substr(sha1('bisped-admin-bridge:' . strtolower($subject)), 0, 40);
+        $stmt = $this->db->prepare(
+            'INSERT INTO admins (display_name, wallet_address, email)
+             VALUES (:display_name, :wallet_address, :email)'
+        );
+        $stmt->execute([
+            'display_name' => $name,
+            'wallet_address' => $wallet,
+            'email' => $email,
+        ]);
+
+        return [
+            'id' => (int)$this->db->lastInsertId(),
+            'display_name' => $name,
+            'wallet_address' => $wallet,
+            'email' => $email,
+        ];
+    }
+
     public function recordSession(int $adminId, string $sessionToken, ?string $ip, ?string $userAgent, int $ttlMinutes = 60): void
     {
         $stmt = $this->db->prepare(

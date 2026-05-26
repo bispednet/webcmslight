@@ -1,0 +1,16 @@
+[Unit]
+Description=Bisped webcmslight MariaDB runtime
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/funboy/bisped.net
+ExecStart=/home/funboy/bisped.net/runtime/mariadb/bin/mariadbd --basedir=/home/funboy/bisped.net/runtime/mariadb --datadir=/home/funboy/bisped.net/runtime/mariadb-data --socket=/home/funboy/bisped.net/runtime/mariadb.sock --port=3307 --pid-file=/home/funboy/bisped.net/runtime/mariadb.pid --log-error=/home/funboy/bisped.net/storage/logs/mariadb.err --skip-networking=0 --bind-address=127.0.0.1
+ExecStop=/home/funboy/bisped.net/runtime/mariadb/bin/mariadb-admin --socket=/home/funboy/bisped.net/runtime/mariadb.sock -uroot shutdown
+Restart=always
+RestartSec=3
+TimeoutStartSec=60
+TimeoutStopSec=60
+
+[Install]
+WantedBy=default.target

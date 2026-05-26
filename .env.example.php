@@ -23,9 +23,23 @@ return [
         'allowed_addresses' => [
             // '0xYourAdminWalletAddress',
         ],
+        'admin_evm_addresses' => [
+            // '0xYourAdminWalletAddress',
+        ],
+        'admin_solana_addresses' => [
+            // 'YourSolanaAdminAddress',
+        ],
         'nonce_ttl' => 300,
         'project_id' => 'your-walletconnect-project-id',
         'rpc_url' => 'https://rpc.ankr.com/eth',
+    ],
+    'google' => [
+        'client_id' => '',
+        'client_secret' => '',
+        'redirect_uri' => 'https://www.bisped.net/auth/google/callback',
+        'admin_emails' => [
+            '0xfunboy@gmail.com',
+        ],
     ],
     'auth_users' => [
         [

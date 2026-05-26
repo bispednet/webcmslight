@@ -31,10 +31,23 @@ $rpcUrl = $rpcUrl ?? '';
 
     <div class="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
         <form method="post" action="/login" class="rounded-[2rem] border border-stroke bg-bg2 p-6 shadow-deep md:p-8">
-            <h2 class="text-2xl font-black text-acc">Entra con email e password</h2>
+            <h2 class="text-2xl font-black text-acc">Entra nella tua area</h2>
             <p class="mt-2 text-sm leading-6 text-muted">Accesso operativo per amministratori, commessi di negozio e clienti.</p>
 
-            <div class="mt-6 space-y-4">
+            <div class="mt-6 grid gap-3">
+                <a href="/auth/google" class="inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-white/90">
+                    Continua con Google
+                </a>
+                <button type="button" id="evm-wallet-login" class="inline-flex w-full items-center justify-center rounded-full border border-stroke px-5 py-3 text-sm font-black text-acc transition hover:border-pri hover:text-pri">
+                    Connetti wallet EVM
+                </button>
+                <button type="button" id="solana-wallet-login" class="inline-flex w-full items-center justify-center rounded-full border border-stroke px-5 py-3 text-sm font-black text-acc transition hover:border-pri hover:text-pri">
+                    Connetti wallet Solana
+                </button>
+            </div>
+
+            <div class="mt-8 border-t border-stroke pt-6 space-y-4">
+                <p class="text-xs font-black uppercase tracking-[0.28em] text-muted">Accesso locale di emergenza</p>
                 <label class="block text-sm font-bold text-muted" for="email">Email</label>
                 <input class="w-full rounded-2xl border border-stroke bg-bg p-3 text-txt outline-none transition focus:border-pri" type="email" name="email" id="email" autocomplete="email" required>
 
@@ -56,8 +69,8 @@ $rpcUrl = $rpcUrl ?? '';
                 </p>
             </article>
             <article class="rounded-3xl border border-stroke bg-glass p-6">
-                <h3 class="text-lg font-black text-acc">Accesso tecnico opzionale</h3>
-                <p class="mt-3 text-sm leading-6 text-muted">Il login wallet resta disponibile per amministratori autorizzati.</p>
+                <h3 class="text-lg font-black text-acc">Policy admin</h3>
+                <p class="mt-3 text-sm leading-6 text-muted">Google assegna il ruolo admin solo agli indirizzi allowlistati lato server. Wallet EVM e Solana entrano in admin solo se l'indirizzo e autorizzato in configurazione.</p>
                 <button
                     type="button"
                     id="wallet-connect-button"
