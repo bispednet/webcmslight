@@ -1,100 +1,85 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const animatedElements = document.querySelectorAll('[data-animate]');
-    const mobileToggleButton = document.querySelector('[data-toggle-mobile-nav]');
-    const mobileNav = document.querySelector('[data-mobile-nav]');
-    const dropdowns = document.querySelectorAll('[data-dropdown]');
-    const themeToggles = document.querySelectorAll('[data-theme-toggle]');
-
+    // ── Animate on scroll ────────────────────────────────────────────────────
+    const animated = document.querySelectorAll('[data-animate]');
     if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver(entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('animate-visible');
-                    observer.unobserve(entry.target);
+        const obs = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    const delay = parseInt(e.target.getAttribute('data-animate-delay') || '0', 10);
+                    setTimeout(() => e.target.classList.add('animate-visible'), delay);
+                    obs.unobserve(e.target);
                 }
             });
-        }, { threshold: 0.1 });
-
-        animatedElements.forEach(element => {
-            const delay = parseInt(element.getAttribute('data-animate-delay') || '0', 10);
-            if (delay) {
-                element.style.transitionDelay = `${delay}ms`;
-            }
-            observer.observe(element);
-        });
+        }, { threshold: 0.08 });
+        animated.forEach(el => obs.observe(el));
     } else {
-        animatedElements.forEach(element => element.classList.add('animate-visible'));
+        animated.forEach(el => el.classList.add('animate-visible'));
     }
 
-    if (mobileToggleButton && mobileNav) {
-        mobileToggleButton.addEventListener('click', () => {
-            mobileNav.classList.toggle('hidden');
-        });
+    // ── Mobile nav toggle ────────────────────────────────────────────────────
+    const mobileBtn = document.querySelector('[data-toggle-mobile-nav]');
+    const mobileNav = document.querySelector('[data-mobile-nav]');
+    if (mobileBtn && mobileNav) {
+        mobileBtn.addEventListener('click', () => mobileNav.classList.toggle('hidden'));
     }
-
-    dropdowns.forEach(dropdown => {
-        const toggle = dropdown.querySelector('[data-dropdown-toggle]');
-        const panel = dropdown.querySelector('[data-dropdown-panel]');
-
-        if (!toggle || !panel) {
-            return;
+    document.addEventListener('click', e => {
+        if (mobileNav && !mobileNav.classList.contains('hidden')) {
+            if (!mobileBtn?.contains(e.target) && !mobileNav.contains(e.target)) {
+                mobileNav.classList.add('hidden');
+            }
         }
-
-        toggle.addEventListener('click', (event) => {
-            event.stopPropagation();
-            panel.classList.toggle('hidden');
-        });
-
-        panel.addEventListener('click', (event) => {
-            event.stopPropagation();
-        });
-
-        document.addEventListener('click', () => {
-            panel.classList.add('hidden');
-        });
     });
 
-    themeToggles.forEach((button) => {
-        button.addEventListener('click', () => {
-            const current = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
-            const next = current === 'light' ? 'dark' : 'light';
+    // ── Dropdown ────────────────────────────────────────────────────────────
+    document.querySelectorAll('[data-dropdown]').forEach(dd => {
+        const toggle = dd.querySelector('[data-dropdown-toggle]');
+        const panel  = dd.querySelector('[data-dropdown-panel]');
+        if (!toggle || !panel) return;
+        toggle.addEventListener('click', e => { e.stopPropagation(); panel.classList.toggle('hidden'); });
+        panel.addEventListener('click', e => e.stopPropagation());
+        document.addEventListener('click', () => panel.classList.add('hidden'));
+    });
+
+    // ── Theme toggle ─────────────────────────────────────────────────────────
+    function applyThemeIcons(theme) {
+        document.querySelectorAll('#icon-sun').forEach(el => el.classList.toggle('hidden', theme !== 'dark'));
+        document.querySelectorAll('#icon-moon').forEach(el => el.classList.toggle('hidden', theme === 'dark'));
+    }
+
+    document.querySelectorAll('[data-theme-toggle]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cur  = document.documentElement.dataset.theme;
+            const next = cur === 'light' ? 'dark' : 'light';
             document.documentElement.dataset.theme = next;
             localStorage.setItem('bisped-theme', next);
+            applyThemeIcons(next);
         });
     });
 
-    document.querySelectorAll('[data-copy-text]').forEach((button) => {
-        button.addEventListener('click', async () => {
-            const text = button.getAttribute('data-copy-text');
-            if (!text) {
-                return;
-            }
-
+    // ── Clipboard copy ───────────────────────────────────────────────────────
+    document.querySelectorAll('[data-copy-text]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const text = btn.getAttribute('data-copy-text');
+            if (!text) return;
             try {
-                if (navigator.clipboard?.writeText) {
-                    await navigator.clipboard.writeText(text);
-                } else {
-                    const textarea = document.createElement('textarea');
-                    textarea.value = text;
-                    textarea.setAttribute('readonly', '');
-                    textarea.style.position = 'absolute';
-                    textarea.style.left = '-9999px';
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textarea);
-                }
-
-                button.classList.add('bg-pri', 'text-white');
-                const original = button.innerHTML;
-                button.innerHTML = '✓';
-                setTimeout(() => {
-                    button.innerHTML = original;
-                    button.classList.remove('bg-pri', 'text-white');
-                }, 2000);
-            } catch (error) {
-                console.error('Copy failed', error);
-            }
+                await (navigator.clipboard?.writeText
+                    ? navigator.clipboard.writeText(text)
+                    : Promise.resolve(document.execCommand('copy')));
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✓ Copiato';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            } catch (err) { console.error('Copy failed', err); }
         });
     });
+
+    // ── Category pill scroll spy ─────────────────────────────────────────────
+    const catPills = document.querySelectorAll('.cat-pill[href^="#"]');
+    if (catPills.length > 0) {
+        catPills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                catPills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+            });
+        });
+    }
 });

@@ -66,10 +66,17 @@ if ($isAdmin) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="it" data-theme="dark">
+<html lang="it">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function(){
+            var t=localStorage.getItem('bisped-theme');
+            if(!t) t=window.matchMedia&&window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';
+            document.documentElement.setAttribute('data-theme',t);
+        })();
+    </script>
     <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <?php if ($metaDescription !== ''): ?>
         <meta name="description" content="<?= htmlspecialchars($metaDescription, ENT_QUOTES, 'UTF-8'); ?>">
@@ -102,13 +109,6 @@ if ($isAdmin) {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800;900&family=Montserrat:wght@600;800;900&display=swap" rel="stylesheet">
-    <script>
-        (function () {
-            const saved = localStorage.getItem('bisped-theme');
-            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-            document.documentElement.dataset.theme = saved || (prefersLight ? 'light' : 'dark');
-        })();
-    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -119,21 +119,15 @@ if ($isAdmin) {
                         display: ['Montserrat', 'Barlow', 'sans-serif'],
                     },
                     colors: {
-                        bg: 'rgb(var(--color-bg) / <alpha-value>)',
-                        bg2: 'rgb(var(--color-bg2) / <alpha-value>)',
-                        txt: 'rgb(var(--color-txt) / <alpha-value>)',
-                        muted: 'rgb(var(--color-muted) / <alpha-value>)',
-                        stroke: 'rgb(var(--color-stroke) / var(--alpha-stroke))',
-                        glass: 'rgb(var(--color-glass) / var(--alpha-glass))',
-                        pri: 'rgb(var(--color-pri) / <alpha-value>)',
-                        'pri-700': 'rgb(var(--color-pri-700) / <alpha-value>)',
-                        acc: 'rgb(var(--color-acc) / <alpha-value>)',
-                        cy: 'rgb(var(--color-cy) / <alpha-value>)',
-                        yl: 'rgb(var(--color-yl) / <alpha-value>)',
+                        bg:      'var(--c-bg)',
+                        bg2:     'var(--c-bg2)',
+                        surface: 'var(--c-surface)',
+                        txt:     'var(--c-txt)',
+                        muted:   'var(--c-muted)',
+                        acc:     'var(--c-acc)',
+                        pri:     'var(--bisped-red)',
+                        border:  'var(--c-border)',
                     },
-                    boxShadow: {
-                        deep: '0 8px 28px rgba(0,0,0,.35)',
-                    }
                 }
             }
         };
@@ -160,7 +154,7 @@ if ($isAdmin) {
         'siteLogo' => $siteLogoPath,
         'navigation' => $headerNavigation,
     ]); ?>
-    <main class="container mx-auto max-w-6xl px-4 py-8 pt-28 space-y-16">
+    <main class="container mx-auto max-w-7xl px-4 lg:px-6 pt-20 pb-16 space-y-16">
         <?php View::renderPartial($contentTemplate, $contentData ?? []); ?>
     </main>
     <?php View::renderPartial('partials/footer', [
