@@ -38,6 +38,12 @@ final class PageController extends Controller
         $this->view('public/azienda', compact('settings'));
     }
 
+    public function dove(): void
+    {
+        $settings = $this->content->getSettings();
+        $this->view('public/dove', compact('settings'));
+    }
+
     public function servizi(): void
     {
         $settings = $this->content->getSettings();

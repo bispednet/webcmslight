@@ -132,6 +132,28 @@ if (empty($featured)) {
     </div>
 </section>
 
+<!-- ─── PROMO BANNERS ────────────────────────────────────────────────────────── -->
+<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 py-2" data-animate>
+    <!-- Banner principale: Gaming RIG -->
+    <a href="/products#gaming" class="promo-banner lg:col-span-2" style="aspect-ratio:16/7">
+        <img src="/media/banners/banner-gaming-rig.jpg" alt="PC Gaming Build Bisped" loading="eager">
+        <div class="promo-banner__overlay">
+            <span class="promo-banner__tag">Promozione</span>
+            <p class="promo-banner__title">Scegli le nostre<br>Build specifiche<br>per il Gaming</p>
+            <span class="promo-banner__cta">Scopri →</span>
+        </div>
+    </a>
+    <!-- Banner secondario: Smartphone -->
+    <a href="/products#smartphone" class="promo-banner" style="aspect-ratio:16/7">
+        <img src="/media/banners/banner-xiaomi.jpg" alt="Scopri Xiaomi" loading="lazy">
+        <div class="promo-banner__overlay">
+            <span class="promo-banner__tag">Ricarica ultra-rapida</span>
+            <p class="promo-banner__title">Scopri<br>Xiaomi</p>
+            <span class="promo-banner__cta">Vedi smartphone →</span>
+        </div>
+    </a>
+</section>
+
 <!-- ─── TRUST BAR ─────────────────────────────────────────────────────────── -->
 <section class="trust-bar py-4 -mx-4 md:-mx-6 lg:-mx-0" data-animate>
     <div class="container mx-auto max-w-7xl px-4 lg:px-6">
@@ -156,6 +178,28 @@ if (empty($featured)) {
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4" style="color:var(--bisped-red)"><path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/></svg>
                 Teleassistenza remota
             </span>
+        </div>
+    </div>
+</section>
+
+<!-- ─── BRAND PARTNER BAR ────────────────────────────────────────────────────── -->
+<section class="brand-bar -mx-4 md:-mx-6 lg:-mx-0" aria-label="Partner e brand">
+    <div class="container mx-auto max-w-7xl px-4 lg:px-6">
+        <div class="brand-bar__track">
+            <span class="text-xs font-black uppercase tracking-widest text-muted opacity-50 flex-shrink-0">Partner ufficiali</span>
+            <img class="brand-logo" src="/media/brands/tim.png"      alt="TIM"      loading="lazy">
+            <img class="brand-logo" src="/media/brands/vodafone.png" alt="Vodafone" loading="lazy">
+            <img class="brand-logo" src="/media/brands/wind.png"     alt="WindTre"  loading="lazy">
+            <img class="brand-logo" src="/media/brands/tre.png"      alt="Tre"      loading="lazy">
+            <img class="brand-logo" src="/media/brands/enel.png"     alt="Enel"     loading="lazy">
+            <img class="brand-logo" src="/media/brands/eni.png"      alt="Eni"      loading="lazy">
+            <img class="brand-logo" src="/media/brands/msi.png"      alt="MSI"      loading="lazy">
+            <span class="brand-label">ASUS</span>
+            <span class="brand-label">Intel</span>
+            <span class="brand-label">AMD</span>
+            <span class="brand-label">Samsung</span>
+            <span class="brand-label">Huawei</span>
+            <img class="brand-logo" src="/media/brands/cisco.png"    alt="Cisco"    loading="lazy">
         </div>
     </div>
 </section>
@@ -209,6 +253,83 @@ if (empty($featured)) {
                 <?php View::renderPartial('public/partials/product-card', ['product' => $product]); ?>
             </a>
         <?php endforeach; ?>
+    </div>
+</section>
+
+<!-- ─── BANNER TELEASSISTENZA ─────────────────────────────────────────────── -->
+<section data-animate>
+    <a href="/servizi#assistenza" class="promo-banner block" style="aspect-ratio:21/5">
+        <img src="/media/banners/banner-teleassistenza.jpg" alt="Teleassistenza Bisped" loading="lazy">
+        <div class="promo-banner__overlay" style="background:linear-gradient(135deg,rgba(209,25,32,.6) 0%,rgba(0,0,0,.15) 60%)">
+            <span class="promo-banner__tag">Servizio attivo</span>
+            <p class="promo-banner__title">Teleassistenza remota —<br>ti aiutiamo anche da casa</p>
+            <span class="promo-banner__cta">Richiedi supporto →</span>
+        </div>
+    </a>
+</section>
+
+<!-- ─── RECENSIONI ────────────────────────────────────────────────────────── -->
+<section data-animate>
+    <div class="mb-8">
+        <div class="section-label mb-4">Clienti soddisfatti</div>
+        <h2 class="font-display text-3xl font-black md:text-4xl" style="color:var(--c-acc)">I nostri clienti soddisfatti.</h2>
+        <p class="mt-3 text-muted max-w-2xl">Quello che dicono le persone che sono passate dal banco, hanno chiamato o ci hanno scritto.</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="review-card" data-animate data-animate-delay="0">
+            <div class="review-card__stars">
+                <?php for ($i = 0; $i < 5; $i++): ?><svg class="review-card__star" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z"/></svg><?php endfor; ?>
+            </div>
+            <p class="review-card__text">"Precisione hardware, bella estetica. Il pc gaming che mi hanno assemblato funziona benissimo e la consulenza è stata eccellente."</p>
+            <div class="review-card__author">Marco R.</div>
+            <div class="review-card__source">Cliente negozio — Gaming build custom</div>
+        </div>
+        <div class="review-card" data-animate data-animate-delay="80">
+            <div class="review-card__stars">
+                <?php for ($i = 0; $i < 5; $i++): ?><svg class="review-card__star" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z"/></svg><?php endfor; ?>
+            </div>
+            <p class="review-card__text">"Avevo un hard disk con anni di foto di famiglia. Recupero dati completato in 48h. Non ci speravo più, sono contentissima."</p>
+            <div class="review-card__author">Silvia M.</div>
+            <div class="review-card__source">Recupero dati — Piombino</div>
+        </div>
+        <div class="review-card" data-animate data-animate-delay="160">
+            <div class="review-card__stars">
+                <?php for ($i = 0; $i < 5; $i++): ?><svg class="review-card__star" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292Z"/></svg><?php endfor; ?>
+            </div>
+            <p class="review-card__text">"Gestione completa della nostra rete aziendale e delle linee TIM Business. Professionali, puntuali e sempre disponibili."</p>
+            <div class="review-card__author">Antonio B.</div>
+            <div class="review-card__source">Soluzione business — Azienda locale</div>
+        </div>
+    </div>
+</section>
+
+<!-- ─── FAQ PREVIEW ────────────────────────────────────────────────────────── -->
+<section data-animate>
+    <div class="grid gap-10 lg:grid-cols-[1fr_440px] lg:items-start">
+        <div>
+            <div class="section-label mb-4">Domande frequenti</div>
+            <h2 class="font-display text-3xl font-black md:text-4xl mb-2" style="color:var(--c-acc)">Lavoriamo con i migliori in campo.</h2>
+            <p class="text-muted text-sm leading-6 mb-6">Le migliori tecnologie informatiche e di telecomunicazione a vostra disposizione: TIM, WindTre, Vodafone, Fastweb, Enel, Heracomm, MSI, ASUS, Intel, AMD, Samsung, Huawei, Philips, HP, Canon.</p>
+            <a href="/faq" class="btn-outline btn-sm">Tutte le FAQ →</a>
+        </div>
+        <div class="space-y-3">
+            <details class="faq-item">
+                <summary>Quali pagamenti accettate?</summary>
+                <p>Accettiamo contanti, bancomat, carte di credito e bonifico bancario. Per acquisti aziendali è possibile concordare pagamenti differiti con fattura.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Come funziona la garanzia?</summary>
+                <p>Tutti i prodotti sono venduti con garanzia ufficiale del produttore (minimo 24 mesi per i privati). Per i dispositivi riparati in laboratorio offriamo garanzia sul lavoro eseguito.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Fate spedizioni?</summary>
+                <p>Sì, spediamo su tutto il territorio nazionale. Contattateci per un preventivo o per verificare la disponibilità immediata prima di ordinare online.</p>
+            </details>
+            <details class="faq-item">
+                <summary>Quanto costa un'assistenza tecnica?</summary>
+                <p>La diagnosi è sempre gratuita. Il preventivo per la riparazione viene comunicato prima di procedere, senza sorprese. Ci rifiutiamo di riparare se non ne vale la pena.</p>
+            </details>
+        </div>
     </div>
 </section>
 

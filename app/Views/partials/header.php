@@ -17,15 +17,16 @@ foreach ($navigation as $group) {
 }
 
 $defaultPrimary = [
-    ['label' => 'Home',         'url' => '/',               'is_external' => false],
-    ['label' => 'Shop',         'url' => '/products',       'is_external' => false],
-    ['label' => 'Servizi',      'url' => '/servizi',        'is_external' => false],
-    ['label' => 'Assistenza',   'url' => '/servizi#assistenza', 'is_external' => false],
-    ['label' => 'Blog',         'url' => '/blog',           'is_external' => false],
+    ['label' => 'Home',        'url' => '/',               'is_external' => false],
+    ['label' => 'Shop',        'url' => '/products',       'is_external' => false],
+    ['label' => 'Servizi',     'url' => '/servizi',        'is_external' => false],
+    ['label' => 'Chi siamo',   'url' => '/azienda',        'is_external' => false],
+    ['label' => 'Dove siamo',  'url' => '/dove',           'is_external' => false],
+    ['label' => 'Blog',        'url' => '/blog',           'is_external' => false],
 ];
 
 $defaultMore = [
-    ['label' => 'Azienda',      'url' => '/azienda',        'is_external' => false],
+    ['label' => 'Assistenza',   'url' => '/servizi#assistenza', 'is_external' => false],
     ['label' => 'FAQ',          'url' => '/faq',            'is_external' => false],
     ['label' => 'Contatti',     'url' => '/contatti',       'is_external' => false],
     ['label' => 'Sostenibilità','url' => '/sostenibilita',  'is_external' => false],

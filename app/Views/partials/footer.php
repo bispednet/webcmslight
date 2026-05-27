@@ -66,6 +66,7 @@ if ($siteLogoUrl === '') {
                     <h3 class="text-xs font-black uppercase tracking-widest mb-4" style="color:var(--c-acc)">Azienda</h3>
                     <ul class="space-y-2.5">
                         <li><a href="/azienda" class="text-sm text-muted hover:text-pri transition-colors">Chi siamo</a></li>
+                        <li><a href="/dove" class="text-sm text-muted hover:text-pri transition-colors">Dove siamo</a></li>
                         <li><a href="/blog" class="text-sm text-muted hover:text-pri transition-colors">News & Blog</a></li>
                         <li><a href="/faq" class="text-sm text-muted hover:text-pri transition-colors">FAQ</a></li>
                         <li><a href="/contatti" class="text-sm text-muted hover:text-pri transition-colors">Contatti</a></li>
