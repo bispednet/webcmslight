@@ -117,7 +117,7 @@ final class ContactController extends Controller
         // Also send confirmation to sender
         $confirm  = "Ciao $name,\n\nAbbiamo ricevuto la tua richiesta e ti risponderemo al più presto.\n\n";
         $confirm .= "Il tuo messaggio:\n$message\n\n";
-        $confirm .= "---\nbisp&d — Piombino (LI)\nTel: +39 334 658 2116\nnegozio@bisped.net\nbisped.net";
+        $confirm .= "---\nbisp&d — Piombino (LI)\nTel: 0565 31136 — WhatsApp: 334 658 2116\nnegozio@bisped.net\nbisped.net";
         $hc  = "From: bisp&d <negozio@bisped.net>\r\n";
         $hc .= "Content-Type: text/plain; charset=utf-8\r\n";
         @mail($from, 'Conferma ricezione — bisp&d', $confirm, $hc);

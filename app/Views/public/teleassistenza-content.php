@@ -26,7 +26,7 @@ $errorMsg   = Flash::get('contact_error');
             <a href="https://wa.me/393346582116?text=Ciao+bisp%26d%2C+ho+bisogno+di+teleassistenza" target="_blank" rel="noopener" class="btn-primary">
                 WhatsApp immediato
             </a>
-            <a href="tel:+393346582116" class="btn-outline">Chiama ora: 334 658 2116</a>
+            <a href="tel:+390565311136" class="btn-outline">Chiama: 0565 31136</a>
         </div>
     </section>
 
@@ -151,7 +151,7 @@ $errorMsg   = Flash::get('contact_error');
                         <input type="tel" name="phone" maxlength="20"
                                class="form-input w-full"
                                style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)"
-                               placeholder="+39 334 658 2116">
+                               placeholder="+39 0565 31136">
                     </div>
                     <div>
                         <label class="form-label">Sistema operativo</label>
@@ -198,8 +198,8 @@ $errorMsg   = Flash::get('contact_error');
                            class="flex items-center gap-2" style="color:var(--c-muted)">
                             <span style="color:#25d366">●</span> WhatsApp: 334 658 2116
                         </a>
-                        <a href="tel:+393346582116" class="flex items-center gap-2" style="color:var(--c-muted)">
-                            <span style="color:var(--bisped-red)">●</span> Tel: 334 658 2116
+                        <a href="tel:+390565311136" class="flex items-center gap-2" style="color:var(--c-muted)">
+                            <span style="color:var(--bisped-red)">●</span> Tel: 0565 31136
                         </a>
                         <a href="mailto:negozio@bisped.net" class="flex items-center gap-2" style="color:var(--c-muted)">
                             <span style="color:var(--bisped-red)">●</span> negozio@bisped.net

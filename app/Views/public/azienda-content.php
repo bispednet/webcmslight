@@ -1,7 +1,9 @@
 <?php
 /** @var array $settings */
 
-$storeImage = $settings['storefront_image'] ?? '/media/bisped/fronte_negozio_bisped.png';
+$_storeRaw  = $settings['storefront_image'] ?? '/media/bisped/fronte_negozio_bisped.png';
+$_storeFile = dirname(__DIR__, 4) . '/public' . parse_url($_storeRaw, PHP_URL_PATH);
+$storeImage = $_storeRaw . '?v=' . (@filemtime($_storeFile) ?: time());
 ?>
 
 <div class="space-y-20">
@@ -60,7 +62,7 @@ $storeImage = $settings['storefront_image'] ?? '/media/bisped/fronte_negozio_bis
         </div>
         <div class="flex gap-3 flex-shrink-0">
             <a href="/contatti" class="btn-primary">Contattaci</a>
-            <a href="tel:+393346582116" class="btn-outline">Chiama</a>
+            <a href="tel:+390565311136" class="btn-outline">Chiama</a>
         </div>
     </div>
 

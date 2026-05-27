@@ -8,7 +8,10 @@ use App\Support\AdminMode;
 $tagline      = $settings['site_tagline']     ?? 'Informatica · Telefonia · Assistenza · Piombino';
 $heroTitle    = $settings['hero_title_home']  ?? 'Tecnologia scelta bene.<br>Installata meglio.';
 $heroSubtitle = $settings['hero_subtitle_home'] ?? 'Bisped è il punto di riferimento tech a Piombino: PC, smartphone, gaming, connettività, energia e assistenza tecnica con persone vere.';
-$heroImage    = $settings['hero_image_home']  ?? '/media/bisped/fronte_negozio_bisped.png';
+$_heroRaw     = $settings['hero_image_home']  ?? '/media/bisped/fronte_negozio_bisped.png';
+$_heroFile    = dirname(__DIR__, 4) . '/public' . parse_url($_heroRaw, PHP_URL_PATH);
+$_heroMtime   = @filemtime($_heroFile) ?: time();
+$heroImage    = $_heroRaw . '?v=' . $_heroMtime;
 $productsList = array_values($products);
 
 $departments = [
