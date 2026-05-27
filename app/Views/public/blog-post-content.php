@@ -1,19 +1,103 @@
 <?php
-/** @var array $post */
+/** @var array  $post */
+/** @var array  $relatedProducts */
+
+use App\Core\Database;
+
+$imgUrl  = trim((string)($post['image_url'] ?? ''));
+$title   = htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8');
+$date    = htmlspecialchars(date('d F Y', strtotime($post['published_at'])), ENT_QUOTES, 'UTF-8');
+$snippet = htmlspecialchars($post['snippet'] ?? '', ENT_QUOTES, 'UTF-8');
+
+// Dynamic related products via tag overlap
+$relatedProducts = $relatedProducts ?? [];
+if (empty($relatedProducts) && !empty($post['related_product_tags'])) {
+    $postTags = array_map('trim', explode(',', (string)$post['related_product_tags']));
+    $pdo = Database::connection();
+    $rows = $pdo->query("SELECT id, name, slug, sale_price, price, campaign_label, tags FROM products ORDER BY featured_order ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        $productTags = array_map('trim', explode(',', (string)($row['tags'] ?? '')));
+        $overlap = array_intersect($postTags, $productTags);
+        if (count($overlap) >= 1) {
+            $relatedProducts[] = $row;
+            if (count($relatedProducts) >= 3) break;
+        }
+    }
+}
 ?>
 
-<div class="max-w-4xl mx-auto">
-    <div data-animate>
-        <a href="/blog" class="text-pri font-semibold hover:underline mb-8 inline-block">&larr; Torna al blog</a>
-        <h1 class="text-4xl md:text-5xl font-extrabold text-acc tracking-tight"><?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8'); ?></h1>
-        <p class="mt-4 text-muted"><?= htmlspecialchars(date('d/m/Y', strtotime($post['published_at'])), ENT_QUOTES, 'UTF-8'); ?></p>
+<article class="max-w-3xl mx-auto" data-animate>
+
+    <!-- Back -->
+    <a href="/blog" class="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest mb-8 transition-colors hover:text-red-400" style="color:var(--bisped-red)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+        </svg>
+        Torna al blog
+    </a>
+
+    <!-- Header -->
+    <header class="mb-8">
+        <p class="text-xs font-bold uppercase tracking-widest mb-4" style="color:var(--bisped-red)"><?= $date ?></p>
+        <h1 class="font-display text-3xl font-black leading-tight md:text-4xl md:leading-tight" style="color:var(--c-acc)"><?= $title ?></h1>
+        <?php if ($snippet): ?>
+            <p class="mt-4 text-lg leading-7" style="color:var(--c-muted)"><?= $snippet ?></p>
+        <?php endif; ?>
+    </header>
+
+    <!-- Cover image -->
+    <?php if ($imgUrl !== ''): ?>
+        <div class="mb-8 rounded-lg overflow-hidden border" style="border-color:var(--c-border);aspect-ratio:16/7">
+            <img src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>"
+                 alt="<?= $title ?>"
+                 class="w-full h-full object-cover" loading="lazy">
+        </div>
+    <?php endif; ?>
+
+    <!-- Content -->
+    <div class="info-card blog-body">
+        <?= $post['content_html'] ?>
     </div>
-    <div data-animate data-animate-delay="100">
-        <img src="<?= htmlspecialchars($post['image_url'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?= htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8'); ?>" class="w-full h-auto max-h-[500px] object-cover rounded-lg my-8 border border-stroke" />
-    </div>
-    <div data-animate data-animate-delay="200">
-        <div class="prose prose-invert text-muted max-w-none space-y-4 bg-glass border border-stroke p-8 rounded-lg shadow-deep backdrop-blur-lg">
-            <?= $post['content_html']; ?>
+
+    <!-- Related products -->
+    <?php if (!empty($relatedProducts)): ?>
+    <div class="mt-12" data-animate>
+        <p class="section-label mb-4">Prodotti correlati</p>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <?php foreach ($relatedProducts as $rp):
+                $rpName     = htmlspecialchars($rp['name'], ENT_QUOTES, 'UTF-8');
+                $rpSlug     = htmlspecialchars($rp['slug'], ENT_QUOTES, 'UTF-8');
+                $rpCampaign = htmlspecialchars($rp['campaign_label'] ?? '', ENT_QUOTES, 'UTF-8');
+                $rpSale     = $rp['sale_price'] ? number_format((float)$rp['sale_price'], 2, ',', '.') . ' €' : null;
+                $rpPrice    = $rp['price']      ? number_format((float)$rp['price'],      2, ',', '.') . ' €' : null;
+            ?>
+            <a href="/products/<?= $rpSlug ?>" class="service-card group block">
+                <h3 class="font-display font-black text-base mb-2 group-hover:text-red-400 transition-colors" style="color:var(--c-acc)"><?= $rpName ?></h3>
+                <?php if ($rpCampaign): ?>
+                    <span class="campaign-badge mb-2 inline-block"><?= $rpCampaign ?></span>
+                <?php endif; ?>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <?php if ($rpSale): ?>
+                        <span class="font-bold" style="color:var(--bisped-red)"><?= $rpSale ?></span>
+                    <?php endif; ?>
+                    <?php if ($rpPrice && $rpSale): ?>
+                        <span class="text-xs line-through" style="color:var(--c-muted)"><?= $rpPrice ?></span>
+                    <?php endif; ?>
+                </div>
+            </a>
+            <?php endforeach; ?>
         </div>
     </div>
-</div>
+    <?php endif; ?>
+
+    <!-- Back link bottom -->
+    <div class="mt-10 pt-8 border-t" style="border-color:var(--c-border)">
+        <a href="/blog" class="btn-outline">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+            </svg>
+            Tutti gli articoli
+        </a>
+    </div>
+
+</article>

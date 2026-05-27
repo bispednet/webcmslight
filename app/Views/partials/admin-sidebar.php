@@ -78,6 +78,13 @@ if ($siteLogoUrl === '') {
         </div>
 
         <div class="space-y-2">
+            <p class="text-xs uppercase tracking-wide text-muted/80">Auto-Update</p>
+            <a href="/admin/ingest" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
+                <span class="text-muted">Catalogo &amp; News</span>
+            </a>
+        </div>
+
+        <div class="space-y-2">
             <p class="text-xs uppercase tracking-wide text-muted/80">Configuration</p>
             <a href="/admin/navigation" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
                 <span class="text-muted">Navigation</span>

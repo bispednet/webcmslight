@@ -82,7 +82,44 @@ final class ContactController extends Controller
         ]);
 
         $_SESSION['last_contact_submit'] = time();
+
+        // Email notification to store
+        $this->sendNotification($sanitized['name'], $sanitized['email'], $message);
+
         Flash::set('contact_success', 'Richiesta ricevuta. Ti risponderemo appena possibile.');
         $this->redirect('/contatti');
+    }
+
+    private function sendNotification(string $name, string $from, string $message): void
+    {
+        $config = require dirname(__DIR__, 2) . '/.env.php';
+        $adminEmails = $config['admin_emails'] ?? ['info@bisped.net'];
+        if (is_array($adminEmails) && isset($adminEmails[0])) {
+            $to = $adminEmails[0];
+        } else {
+            $to = 'info@bisped.net';
+        }
+
+        $subject  = '[bisp&d] Nuova richiesta da ' . $name;
+        $body     = "Hai ricevuto una nuova richiesta dal sito bisped.net\n\n";
+        $body    .= "Nome: $name\n";
+        $body    .= "Email: $from\n\n";
+        $body    .= "Messaggio:\n$message\n";
+        $body    .= "\n---\nbisped.net contact form";
+
+        $headers  = "From: noreply@bisped.net\r\n";
+        $headers .= "Reply-To: $from\r\n";
+        $headers .= "X-Mailer: bisp&d CMS\r\n";
+        $headers .= "Content-Type: text/plain; charset=utf-8\r\n";
+
+        @mail($to, $subject, $body, $headers);
+
+        // Also send confirmation to sender
+        $confirm  = "Ciao $name,\n\nAbbiamo ricevuto la tua richiesta e ti risponderemo al più presto.\n\n";
+        $confirm .= "Il tuo messaggio:\n$message\n\n";
+        $confirm .= "---\nbisp&d — Piombino (LI)\nTel: +39 0565 200000\ninfo@bisped.net\nbisped.net";
+        $hc  = "From: bisp&d <info@bisped.net>\r\n";
+        $hc .= "Content-Type: text/plain; charset=utf-8\r\n";
+        @mail($from, 'Conferma ricezione — bisp&d', $confirm, $hc);
     }
 }

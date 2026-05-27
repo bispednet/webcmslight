@@ -23,6 +23,7 @@ use App\Controllers\Admin\PressController;
 use App\Controllers\Admin\LegalController;
 use App\Controllers\Admin\TransparencyController;
 use App\Controllers\Admin\NavigationController;
+use App\Controllers\Admin\IngestController;
 
 $router = new Router();
 
@@ -140,5 +141,8 @@ $router->post('/admin/roadmap/tracks', [RoadmapController::class, 'updateTracks'
 
 $router->get('/admin/settings', [SettingsController::class, 'index'], [$requireAdmin]);
 $router->post('/admin/settings', [SettingsController::class, 'update'], [$requireAdmin]);
+
+$router->get('/admin/ingest', [IngestController::class, 'index'], [$requireAdmin]);
+$router->post('/admin/ingest/run', [IngestController::class, 'run'], [$requireAdmin]);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

@@ -1,0 +1,294 @@
+{
+  "_comment": "Brand sources registry for bisped.net auto-update system",
+  "_updated": "2026-05-27",
+
+  "smartphone": [
+    {
+      "brand": "Samsung",
+      "name": "Samsung Newsroom Italia",
+      "type": "rss",
+      "url": "https://news.samsung.com/it/feed",
+      "category": "smartphone",
+      "keywords": ["galaxy", "smartphone", "android"],
+      "enabled": true
+    },
+    {
+      "brand": "Apple",
+      "name": "Apple Newsroom",
+      "type": "rss",
+      "url": "https://www.apple.com/newsroom/rss-feed.rss",
+      "category": "smartphone",
+      "keywords": ["iphone", "ipad", "macbook", "apple watch", "airpods"],
+      "enabled": true
+    },
+    {
+      "brand": "Xiaomi",
+      "name": "Xiaomi Blog",
+      "type": "rss",
+      "url": "https://blog.mi.com/en/feed",
+      "category": "smartphone",
+      "keywords": ["xiaomi", "redmi", "poco", "miui"],
+      "enabled": true
+    },
+    {
+      "brand": "Google",
+      "name": "Google Keyword Blog",
+      "type": "rss",
+      "url": "https://blog.google/products/pixel/rss",
+      "category": "smartphone",
+      "keywords": ["pixel", "android"],
+      "enabled": true
+    }
+  ],
+
+  "informatica": [
+    {
+      "brand": "ASUS",
+      "name": "ASUS ROG News",
+      "type": "rss",
+      "url": "https://rog.asus.com/articles/category/news/feed",
+      "category": "gaming",
+      "keywords": ["rog", "tuf", "vivobook", "zenbook"],
+      "enabled": true
+    },
+    {
+      "brand": "Lenovo",
+      "name": "Lenovo News",
+      "type": "rss",
+      "url": "https://news.lenovo.com/feed",
+      "category": "informatica",
+      "keywords": ["thinkpad", "ideapad", "legion", "loq"],
+      "enabled": true
+    },
+    {
+      "brand": "Intel",
+      "name": "Intel Newsroom",
+      "type": "rss",
+      "url": "https://www.intel.com/content/www/us/en/newsroom/news-home.html/rss",
+      "category": "informatica",
+      "keywords": ["core ultra", "intel arc", "meteor lake"],
+      "enabled": false,
+      "note": "Intel RSS may require scraping fallback"
+    },
+    {
+      "brand": "AMD",
+      "name": "AMD Blog",
+      "type": "rss",
+      "url": "https://community.amd.com/t5/blogs/blogarticlepage/blog-id/AMD_Official_Blog",
+      "category": "informatica",
+      "keywords": ["ryzen", "radeon", "epyc"],
+      "enabled": true
+    },
+    {
+      "brand": "HP",
+      "name": "HP Newsroom",
+      "type": "rss",
+      "url": "https://press.hp.com/us/en/press-releases/rss.xml",
+      "category": "informatica",
+      "keywords": ["hp", "elitebook", "pavilion", "envy"],
+      "enabled": true
+    },
+    {
+      "brand": "Acer",
+      "name": "Acer Newsroom",
+      "type": "rss",
+      "url": "https://www.acer.com/us-en/news/rss",
+      "category": "informatica",
+      "keywords": ["acer", "predator", "nitro", "aspire"],
+      "enabled": true
+    }
+  ],
+
+  "gaming": [
+    {
+      "brand": "NVIDIA",
+      "name": "NVIDIA Blog",
+      "type": "rss",
+      "url": "https://blogs.nvidia.com/feed",
+      "category": "gaming",
+      "keywords": ["rtx", "geforce", "dlss", "blackwell"],
+      "enabled": true
+    },
+    {
+      "brand": "itek",
+      "name": "itek Gaming News",
+      "type": "rss",
+      "url": "https://www.iteksport.it/feed",
+      "category": "gaming",
+      "keywords": ["itek", "gaming", "mouse", "tastiera"],
+      "enabled": true
+    },
+    {
+      "brand": "Sharkoon",
+      "name": "Sharkoon News",
+      "type": "rss",
+      "url": "https://www.sharkoon.com/news/rss.xml",
+      "category": "gaming",
+      "keywords": ["sharkoon", "gaming", "accessori"],
+      "enabled": true
+    }
+  ],
+
+  "connettivita": [
+    {
+      "brand": "TIM",
+      "name": "TIM Offerte Residenziali",
+      "type": "scrape",
+      "url": "https://www.tim.it/assistenza/tim-per-casa/offerte-tim-per-casa",
+      "category": "connettivita",
+      "keywords": ["tim", "fibra", "adsl", "5g home"],
+      "enabled": true,
+      "scrape_selector": ".offer-card"
+    },
+    {
+      "brand": "Fastweb Vodafone",
+      "name": "Fastweb Offerte Casa",
+      "type": "scrape",
+      "url": "https://www.fastweb.it/offerte-internet/",
+      "category": "connettivita",
+      "keywords": ["fastweb", "fibra", "ftth"],
+      "enabled": true,
+      "scrape_selector": ".offer-item"
+    },
+    {
+      "brand": "Wind3",
+      "name": "WindTre Offerte Mobile",
+      "type": "scrape",
+      "url": "https://www.windtre.it/offerte/",
+      "category": "connettivita",
+      "keywords": ["wind3", "windtre", "5g", "sim"],
+      "enabled": true
+    },
+    {
+      "brand": "Iliad",
+      "name": "Iliad Italia",
+      "type": "scrape",
+      "url": "https://www.iliad.it/offerte/",
+      "category": "connettivita",
+      "keywords": ["iliad", "giga", "5g"],
+      "enabled": true
+    },
+    {
+      "brand": "Sky",
+      "name": "Sky Pacchetti",
+      "type": "scrape",
+      "url": "https://www.sky.it/abbonamenti",
+      "category": "connettivita",
+      "keywords": ["sky", "tv", "internet", "bundle"],
+      "enabled": false
+    },
+    {
+      "brand": "Telepass",
+      "name": "Telepass Pay",
+      "type": "scrape",
+      "url": "https://www.telepass.com/it/offerte",
+      "category": "connettivita",
+      "keywords": ["telepass", "pay", "assicurazione", "carburante"],
+      "enabled": false
+    }
+  ],
+
+  "energia": [
+    {
+      "brand": "Enel",
+      "name": "Enel Energia Offerte",
+      "type": "api",
+      "url": "https://www.enel.it/it/luce-e-gas/offerte",
+      "category": "energia",
+      "keywords": ["enel", "luce", "gas", "fotovoltaico"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "Iren",
+      "name": "Iren Mercato",
+      "type": "scrape",
+      "url": "https://www.irenmercato.it/offerte",
+      "category": "energia",
+      "keywords": ["iren", "luce", "gas"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "Edison",
+      "name": "Edison Energia Offerte",
+      "type": "scrape",
+      "url": "https://www.edisonenergia.it/offerte/",
+      "category": "energia",
+      "keywords": ["edison", "luce", "gas", "dual fuel"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "Optima",
+      "name": "Optima Italia",
+      "type": "scrape",
+      "url": "https://www.optimaitalia.com/privati/offerte",
+      "category": "energia",
+      "keywords": ["optima", "luce", "gas", "telefono"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "Estra",
+      "name": "Estra Energie",
+      "type": "scrape",
+      "url": "https://www.estra.it/casa/",
+      "category": "energia",
+      "keywords": ["estra", "luce", "gas", "toscana"],
+      "enabled": true,
+      "arera_source": true,
+      "note": "Estra ha forte presenza in Toscana — rilevante per Piombino"
+    },
+    {
+      "brand": "Enegan",
+      "name": "Enegan Offerte",
+      "type": "scrape",
+      "url": "https://www.enegan.it/offerte",
+      "category": "energia",
+      "keywords": ["enegan", "luce", "gas"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "Eracom",
+      "name": "Eracom Energia",
+      "type": "scrape",
+      "url": "https://www.eracom.it/offerte",
+      "category": "energia",
+      "keywords": ["eracom", "luce", "gas"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "TIM Energia",
+      "name": "TIM Energia Offerte",
+      "type": "scrape",
+      "url": "https://www.tim.it/luce-e-gas",
+      "category": "energia",
+      "keywords": ["tim energia", "luce", "gas", "tim"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "Wind3 Energia",
+      "name": "WindTre Luce e Gas",
+      "type": "scrape",
+      "url": "https://www.windtre.it/luce-e-gas/",
+      "category": "energia",
+      "keywords": ["wind3 energia", "windtre", "luce", "gas"],
+      "enabled": true,
+      "arera_source": true
+    },
+    {
+      "brand": "ARERA",
+      "name": "ARERA Portale Offerte (open data)",
+      "type": "api",
+      "url": "https://www.ilportaleofferte.it/portaleOfferte/",
+      "category": "energia",
+      "keywords": ["mercato libero", "luce", "gas"],
+      "enabled": true,
+      "note": "Open data CSV — fonte primaria per comparazione prezzi"
+    }
+  ]
+}
