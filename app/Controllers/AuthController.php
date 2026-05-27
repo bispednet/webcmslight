@@ -13,6 +13,7 @@ use App\Services\Auth\SessionGuard;
 use App\Services\Auth\SolanaVerifier;
 use App\Services\Auth\UserIdentityRepository;
 use App\Services\Auth\WalletVerifier;
+use App\Services\Security\Csrf;
 use App\Support\AdminMode;
 use App\Support\Flash;
 use App\Support\Session;
@@ -26,13 +27,23 @@ final class AuthController extends Controller
         $config = Container::get('config');
         $projectId = $config['wallet']['project_id'] ?? '';
         $rpcUrl = $config['wallet']['rpc_url'] ?? '';
+        $googleConfigured = !empty($config['google']['client_id']) && !empty($config['google']['client_secret']) && !empty($config['google']['redirect_uri']);
+        $csrfToken = Csrf::token();
 
-        View::render('public/login', compact('notice', 'error', 'projectId', 'rpcUrl'));
+        View::render('public/login', compact('notice', 'error', 'projectId', 'rpcUrl', 'googleConfigured', 'csrfToken'));
     }
 
     public function passwordLogin(): void
     {
         Session::ensureStarted();
+
+        if (!$this->verifyFormCsrf('auth_error')) {
+            $this->redirect('/login');
+        }
+        if (!$this->throttleAuthAction('login')) {
+            Flash::set('auth_error', 'Troppi tentativi ravvicinati. Attendi un minuto e riprova.');
+            $this->redirect('/login');
+        }
 
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $password = (string)($_POST['password'] ?? '');
@@ -40,8 +51,11 @@ final class AuthController extends Controller
         $config = Container::get('config', []);
         $users = is_array($config['auth_users'] ?? null) ? $config['auth_users'] : [];
 
-        $matched = null;
+        $matched = $this->findRegisteredPasswordUser($email, $password);
         foreach ($users as $user) {
+            if ($matched) {
+                break;
+            }
             if (!is_array($user)) {
                 continue;
             }
@@ -77,6 +91,44 @@ final class AuthController extends Controller
         }
 
         Flash::set('auth_notice', 'Accesso effettuato. Benvenuto nella tua area Bisped.');
+        $this->redirect('/area-clienti');
+    }
+
+    public function register(): void
+    {
+        Session::ensureStarted();
+
+        if (!$this->verifyFormCsrf('auth_error')) {
+            $this->redirect('/login');
+        }
+        if (!$this->throttleAuthAction('register')) {
+            Flash::set('auth_error', 'Troppi tentativi ravvicinati. Attendi un minuto e riprova.');
+            $this->redirect('/login');
+        }
+
+        $name = trim((string)($_POST['name'] ?? ''));
+        $email = strtolower(trim((string)($_POST['email'] ?? '')));
+        $password = (string)($_POST['password'] ?? '');
+
+        if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($password) < 8) {
+            Flash::set('auth_error', 'Inserisci nome, email valida e password di almeno 8 caratteri.');
+            $this->redirect('/login');
+        }
+
+        $identity = new UserIdentityRepository();
+        $user = $identity->upsertGoogleUser($email, $name, '', 'local:' . $email, 'cliente');
+        $pdo = \App\Core\Database::connection();
+        $stmt = $pdo->prepare('UPDATE users SET password_hash = :hash WHERE id = :id');
+        $stmt->execute([
+            'hash' => password_hash($password, PASSWORD_DEFAULT),
+            'id' => (int)$user['id'],
+        ]);
+
+        $_SESSION['user_email'] = $email;
+        $_SESSION['user_name'] = $name;
+        $_SESSION['user_role'] = 'cliente';
+
+        Flash::set('auth_notice', 'Registrazione completata. Benvenuto nella tua area Bisped.');
         $this->redirect('/area-clienti');
     }
 
@@ -297,6 +349,12 @@ final class AuthController extends Controller
     public function logout(): void
     {
         Session::ensureStarted();
+        $token = $_POST['csrf_token'] ?? null;
+        if (!Csrf::verify(is_string($token) ? $token : null)) {
+            Flash::set('auth_error', 'Sessione scaduta. Riprova.');
+            $this->redirect('/login');
+        }
+
         $sessionId = session_id();
 
         $repository = new AdminRepository();
@@ -320,6 +378,66 @@ final class AuthController extends Controller
         AdminMode::setWallet((string)$admin['wallet_address']);
         AdminMode::disable();
         $repository->recordSession((int)$admin['id'], session_id(), $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null, 480);
+    }
+
+    private function verifyFormCsrf(string $flashKey): bool
+    {
+        $token = $_POST['csrf_token'] ?? null;
+        if (Csrf::verify(is_string($token) ? $token : null)) {
+            return true;
+        }
+
+        Flash::set($flashKey, 'Sessione scaduta. Ricarica la pagina e riprova.');
+        return false;
+    }
+
+    private function throttleAuthAction(string $bucket): bool
+    {
+        $key = '_auth_rate_' . $bucket;
+        $now = time();
+        $attempts = $_SESSION[$key] ?? [];
+        if (!is_array($attempts)) {
+            $attempts = [];
+        }
+        $attempts = array_values(array_filter($attempts, static fn(int $ts): bool => $ts > $now - 60));
+        if (count($attempts) >= 8) {
+            $_SESSION[$key] = $attempts;
+            return false;
+        }
+        $attempts[] = $now;
+        $_SESSION[$key] = $attempts;
+        return true;
+    }
+
+    private function findRegisteredPasswordUser(string $email, string $password): ?array
+    {
+        try {
+            $pdo = \App\Core\Database::connection();
+            $stmt = $pdo->prepare(
+                'SELECT u.id, u.email, u.display_name, u.password_hash, GROUP_CONCAT(r.role_key) AS roles
+                 FROM users u
+                 LEFT JOIN user_roles r ON r.user_id = u.id
+                 WHERE LOWER(u.email) = LOWER(:email) AND u.status = "active"
+                 GROUP BY u.id, u.email, u.display_name, u.password_hash
+                 LIMIT 1'
+            );
+            $stmt->execute(['email' => $email]);
+            $user = $stmt->fetch();
+            if (!$user || empty($user['password_hash']) || !password_verify($password, (string)$user['password_hash'])) {
+                return null;
+            }
+
+            $roles = array_filter(explode(',', (string)($user['roles'] ?? '')));
+            $role = in_array('admin', $roles, true) ? 'admin' : (in_array('commesso', $roles, true) ? 'commesso' : 'cliente');
+
+            return [
+                'name' => (string)($user['display_name'] ?: $email),
+                'email' => $email,
+                'role' => $role,
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function exchangeGoogleCode(string $code, array $google): ?array

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use App\Core\Container;
+use App\Support\I18n;
 
 final class View
 {
@@ -19,7 +20,9 @@ final class View
         extract($data, EXTR_SKIP);
         $appName = $config['app']['name'] ?? 'Bisped';
 
+        ob_start();
         require $viewPath;
+        echo I18n::translateHtml((string)ob_get_clean());
     }
 
     public static function renderPartial(string $template, array $data = []): void

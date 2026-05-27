@@ -4,17 +4,25 @@
  * Read-only access to FTP produzione.
  */
 
-$dbHost = '127.0.0.1';
-$dbPort = 3307;
-$dbUser = 'bisped_user';
-$dbPass = 'REDACTED_LOCAL_DB_PASSWORD';
-$dbName = 'bisped_net';
-$dbLegacy = 'bisped_wp_legacy';
+$config = require dirname(__DIR__) . '/.env.php';
+$db = $config['database'] ?? [];
 
-$ftpBase = 'ftp://ftp.bisped.net/public_html/wp-content/uploads/';
-$ftpUser = 'info@bisped.net';
-$ftpPass = 'REDACTED_FTP_PASSWORD';
+$dbHost = (string)($db['host'] ?? '127.0.0.1');
+$dbPort = (int)($db['port'] ?? 3306);
+$dbUser = (string)($db['username'] ?? '');
+$dbPass = (string)($db['password'] ?? '');
+$dbName = (string)($db['database'] ?? 'bisped_net');
+$dbLegacy = (string)(getenv('BISPED_LEGACY_DB') ?: 'bisped_wp_legacy');
+
+$ftpBase = rtrim((string)(getenv('BISPED_FTP_UPLOADS_URL') ?: 'ftp://ftp.bisped.net/public_html/wp-content/uploads/'), '/') . '/';
+$ftpUser = (string)(getenv('BISPED_FTP_USER') ?: '');
+$ftpPass = (string)(getenv('BISPED_FTP_PASS') ?: '');
 $mediaDir = __DIR__ . '/../public/media/products';
+
+if ($ftpUser === '' || $ftpPass === '') {
+    fwrite(STDERR, "Missing BISPED_FTP_USER/BISPED_FTP_PASS environment variables.\n");
+    exit(1);
+}
 
 if (!is_dir($mediaDir)) {
     mkdir($mediaDir, 0755, true);

@@ -71,6 +71,7 @@ if ($siteLogoUrl === '') {
                         <li><a href="/blog" class="text-sm text-muted hover:text-pri transition-colors">News & Blog</a></li>
                         <li><a href="/faq" class="text-sm text-muted hover:text-pri transition-colors">FAQ</a></li>
                         <li><a href="/contatti" class="text-sm text-muted hover:text-pri transition-colors">Contatti</a></li>
+                        <li><a href="/appuntamenti" class="text-sm text-muted hover:text-pri transition-colors">Appuntamenti</a></li>
                         <li><a href="/sostenibilita" class="text-sm text-muted hover:text-pri transition-colors">Sostenibilità</a></li>
                     </ul>
                 </div>
@@ -91,7 +92,7 @@ if ($siteLogoUrl === '') {
     <div class="border-t" style="border-color:var(--c-border)">
         <div class="container mx-auto max-w-7xl px-4 lg:px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-3">
             <p class="text-xs text-muted text-center sm:text-left">
-                &copy; <?= date('Y') ?> Bisped s.r.l. — P.IVA IT01234567890 — Tutti i diritti riservati.<br class="sm:hidden">
+                &copy; <?= date('Y') ?> bisp&amp;d s.r.l. — P.IVA IT0156025048 — REA LI-138175 — Capitale sociale 100.000€ i.v. — Tutti i diritti riservati.<br class="sm:hidden">
                 <span class="hidden sm:inline"> · </span>Computer, telefonia, connettività, energia e assistenza tecnica a Piombino (LI).
             </p>
             <div class="flex items-center gap-3">

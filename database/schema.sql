@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
     display_name VARCHAR(190) NULL,
     avatar_url VARCHAR(500) NULL,
     status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+    password_hash VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -348,4 +349,23 @@ CREATE TABLE IF NOT EXISTS contact_messages (
     user_agent VARCHAR(255) NULL,
     status ENUM('new','read','archived') NOT NULL DEFAULT 'new',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS appointment_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    phone VARCHAR(80) NULL,
+    service_type VARCHAR(120) NOT NULL,
+    meeting_type ENUM('negozio','meet','whatsapp') NOT NULL DEFAULT 'negozio',
+    starts_at DATETIME NOT NULL,
+    ends_at DATETIME NOT NULL,
+    notes TEXT NULL,
+    status ENUM('pending','confirmed','cancelled','completed') NOT NULL DEFAULT 'pending',
+    google_event_id VARCHAR(190) NULL,
+    meet_url VARCHAR(500) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_appointment_status_start (status, starts_at),
+    INDEX idx_appointment_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

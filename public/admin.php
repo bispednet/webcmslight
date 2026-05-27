@@ -24,6 +24,8 @@ use App\Controllers\Admin\LegalController;
 use App\Controllers\Admin\TransparencyController;
 use App\Controllers\Admin\NavigationController;
 use App\Controllers\Admin\IngestController;
+use App\Controllers\Admin\MessagesController;
+use App\Controllers\Admin\AppointmentsController;
 
 $router = new Router();
 
@@ -144,5 +146,13 @@ $router->post('/admin/settings', [SettingsController::class, 'update'], [$requir
 
 $router->get('/admin/ingest', [IngestController::class, 'index'], [$requireAdmin]);
 $router->post('/admin/ingest/run', [IngestController::class, 'run'], [$requireAdmin]);
+
+$router->get('/admin/messages', [MessagesController::class, 'index'], [$requireAdmin]);
+$router->post('/admin/messages/read/{id}', [MessagesController::class, 'markRead'], [$requireAdmin]);
+$router->post('/admin/messages/archive/{id}', [MessagesController::class, 'archive'], [$requireAdmin]);
+
+$router->get('/admin/appointments', [AppointmentsController::class, 'index'], [$requireAdmin]);
+$router->post('/admin/appointments/accept/{id}', [AppointmentsController::class, 'accept'], [$requireAdmin]);
+$router->post('/admin/appointments/reject/{id}', [AppointmentsController::class, 'reject'], [$requireAdmin]);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

@@ -1,15 +1,21 @@
-# Bisped.net custom CMS
+# Bisped.net WebCMSLight
 
-Rework locale di `bisped.net` basato su AIRewebCMS, pensato per sostituire WordPress/WooCommerce solo quando il nuovo sito sara validato.
+Custom CMS PHP/MariaDB per il rework commerciale di `bisped.net`, pensato per sostituire WordPress/WooCommerce solo dopo validazione completa in preview.
 
 ## Stato
 
 - Base PHP/MySQL server-rendered con document root in `public/`.
-- Pagine pubbliche Bisped: `/`, `/azienda`, `/servizi`, `/sostenibilita`, `/contatti`, `/products`, `/blog`, `/faq`, `/legal`.
-- Seed iniziale per impostazioni, navigazione, prodotti WooCommerce importati, FAQ, blog e testi legali provvisori.
+- Pagine pubbliche Bisped: `/`, `/azienda`, `/servizi`, `/sostenibilita`, `/contatti`, `/appuntamenti`, `/products`, `/blog`, `/faq`, `/legal`.
+- Route statiche inglesi per preview: `/en`, `/en/company`, `/en/services`, `/en/contact`, `/en/appointments`, `/en/legal`, `/en/find-us`, `/en/sustainability`, `/en/faq`.
+- Admin: prodotti, blog, media, impostazioni, ingest, messaggi contatto e appuntamenti.
+- Auth: password locale, Google OAuth, wallet EVM/Solana; ruoli `admin`, `commesso`, `cliente`.
+- Agenda: richieste appuntamento pubbliche e accettazione admin; sync Google Calendar pronta, attiva solo dopo refresh token OAuth.
+- Ingest: job giornaliero per news/offerte con immagini e deduplica.
+- Seed iniziale per impostazioni, navigazione, prodotti, FAQ, blog, team e testi legali.
 - Asset recuperati in sola lettura da FTP in `public/media/bisped/`.
-- Form contatti con CSRF, honeypot e rate-limit sessione.
+- Form contatti e appuntamenti con CSRF, honeypot/rate-limit dove applicabile.
 - Audit migrazione in `docs/BISPED_MIGRATION_AUDIT.md`.
+- Security assessment in `docs/SECURITY_ASSESSMENT.md`.
 - Runtime locale portabile in `runtime/` con FrankenPHP, MariaDB e Playwright. La cartella e esclusa da Git.
 
 ## Sorgenti legacy
@@ -31,21 +37,16 @@ Poi configurare database MySQL, URL, chiave applicazione e wallet admin in `.env
 mysql -u bisped_user -p bisped_net < database/schema.sql
 ```
 
-Con document root puntato a `public/`, visitare:
-
-```text
-/install.php
-```
-
-L installer crea lo schema, importa `database/seed-data.php` e scrive `storage/install.lock`.
+L'installer web `public/install.php` e disabilitato di default per sicurezza. Abilitarlo solo in setup controllato con `BISPED_ALLOW_WEB_INSTALL=1`, poi rimuovere subito l'accesso.
 
 ## Note operative
 
-- Non committare `.env.php`, dump SQL, backup, log o dati cliente.
+- Non committare `.env.php`, dump SQL, backup, log, credenziali FTP/SMTP/OAuth o dati cliente.
 - Non modificare la produzione WordPress via FTP durante lo sviluppo.
 - Il dump `uu4c5pdm_wpb.sql` contiene 116 tabelle importate, WooCommerce 10.7.0, 66 prodotti pubblicati e ordini legacy.
-- Il catalogo preview importa 36 prodotti reali come prima tranche amministrabile.
+- Il catalogo preview e amministrabile dal pannello `/admin/products`.
 - Il tunnel di preview usa `https://solclawn.com`, gia configurato via cloudflared verso `127.0.0.1:4000`.
+- Il deploy produzione richiede aggiornamento di `.env.php`, redirect OAuth Google, SMTP, DNS e refresh token Calendar se si vuole il sync automatico.
 
 ## Runtime preview attuale
 
@@ -78,4 +79,13 @@ Test Playwright:
 ```bash
 runtime/venv/bin/python runtime/playwright_check.py
 runtime/venv/bin/python runtime/playwright_mobile_links.py
+```
+
+Security check rapido:
+
+```bash
+rg -n "REAL_SECRET_PREFIX|FTP_PASSWORD|OAUTH_SECRET|SMTP_PASSWORD|TEMP_ADMIN_PASSWORD" \
+  --glob '!runtime/**' --glob '!storage/**' --glob '!.env.php'
+curl -I https://solclawn.com/
+curl -s -o /tmp/install -w '%{http_code}\n' https://solclawn.com/install.php
 ```

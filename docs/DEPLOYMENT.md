@@ -57,6 +57,21 @@ tail -n 100 storage/logs/app.log
 
 `/health/db` verifica connessione database e restituisce `503` se il DB non e disponibile.
 
+## Sicurezza deploy
+
+- `.env.php` deve restare fuori da Git e leggibile solo dall'utente runtime.
+- `public/install.php` e disabilitato: abilitarlo solo temporaneamente con `BISPED_ALLOW_WEB_INSTALL=1`.
+- Le credenziali FTP per recupero asset non sono nel repo: usare `BISPED_FTP_USER`, `BISPED_FTP_PASS`, `BISPED_FTP_UPLOADS_URL`.
+- Per Google OAuth configurare redirect separati per preview e produzione.
+- Per Calendar sync impostare `calendar.google_refresh_token` solo in `.env.php`.
+- Prima del go-live verificare:
+
+```bash
+curl -I https://bisped.net/
+curl -s https://bisped.net/health/db
+curl -s -o /tmp/install -w '%{http_code}\n' https://bisped.net/install.php
+```
+
 ## Nota
 
 Non avviare MariaDB e FrankenPHP a mano dentro una shell SSH per la preview pubblica: se la sessione termina, il sito rischia `Connection refused`.

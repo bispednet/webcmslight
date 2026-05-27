@@ -17,10 +17,13 @@ final class Session
         $sessionName = $config['app']['session_name'] ?? 'bisped_session';
 
         session_name($sessionName);
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+
         session_start([
             'cookie_httponly' => true,
             'cookie_samesite' => 'Lax',
-            'cookie_secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+            'cookie_secure' => $isHttps,
         ]);
     }
 }

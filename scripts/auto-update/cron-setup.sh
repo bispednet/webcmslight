@@ -6,6 +6,7 @@ BISPED_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 FRANKENPHP="${BISPED_DIR}/runtime/bin/frankenphp"
 INGEST="${BISPED_DIR}/scripts/auto-update/ingest.php"
 LOGDIR="${BISPED_DIR}/storage"
+LOCKFILE="${BISPED_DIR}/storage/ingest.lock"
 
 # Check frankenphp exists
 if [ ! -f "$FRANKENPHP" ]; then
@@ -13,7 +14,9 @@ if [ ! -f "$FRANKENPHP" ]; then
     exit 1
 fi
 
-CRON_LINE="0 6 * * * ${FRANKENPHP} php-cli ${INGEST} --all >> ${LOGDIR}/ingest-cron.log 2>&1"
+mkdir -p "$LOGDIR"
+
+CRON_LINE="0 6 * * * flock -n ${LOCKFILE} ${FRANKENPHP} php-cli ${INGEST} --all --limit=3 >> ${LOGDIR}/ingest-cron.log 2>&1"
 
 # Add to crontab if not already present
 (crontab -l 2>/dev/null | grep -F "$INGEST") && {

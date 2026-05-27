@@ -9,6 +9,14 @@ $schemaPath = $projectRoot . '/database/schema.sql';
 $messages = [];
 $errors = [];
 
+$installerEnabled = getenv('BISPED_ALLOW_WEB_INSTALL') === '1';
+if (!$installerEnabled) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Not found\n";
+    exit;
+}
+
 function default_config(): array
 {
     return [
@@ -45,6 +53,21 @@ function default_config(): array
             'encryption' => 'tls',
             'from_address' => 'noreply@bisped.net',
             'from_name' => 'Bisped',
+        ],
+        'google' => [
+            'client_id' => '',
+            'client_secret' => '',
+            'redirect_uri' => 'https://www.bisped.net/auth/google/callback',
+            'admin_emails' => [],
+        ],
+        'calendar' => [
+            'enabled' => true,
+            'calendar_id' => 'primary',
+            'timezone' => 'Europe/Rome',
+            'default_duration_minutes' => 30,
+            'google_refresh_token' => '',
+            'auto_confirm' => false,
+            'meet_enabled' => true,
         ],
     ];
 }

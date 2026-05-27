@@ -51,6 +51,63 @@ $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $isActive = static fn(string $url): bool =>
     $url !== '/' ? str_starts_with($currentPath, $url) : $currentPath === '/';
 
+$localized = static function (string $locale) use ($currentPath): string {
+    $toEn = [
+        '/' => '/en/',
+        '/it' => '/en/',
+        '/it/' => '/en/',
+        '/azienda' => '/en/company',
+        '/chi-siamo' => '/en/company',
+        '/servizi' => '/en/services',
+        '/products' => '/en/products',
+        '/prodotti' => '/en/products',
+        '/blog' => '/en/blog',
+        '/contatti' => '/en/contact',
+        '/contact' => '/en/contact',
+        '/appuntamenti' => '/en/appointments',
+        '/appointments' => '/en/appointments',
+        '/dove' => '/en/find-us',
+        '/dove-siamo' => '/en/find-us',
+        '/sostenibilita' => '/en/sustainability',
+        '/legal' => '/en/legal',
+        '/faq' => '/en/faq',
+        '/teleassistenza' => '/en/remote-support',
+        '/area-clienti' => '/en/customer-area',
+    ];
+    $toIt = [
+        '/en' => '/',
+        '/en/' => '/',
+        '/en/company' => '/azienda',
+        '/en/services' => '/servizi',
+        '/en/products' => '/products',
+        '/en/blog' => '/blog',
+        '/en/contact' => '/contatti',
+        '/en/appointments' => '/appuntamenti',
+        '/en/find-us' => '/dove',
+        '/en/sustainability' => '/sostenibilita',
+        '/en/legal' => '/legal',
+        '/en/faq' => '/faq',
+        '/en/remote-support' => '/teleassistenza',
+        '/en/customer-area' => '/area-clienti',
+    ];
+
+    if ($locale === 'en') {
+        foreach ($toEn as $it => $en) {
+            if ($currentPath === $it || str_starts_with($currentPath, $it . '/')) {
+                return $en;
+            }
+        }
+        return '/en/';
+    }
+
+    foreach ($toIt as $en => $it) {
+        if ($currentPath === $en || str_starts_with($currentPath, $en . '/')) {
+            return $it;
+        }
+    }
+    return $currentPath ?: '/';
+};
+
 $linkAttrs = static function (array $item): string {
     $url = $item['url'] ?? '#';
     $ext = !empty($item['is_external']);
@@ -115,8 +172,8 @@ $linkAttrs = static function (array $item): string {
             <div class="hidden lg:flex items-center gap-2">
                 <!-- Language -->
                 <div class="flex gap-1">
-                    <a href="/it/" class="header-util-btn <?= str_starts_with($currentPath, '/en/') ? '' : 'active' ?>">IT</a>
-                    <a href="/en/" class="header-util-btn <?= str_starts_with($currentPath, '/en/') ? 'active' : '' ?>">EN</a>
+                    <a href="<?= htmlspecialchars($localized('it'), ENT_QUOTES, 'UTF-8') ?>" class="header-util-btn <?= str_starts_with($currentPath, '/en') ? '' : 'active' ?>">IT</a>
+                    <a href="<?= htmlspecialchars($localized('en'), ENT_QUOTES, 'UTF-8') ?>" class="header-util-btn <?= str_starts_with($currentPath, '/en') ? 'active' : '' ?>">EN</a>
                 </div>
 
                 <!-- Theme toggle -->
@@ -164,8 +221,8 @@ $linkAttrs = static function (array $item): string {
             <?php endforeach; ?>
             <div class="border-t my-3" style="border-color:var(--c-border)"></div>
             <div class="flex items-center gap-2 flex-wrap px-3 pb-2">
-                <a href="/it/" class="header-util-btn">IT</a>
-                <a href="/en/" class="header-util-btn">EN</a>
+                <a href="<?= htmlspecialchars($localized('it'), ENT_QUOTES, 'UTF-8') ?>" class="header-util-btn <?= str_starts_with($currentPath, '/en') ? '' : 'active' ?>">IT</a>
+                <a href="<?= htmlspecialchars($localized('en'), ENT_QUOTES, 'UTF-8') ?>" class="header-util-btn <?= str_starts_with($currentPath, '/en') ? 'active' : '' ?>">EN</a>
                 <button type="button" data-theme-toggle class="header-util-btn">
                     <span class="theme-toggle-label"></span>
                 </button>

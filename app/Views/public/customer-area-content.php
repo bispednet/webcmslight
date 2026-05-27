@@ -2,6 +2,7 @@
 /** @var string $name */
 /** @var string $email */
 /** @var string $role */
+use App\Services\Security\Csrf;
 
 $name  = htmlspecialchars($name  ?? 'Cliente', ENT_QUOTES, 'UTF-8');
 $email = htmlspecialchars($email ?? '',         ENT_QUOTES, 'UTF-8');
@@ -38,7 +39,7 @@ $role  = $role ?? 'customer';
 
     <div data-animate>
         <form method="post" action="/auth/logout">
-            <input type="hidden" name="csrf_token" value="">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
             <button type="submit" class="btn-outline btn-sm">Esci dall'account</button>
         </form>
     </div>

@@ -43,7 +43,7 @@ final class IngestController extends Controller
             $category = 'all';
         }
 
-        $phpBin = dirname(__DIR__, 3) . '/runtime/bin/frankenphp';
+        $phpBin = escapeshellarg(dirname(__DIR__, 3) . '/runtime/bin/frankenphp');
         $script = escapeshellarg($this->ingestScript);
         $flag   = $category === 'all' ? '--all' : '--source=' . escapeshellarg($category);
 

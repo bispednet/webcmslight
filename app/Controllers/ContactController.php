@@ -92,6 +92,8 @@ final class ContactController extends Controller
 
     private function sendNotification(string $name, string $from, string $message): void
     {
+        $name = $this->safeHeaderValue($name);
+        $from = $this->safeHeaderValue($from);
         $config = require dirname(__DIR__, 2) . '/.env.php';
         $adminEmails = $config['admin_emails'] ?? ['negozio@bisped.net'];
         if (is_array($adminEmails) && isset($adminEmails[0])) {
@@ -121,5 +123,10 @@ final class ContactController extends Controller
         $hc  = "From: bisp&d <negozio@bisped.net>\r\n";
         $hc .= "Content-Type: text/plain; charset=utf-8\r\n";
         @mail($from, 'Conferma ricezione — bisp&d', $confirm, $hc);
+    }
+
+    private function safeHeaderValue(string $value): string
+    {
+        return trim(str_replace(["\r", "\n"], '', $value));
     }
 }

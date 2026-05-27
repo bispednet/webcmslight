@@ -341,7 +341,7 @@ return [
 
 # MariaDB CLI
 /home/funboy/bisped.net/runtime/mariadb/bin/mariadb \
-  -u bisped_user -pREDACTED_LOCAL_DB_PASSWORD -h 127.0.0.1 -P 3307 bisped_net
+  -u "$DB_USER" -p"$DB_PASS" -h 127.0.0.1 -P "$DB_PORT" "$DB_NAME"
 
 # Git push (SSH alias configurato)
 git push git@github-bispednet:bispednet/webcmslight rework/full-foundation-v3

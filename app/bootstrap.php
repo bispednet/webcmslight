@@ -45,13 +45,28 @@ if (!function_exists('config')) {
 
 $GLOBALS['config'] = $config;
 
+if (PHP_SAPI !== 'cli') {
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+
+    header_remove('X-Powered-By');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+    if ($isHttps) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    }
+}
+
 if (PHP_SAPI !== 'cli' && session_status() !== PHP_SESSION_ACTIVE) {
     $sessionName = $config['app']['session_name'] ?? 'bisped_session';
     session_name($sessionName);
     session_start([
         'cookie_httponly' => true,
         'cookie_samesite' => 'Lax',
-        'cookie_secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'cookie_secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https',
     ]);
 }
 

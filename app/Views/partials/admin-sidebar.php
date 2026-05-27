@@ -75,6 +75,12 @@ if ($siteLogoUrl === '') {
             <a href="/admin/media" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
                 <span class="text-muted">Media Library</span>
             </a>
+            <a href="/admin/messages" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
+                <span class="text-muted">Messaggi contatto</span>
+            </a>
+            <a href="/admin/appointments" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
+                <span class="text-muted">Appuntamenti</span>
+            </a>
         </div>
 
         <div class="space-y-2">
