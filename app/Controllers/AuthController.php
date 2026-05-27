@@ -24,13 +24,18 @@ final class AuthController extends Controller
     {
         $notice = Flash::pull('auth_notice');
         $error = Flash::pull('auth_error');
-        $config = Container::get('config');
-        $projectId = $config['wallet']['project_id'] ?? '';
-        $rpcUrl = $config['wallet']['rpc_url'] ?? '';
-        $googleConfigured = !empty($config['google']['client_id']) && !empty($config['google']['client_secret']) && !empty($config['google']['redirect_uri']);
-        $csrfToken = Csrf::token();
+        $authViewData = $this->authViewData();
 
-        View::render('public/login', compact('notice', 'error', 'projectId', 'rpcUrl', 'googleConfigured', 'csrfToken'));
+        View::render('public/login', array_merge(compact('notice', 'error'), $authViewData));
+    }
+
+    public function showRegister(): void
+    {
+        $notice = Flash::pull('auth_notice');
+        $error = Flash::pull('auth_error');
+        $authViewData = $this->authViewData();
+
+        View::render('public/register', array_merge(compact('notice', 'error'), $authViewData));
     }
 
     public function passwordLogin(): void
@@ -389,6 +394,21 @@ final class AuthController extends Controller
 
         Flash::set($flashKey, 'Sessione scaduta. Ricarica la pagina e riprova.');
         return false;
+    }
+
+    private function authViewData(): array
+    {
+        $config = Container::get('config');
+
+        return [
+            'projectId' => $config['wallet']['project_id'] ?? '',
+            'rpcUrl' => $config['wallet']['rpc_url'] ?? '',
+            'googleConfigured' => !empty($config['google']['client_id'])
+                && !empty($config['google']['client_secret'])
+                && !empty($config['google']['redirect_uri']),
+            'googleRedirectUri' => (string)($config['google']['redirect_uri'] ?? ''),
+            'csrfToken' => Csrf::token(),
+        ];
     }
 
     private function throttleAuthAction(string $bucket): bool

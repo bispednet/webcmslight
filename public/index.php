@@ -83,6 +83,8 @@ $router->post('/auth/wallet/verify', [AuthController::class, 'verifyWallet']);
 $router->post('/auth/logout', [AuthController::class, 'logout']);
 $router->get('/login', [AuthController::class, 'showLogin']);
 $router->post('/login', [AuthController::class, 'passwordLogin']);
+$router->get('/register', [AuthController::class, 'showRegister']);
+$router->get('/en/register', [AuthController::class, 'showRegister']);
 $router->post('/register', [AuthController::class, 'register']);
 $router->get('/area-clienti', [PageController::class, 'customerArea']);
 $router->get('/it/area-clienti', [PageController::class, 'customerArea']);

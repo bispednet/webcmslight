@@ -1,22 +1,19 @@
 <?php
+use App\Core\View;
+
 /** @var ?string $notice */
 /** @var ?string $error */
 /** @var bool $googleConfigured */
 /** @var string $googleRedirectUri */
 /** @var string $csrfToken */
-
-use App\Core\View;
-
-$notice = $notice ?? null;
-$error  = $error  ?? null;
 ?>
 
 <div class="max-w-md mx-auto space-y-8">
 
     <div data-animate>
-        <p class="section-label mb-5">Area riservata</p>
-        <h1 class="font-display text-4xl font-black" style="color:var(--c-acc)">Accedi al tuo account</h1>
-        <p class="mt-4 text-sm leading-6" style="color:var(--c-muted)">Clienti, commessi e amministratori: un unico accesso per seguire richieste, gestire catalogo e storico ordini.</p>
+        <p class="section-label mb-5">Nuovo account</p>
+        <h1 class="font-display text-4xl font-black" style="color:var(--c-acc)">Crea il tuo account.</h1>
+        <p class="mt-4 text-sm leading-6" style="color:var(--c-muted)">Registrati per seguire richieste, appuntamenti e comunicazioni con bisp&amp;d.</p>
     </div>
 
     <?php if ($notice): ?>
@@ -32,10 +29,10 @@ $error  = $error  ?? null;
 
     <div class="info-card space-y-5" data-animate data-animate-delay="80">
         <?php if ($googleConfigured): ?>
-            <?php View::renderPartial('public/partials/google-button', ['label' => 'Accedi con Google']); ?>
+            <?php View::renderPartial('public/partials/google-button', ['label' => 'Registrati con Google']); ?>
         <?php else: ?>
             <div class="rounded border px-4 py-3 text-xs" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.30);color:#fde68a">
-                Login Google configurato solo dopo credenziali OAuth valide.
+                Registrazione Google non configurata.
             </div>
         <?php endif; ?>
 
@@ -43,22 +40,28 @@ $error  = $error  ?? null;
             <span class="text-xs uppercase tracking-[0.2em]" style="color:var(--c-muted)">oppure</span>
         </div>
 
-        <form method="post" action="/login" class="space-y-5">
+        <form method="post" action="/register" class="space-y-4">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
             <div>
-                <label class="form-label" for="email">Email</label>
-                <input class="form-input" type="email" name="email" id="email" required autocomplete="email"
+                <label class="form-label" for="register-name">Nome</label>
+                <input class="form-input" type="text" name="name" id="register-name" required autocomplete="name"
                        style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
             </div>
             <div>
-                <label class="form-label" for="password">Password</label>
-                <input class="form-input" type="password" name="password" id="password" required autocomplete="current-password"
+                <label class="form-label" for="register-email">Email</label>
+                <input class="form-input" type="email" name="email" id="register-email" required autocomplete="email"
                        style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
             </div>
-            <button type="submit" class="btn-primary w-full" style="justify-content:center">Accedi</button>
+            <div>
+                <label class="form-label" for="register-password">Password</label>
+                <input class="form-input" type="password" name="password" id="register-password" required minlength="8" autocomplete="new-password"
+                       style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
+            </div>
+            <button type="submit" class="btn-primary w-full" style="justify-content:center">Crea account</button>
         </form>
+
         <div class="pt-5 border-t text-center" style="border-color:var(--c-border)">
-            <p class="text-xs" style="color:var(--c-muted)">Non hai un account? <a href="/register" class="font-bold" style="color:var(--bisped-red)">Registrati</a></p>
+            <p class="text-xs" style="color:var(--c-muted)">Hai gia un account? <a href="/login" class="font-bold" style="color:var(--bisped-red)">Accedi</a></p>
         </div>
     </div>
 

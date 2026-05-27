@@ -73,6 +73,7 @@ $localized = static function (string $locale) use ($currentPath): string {
         '/faq' => '/en/faq',
         '/teleassistenza' => '/en/remote-support',
         '/area-clienti' => '/en/customer-area',
+        '/register' => '/en/register',
     ];
     $toIt = [
         '/en' => '/',
@@ -89,6 +90,7 @@ $localized = static function (string $locale) use ($currentPath): string {
         '/en/faq' => '/faq',
         '/en/remote-support' => '/teleassistenza',
         '/en/customer-area' => '/area-clienti',
+        '/en/register' => '/register',
     ];
 
     if ($locale === 'en') {
