@@ -209,4 +209,62 @@ final class PageController extends Controller
             'role' => (string)($_SESSION['user_role'] ?? 'cliente'),
         ]);
     }
+
+    public function teleassistenza(): void
+    {
+        $settings = $this->content->getSettings();
+        $this->view('public/teleassistenza', compact('settings'));
+    }
+
+    public function sitemap(): void
+    {
+        $pdo = \App\Core\Database::connection();
+
+        $products = $pdo->query("SELECT slug, updated_at FROM products ORDER BY featured_order ASC")->fetchAll(\PDO::FETCH_ASSOC);
+        $posts    = $pdo->query("SELECT slug, updated_at FROM blog_posts WHERE is_published = 1 ORDER BY published_at DESC")->fetchAll(\PDO::FETCH_ASSOC);
+
+        $baseUrl = 'https://bisped.net';
+
+        header('Content-Type: application/xml; charset=utf-8');
+        header('X-Robots-Tag: noindex');
+
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+
+        $staticPages = [
+            ['loc' => '/',              'priority' => '1.0',  'freq' => 'weekly'],
+            ['loc' => '/products',      'priority' => '0.9',  'freq' => 'weekly'],
+            ['loc' => '/blog',          'priority' => '0.8',  'freq' => 'weekly'],
+            ['loc' => '/servizi',       'priority' => '0.8',  'freq' => 'monthly'],
+            ['loc' => '/teleassistenza','priority' => '0.8',  'freq' => 'monthly'],
+            ['loc' => '/azienda',       'priority' => '0.6',  'freq' => 'monthly'],
+            ['loc' => '/dove',          'priority' => '0.7',  'freq' => 'monthly'],
+            ['loc' => '/contatti',      'priority' => '0.7',  'freq' => 'monthly'],
+            ['loc' => '/faq',           'priority' => '0.6',  'freq' => 'monthly'],
+            ['loc' => '/legal',         'priority' => '0.3',  'freq' => 'yearly'],
+        ];
+
+        foreach ($staticPages as $p) {
+            echo "  <url>\n";
+            echo "    <loc>{$baseUrl}" . htmlspecialchars($p['loc'], ENT_XML1) . "</loc>\n";
+            echo "    <changefreq>{$p['freq']}</changefreq>\n";
+            echo "    <priority>{$p['priority']}</priority>\n";
+            echo "  </url>\n";
+        }
+
+        foreach ($products as $p) {
+            $loc     = $baseUrl . '/products/' . htmlspecialchars($p['slug'], ENT_XML1);
+            $lastmod = substr((string)($p['updated_at'] ?? date('Y-m-d')), 0, 10);
+            echo "  <url><loc>{$loc}</loc><lastmod>{$lastmod}</lastmod><priority>0.7</priority></url>\n";
+        }
+
+        foreach ($posts as $p) {
+            $loc     = $baseUrl . '/blog/' . htmlspecialchars($p['slug'], ENT_XML1);
+            $lastmod = substr((string)($p['updated_at'] ?? date('Y-m-d')), 0, 10);
+            echo "  <url><loc>{$loc}</loc><lastmod>{$lastmod}</lastmod><priority>0.65</priority></url>\n";
+        }
+
+        echo '</urlset>';
+        exit;
+    }
 }

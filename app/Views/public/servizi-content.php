@@ -120,7 +120,7 @@ $services = [
         </div>
         <div class="flex gap-3 flex-shrink-0">
             <a href="/contatti" class="btn-primary">Contattaci</a>
-            <a href="tel:+390565200000" class="btn-outline">Chiama</a>
+            <a href="tel:+393346582116" class="btn-outline">Chiama</a>
         </div>
     </div>
 

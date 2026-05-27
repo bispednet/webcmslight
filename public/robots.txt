@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /api/
+Disallow: /storage/
+Disallow: /health/
+
+Sitemap: https://bisped.net/sitemap.xml

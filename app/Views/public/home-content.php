@@ -333,6 +333,65 @@ if (empty($featured)) {
     </div>
 </section>
 
+<!-- ─── COUPON BANNER ─────────────────────────────────────────────────────── -->
+<section class="coupon-banner" data-animate>
+    <div class="coupon-banner__inner">
+        <div class="coupon-banner__left">
+            <span class="coupon-banner__tag">Offerta esclusiva</span>
+            <h2 class="font-display text-2xl font-black mt-2" style="color:#fff">-10% sul tuo primo acquisto in negozio</h2>
+            <p class="mt-1 text-sm" style="color:rgba(255,255,255,.75)">Mostra questo codice alla cassa o citalo al telefono. Valido su tutti i prodotti tech in esposizione.</p>
+        </div>
+        <div class="coupon-banner__code">
+            <p class="text-xs uppercase tracking-widest mb-1" style="color:rgba(255,255,255,.6)">Codice promo</p>
+            <div class="coupon-code-box">BISPED10</div>
+            <p class="text-xs mt-2" style="color:rgba(255,255,255,.5)">Valido fino al 31/12/2026 · non cumulabile</p>
+        </div>
+    </div>
+</section>
+
+<!-- ─── NEWSLETTER ────────────────────────────────────────────────────────── -->
+<section data-animate>
+    <div class="info-card" style="border-color:rgba(209,25,32,.2)">
+        <div class="grid gap-8 md:grid-cols-[1fr_1fr] md:items-center">
+            <div>
+                <p class="section-label mb-3">Newsletter Bisped</p>
+                <h2 class="font-display text-2xl font-black" style="color:var(--c-acc)">Novità tech direttamente da Piombino</h2>
+                <p class="mt-3 text-sm" style="color:var(--c-muted)">
+                    Nuovi prodotti 2025-2026, offerte in anteprima, guide all'acquisto e notizie dal mondo tech.
+                    Senza spam: massimo 2 email al mese.
+                </p>
+                <p class="mt-2 text-xs" style="color:var(--c-muted)">Iscrivendoti accetti la nostra <a href="/legal" style="color:var(--bisped-red)">privacy policy</a>. Cancellazione in un clic.</p>
+            </div>
+            <form method="post" action="/contatti" class="space-y-3">
+                <input type="hidden" name="topic" value="newsletter">
+                <input type="hidden" name="message" value="Iscrizione newsletter bisped.net">
+                <div>
+                    <label class="form-label">Il tuo nome</label>
+                    <input type="text" name="name" required placeholder="Mario Rossi"
+                           class="form-input w-full"
+                           style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
+                </div>
+                <div>
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" required placeholder="mario@email.it"
+                           class="form-input w-full"
+                           style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
+                </div>
+                <!-- CSRF via hidden field populated by JS (same pattern as contact form) -->
+                <input type="hidden" name="csrf_token" id="nl-csrf">
+                <script>
+                    (function(){
+                        var m = document.querySelector('meta[name="csrf-token"]');
+                        var f = document.getElementById('nl-csrf');
+                        if (m && f) f.value = m.content;
+                    })();
+                </script>
+                <button type="submit" class="btn-primary w-full">Iscriviti gratis →</button>
+            </form>
+        </div>
+    </div>
+</section>
+
 <!-- ─── CTA STRIP ─────────────────────────────────────────────────────────── -->
 <section class="cta-strip" data-animate>
     <div class="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">

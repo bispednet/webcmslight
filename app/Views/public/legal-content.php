@@ -2,7 +2,7 @@
 /** @var array $settings */
 /** @var array $sections */
 
-$contactEmail = $settings['contact_email'] ?? 'info@bisped.net';
+$contactEmail = $settings['contact_email'] ?? 'negozio@bisped.net';
 $sections = $sections ?? [];
 ?>
 

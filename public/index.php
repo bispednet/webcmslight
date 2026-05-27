@@ -76,4 +76,12 @@ $router->get('/area-clienti', [PageController::class, 'customerArea']);
 $router->get('/it/area-clienti', [PageController::class, 'customerArea']);
 $router->get('/en/customer-area', [PageController::class, 'customerArea']);
 
+$router->get('/teleassistenza', [PageController::class, 'teleassistenza']);
+$router->get('/teleassistenza/', [PageController::class, 'teleassistenza']);
+$router->get('/it/teleassistenza', [PageController::class, 'teleassistenza']);
+$router->get('/en/remote-support', [PageController::class, 'teleassistenza']);
+
+$router->get('/sitemap.xml', [PageController::class, 'sitemap']);
+$router->get('/sitemap', [PageController::class, 'sitemap']);
+
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

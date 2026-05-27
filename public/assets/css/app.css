@@ -915,6 +915,57 @@ html[data-theme="light"] .theme-toggle-label::after { content: "Chiaro"; }
 ::-webkit-scrollbar-thumb { background: rgba(209,25,32,.5); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--bisped-red); }
 
+/* ─── Coupon banner ─────────────────────────────────────────────────────────── */
+.coupon-banner {
+    background: linear-gradient(135deg, #8B0000 0%, var(--bisped-red) 50%, #c41420 100%);
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+}
+.coupon-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+    pointer-events: none;
+}
+.coupon-banner__inner {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 32px;
+}
+.coupon-banner__left { flex: 1; min-width: 220px; }
+.coupon-banner__tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+.coupon-banner__code { text-align: center; flex-shrink: 0; }
+.coupon-code-box {
+    font-family: 'Montserrat', 'Barlow', monospace;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: .15em;
+    color: #fff;
+    background: rgba(0,0,0,.25);
+    border: 2px dashed rgba(255,255,255,.5);
+    border-radius: 8px;
+    padding: 12px 28px;
+    cursor: pointer;
+    user-select: all;
+}
+
 /* ─── Campaign badge ────────────────────────────────────────────────────────── */
 .campaign-badge {
     display: inline-block;

@@ -93,11 +93,11 @@ final class ContactController extends Controller
     private function sendNotification(string $name, string $from, string $message): void
     {
         $config = require dirname(__DIR__, 2) . '/.env.php';
-        $adminEmails = $config['admin_emails'] ?? ['info@bisped.net'];
+        $adminEmails = $config['admin_emails'] ?? ['negozio@bisped.net'];
         if (is_array($adminEmails) && isset($adminEmails[0])) {
             $to = $adminEmails[0];
         } else {
-            $to = 'info@bisped.net';
+            $to = 'negozio@bisped.net';
         }
 
         $subject  = '[bisp&d] Nuova richiesta da ' . $name;
@@ -117,8 +117,8 @@ final class ContactController extends Controller
         // Also send confirmation to sender
         $confirm  = "Ciao $name,\n\nAbbiamo ricevuto la tua richiesta e ti risponderemo al più presto.\n\n";
         $confirm .= "Il tuo messaggio:\n$message\n\n";
-        $confirm .= "---\nbisp&d — Piombino (LI)\nTel: +39 0565 200000\ninfo@bisped.net\nbisped.net";
-        $hc  = "From: bisp&d <info@bisped.net>\r\n";
+        $confirm .= "---\nbisp&d — Piombino (LI)\nTel: +39 334 658 2116\nnegozio@bisped.net\nbisped.net";
+        $hc  = "From: bisp&d <negozio@bisped.net>\r\n";
         $hc .= "Content-Type: text/plain; charset=utf-8\r\n";
         @mail($from, 'Conferma ricezione — bisp&d', $confirm, $hc);
     }

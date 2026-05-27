@@ -26,10 +26,10 @@ $defaultPrimary = [
 ];
 
 $defaultMore = [
-    ['label' => 'Assistenza',   'url' => '/servizi#assistenza', 'is_external' => false],
-    ['label' => 'FAQ',          'url' => '/faq',            'is_external' => false],
-    ['label' => 'Contatti',     'url' => '/contatti',       'is_external' => false],
-    ['label' => 'Sostenibilità','url' => '/sostenibilita',  'is_external' => false],
+    ['label' => 'Teleassistenza','url' => '/teleassistenza', 'is_external' => false],
+    ['label' => 'FAQ',           'url' => '/faq',            'is_external' => false],
+    ['label' => 'Contatti',      'url' => '/contatti',       'is_external' => false],
+    ['label' => 'Sostenibilità', 'url' => '/sostenibilita',  'is_external' => false],
 ];
 
 $primaryItems = $navMap['header_primary'] ?? $defaultPrimary;

@@ -4,7 +4,7 @@
 /** @var ?string $success */
 /** @var ?string $error */
 
-$contactEmail = $settings['contact_email'] ?? 'info@bisped.net';
+$contactEmail = $settings['contact_email'] ?? 'negozio@bisped.net';
 
 $prefill = [];
 if (!empty($_GET['prodotto'])) $prefill['prodotto'] = htmlspecialchars((string)$_GET['prodotto'], ENT_QUOTES, 'UTF-8');
@@ -101,7 +101,7 @@ if (!empty($prefill['prodotto'])) {
         </div>
         <div class="info-card">
             <h3 class="font-display text-base font-black mb-3" style="color:var(--c-acc)">Telefono</h3>
-            <a href="tel:+390565200000" class="text-sm transition-colors hover:text-red-400" style="color:var(--c-muted)">+39 0565 200000</a>
+            <a href="tel:+393346582116" class="text-sm transition-colors hover:text-red-400" style="color:var(--c-muted)">+39 334 658 2116</a>
         </div>
         <div class="info-card">
             <h3 class="font-display text-base font-black mb-3" style="color:var(--c-acc)">Cosa succede dopo</h3>
