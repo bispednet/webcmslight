@@ -24,6 +24,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Aggiornato schema DB con `users.password_hash` e `appointment_requests`.
 - Aggiornata documentazione per evitare credenziali in comandi copiabili.
 - Integrato Gemini direttamente dal CMS PHP con chiave solo in `.env.php`, rate limit persistente e filtro anti-SSRF per acquisizione testi e immagini editoriali.
+- Aggiunto concierge WhatsApp con endpoint CSRF, cronologia limitata, rate limit di sessione e profilo Gemini separato.
 
 ## Controlli Eseguiti
 

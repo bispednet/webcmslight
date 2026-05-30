@@ -16,9 +16,9 @@ Il blog bisp&d deve essere utile anche senza aprire la fonte originale. Il cron 
 
 ## Controllo qualita
 
-Il modello editoriale riceve due prompt strutturati, uno italiano e uno inglese, e deve restituire un corpo HTML completo per ciascuna lingua. Titolo e anteprima vengono derivati dalla rispettiva versione per evitare contenuti ibridi. Se il modello non e disponibile o restituisce contenuti sotto soglia, il cron salta la pubblicazione: il fallback prudente viene usato solo nelle simulazioni tecniche. Gli articoli legacy troppo brevi devono essere rimossi o riscritti prima della pubblicazione.
+Il modello editoriale riceve prima un prompt strutturato in italiano. Solo se il testo supera il controllo qualita, una seconda richiesta traduce integralmente lo stesso articolo in inglese. Titolo e anteprima vengono derivati dalla rispettiva versione per evitare contenuti ibridi. Se il modello non e disponibile o restituisce contenuti sotto soglia, il cron salta la pubblicazione: il fallback prudente viene usato solo nelle simulazioni tecniche. Gli articoli legacy troppo brevi devono essere rimossi o riscritti prima della pubblicazione.
 
-La redazione automatica usa direttamente Gemini API dal CMS PHP con modello `gemma-4-31b-it`: CopilotRM non e una dipendenza runtime del sito. La chiave resta in `.env.php`, escluso da Git. Il client applica un cooldown persistente di 7 secondi e limiti locali di 10 richieste al minuto e 5.000 richieste al giorno. Il cron parte prudentemente da un solo tentativo editoriale al giorno: se il modello restituisce una scaletta o residui del ragionamento invece dell'articolo finale, il contenuto viene scartato senza pubblicazione.
+La redazione automatica usa direttamente Gemini API dal CMS PHP con modello `gemma-4-31b-it`: CopilotRM non e una dipendenza runtime del sito. La chiave resta in `.env.php`, escluso da Git. Il client applica un cooldown persistente di 7 secondi e limiti locali di 10 richieste al minuto, 5.000 token al minuto e 1.000 richieste al giorno. `gemma-4-31b-it` non supporta `thinkingBudget`: il cron parte prudentemente da un solo tentativo editoriale al giorno e scarta scalette o residui del ragionamento senza pubblicarli.
 
 Prima del deploy su un database esistente eseguire:
 

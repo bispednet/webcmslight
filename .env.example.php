@@ -43,10 +43,23 @@ return [
     ],
     'gemini' => [
         'api_key' => '',
-        'model' => 'gemma-4-31b-it',
-        'requests_per_minute' => 10,
-        'requests_per_day' => 5000,
-        'cooldown_seconds' => 7,
+        'editorial' => [
+            'model' => 'gemma-4-31b-it',
+            'requests_per_minute' => 10,
+            'tokens_per_minute' => 5000,
+            'requests_per_day' => 1000,
+            'cooldown_seconds' => 7,
+            'timeout_seconds' => 150,
+        ],
+        'concierge' => [
+            'model' => 'gemini-3.1-flash-lite',
+            'requests_per_minute' => 15,
+            'tokens_per_minute' => 250000,
+            'requests_per_day' => 500,
+            'cooldown_seconds' => 2,
+            'timeout_seconds' => 20,
+            'thinking_config' => ['thinkingLevel' => 'minimal'],
+        ],
     ],
     'calendar' => [
         'enabled' => true,

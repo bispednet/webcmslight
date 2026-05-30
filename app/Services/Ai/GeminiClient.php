@@ -9,36 +9,53 @@ final class GeminiClient
 {
     public function __construct(
         private readonly string $apiKey,
-        private readonly string $model = 'gemma-4-31b-it',
-        private readonly int $requestsPerMinute = 10,
-        private readonly int $requestsPerDay = 5000,
-        private readonly int $cooldownSeconds = 7,
+        private readonly string $profile,
+        private readonly string $model,
+        private readonly int $requestsPerMinute,
+        private readonly int $tokensPerMinute,
+        private readonly int $requestsPerDay,
+        private readonly int $cooldownSeconds,
+        private readonly int $timeoutSeconds,
+        private readonly array $thinkingConfig = [],
     ) {
     }
 
-    public static function fromConfig(array $config): ?self
+    public static function fromConfig(array $config, string $profile = 'editorial'): ?self
     {
-        $settings = $config['gemini'] ?? [];
-        $apiKey = trim((string)($settings['api_key'] ?? ''));
-        if ($apiKey === '') {
+        $gemini = $config['gemini'] ?? [];
+        $settings = $gemini[$profile] ?? ($profile === 'editorial' ? $gemini : []);
+        $apiKey = trim((string)($gemini['api_key'] ?? $settings['api_key'] ?? ''));
+        if ($apiKey === '' || empty($settings['model'])) {
             return null;
         }
 
         return new self(
             $apiKey,
-            (string)($settings['model'] ?? 'gemma-4-31b-it'),
+            preg_replace('/[^a-z0-9_-]/i', '', $profile) ?: 'default',
+            (string)$settings['model'],
             max(1, (int)($settings['requests_per_minute'] ?? 10)),
-            max(1, (int)($settings['requests_per_day'] ?? 5000)),
-            max(1, (int)($settings['cooldown_seconds'] ?? 7)),
+            max(1, (int)($settings['tokens_per_minute'] ?? 5000)),
+            max(1, (int)($settings['requests_per_day'] ?? 1000)),
+            max(0, (int)($settings['cooldown_seconds'] ?? 0)),
+            max(5, (int)($settings['timeout_seconds'] ?? 150)),
+            is_array($settings['thinking_config'] ?? null) ? $settings['thinking_config'] : [],
         );
     }
 
-    public function generate(string $prompt, int $maxOutputTokens = 8192): ?string
+    public function generate(string $prompt, int $maxOutputTokens = 2048): ?string
     {
-        $this->waitForCooldown();
-        if (!$this->reserveRequest()) {
-            Logger::error('Gemini request skipped: local rate limit reached', ['model' => $this->model]);
+        $reservation = $this->estimateTokens($prompt, $maxOutputTokens);
+        if (!$this->reserveRequest($reservation)) {
+            Logger::error('Gemini request skipped: local rate limit reached', ['profile' => $this->profile, 'model' => $this->model]);
             return null;
+        }
+
+        $generationConfig = [
+            'temperature' => 0.35,
+            'maxOutputTokens' => $maxOutputTokens,
+        ];
+        if ($this->thinkingConfig) {
+            $generationConfig['thinkingConfig'] = $this->thinkingConfig;
         }
 
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
@@ -48,10 +65,7 @@ final class GeminiClient
                 'role' => 'user',
                 'parts' => [['text' => $prompt]],
             ]],
-            'generationConfig' => [
-                'temperature' => 0.35,
-                'maxOutputTokens' => $maxOutputTokens,
-            ],
+            'generationConfig' => $generationConfig,
         ], JSON_THROW_ON_ERROR);
 
         $ch = curl_init($url);
@@ -63,73 +77,110 @@ final class GeminiClient
                 'Content-Type: application/json',
                 'x-goog-api-key: ' . $this->apiKey,
             ],
-            CURLOPT_TIMEOUT => 150,
+            CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_CONNECTTIMEOUT => 8,
         ]);
         $raw = curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
 
         if (!is_string($raw) || $status < 200 || $status >= 300) {
-            Logger::error('Gemini generation failed', ['model' => $this->model, 'status' => $status]);
+            Logger::error('Gemini generation failed', ['profile' => $this->profile, 'model' => $this->model, 'status' => $status]);
             return null;
         }
 
         $response = json_decode($raw, true);
+        $actualTokens = (int)($response['usageMetadata']['totalTokenCount'] ?? $reservation);
+        $this->replaceReservation($reservation, max(1, $actualTokens));
         $text = $response['candidates'][0]['content']['parts'][0]['text'] ?? null;
         return is_string($text) && trim($text) !== '' ? trim($text) : null;
     }
 
-    private function waitForCooldown(): void
+    private function estimateTokens(string $prompt, int $maxOutputTokens): int
     {
-        $path = BASE_PATH . '/storage/gemini-rate-limit.json';
-        if (!is_file($path)) {
-            return;
-        }
-        $state = json_decode((string)file_get_contents($path), true);
-        $last = is_array($state) ? (int)($state['last'] ?? 0) : 0;
-        $remaining = $this->cooldownSeconds - (time() - $last);
-        if ($remaining > 0) {
-            sleep($remaining);
-        }
+        return max(1, (int)ceil(mb_strlen($prompt, 'UTF-8') / 4) + $maxOutputTokens);
     }
 
-    private function reserveRequest(): bool
+    private function reserveRequest(int $tokens): bool
+    {
+        if ($tokens > $this->tokensPerMinute) {
+            return false;
+        }
+        $deadline = time() + 65;
+        do {
+            if ($this->writeReservation($tokens)) {
+                return true;
+            }
+            sleep(2);
+        } while (time() < $deadline);
+        return false;
+    }
+
+    private function writeReservation(int $tokens): bool
+    {
+        return $this->updateState(function (array $profile) use ($tokens): array {
+            $now = time();
+            $profile = $this->pruneProfile($profile, $now);
+            $minute = $profile['minute'];
+            $daily = ($profile['day'] ?? '') === gmdate('Y-m-d', $now) ? (int)($profile['daily'] ?? 0) : 0;
+            $tokenTotal = array_sum(array_column($minute, 'tokens'));
+            if (($now - (int)($profile['last'] ?? 0)) < $this->cooldownSeconds
+                || count($minute) >= $this->requestsPerMinute
+                || $tokenTotal + $tokens > $this->tokensPerMinute
+                || $daily >= $this->requestsPerDay) {
+                return [$profile, false];
+            }
+            $minute[] = ['at' => $now, 'tokens' => $tokens];
+            return [[
+                'day' => gmdate('Y-m-d', $now),
+                'daily' => $daily + 1,
+                'minute' => $minute,
+                'last' => $now,
+            ], true];
+        });
+    }
+
+    private function replaceReservation(int $reservedTokens, int $actualTokens): void
+    {
+        $this->updateState(function (array $profile) use ($reservedTokens, $actualTokens): array {
+            $profile = $this->pruneProfile($profile, time());
+            for ($index = count($profile['minute']) - 1; $index >= 0; $index--) {
+                if ((int)$profile['minute'][$index]['tokens'] === $reservedTokens) {
+                    $profile['minute'][$index]['tokens'] = $actualTokens;
+                    break;
+                }
+            }
+            return [$profile, true];
+        });
+    }
+
+    private function pruneProfile(array $profile, int $now): array
+    {
+        $profile['minute'] = array_values(array_filter(
+            (array)($profile['minute'] ?? []),
+            static fn(mixed $request): bool => is_array($request) && ($now - (int)($request['at'] ?? 0)) < 60
+        ));
+        return $profile;
+    }
+
+    private function updateState(callable $callback): bool
     {
         $path = BASE_PATH . '/storage/gemini-rate-limit.json';
         $handle = fopen($path, 'c+');
-        if ($handle === false) {
+        if ($handle === false || !flock($handle, LOCK_EX)) {
             return false;
         }
-
         try {
-            if (!flock($handle, LOCK_EX)) {
-                return false;
-            }
             $raw = stream_get_contents($handle);
             $state = is_string($raw) && $raw !== '' ? json_decode($raw, true) : [];
             $state = is_array($state) ? $state : [];
-            $now = time();
-            $day = gmdate('Y-m-d', $now);
-            $minute = array_values(array_filter(
-                (array)($state['minute'] ?? []),
-                static fn(mixed $timestamp): bool => is_int($timestamp) && ($now - $timestamp) < 60
-            ));
-            $last = (int)($state['last'] ?? 0);
-            $daily = ($state['day'] ?? '') === $day ? (int)($state['daily'] ?? 0) : 0;
-
-            if (($now - $last) < $this->cooldownSeconds
-                || count($minute) >= $this->requestsPerMinute
-                || $daily >= $this->requestsPerDay) {
-                return false;
-            }
-
-            $minute[] = $now;
-            $state = ['day' => $day, 'daily' => $daily + 1, 'minute' => $minute, 'last' => $now];
+            $profiles = is_array($state['profiles'] ?? null) ? $state['profiles'] : [];
+            [$profiles[$this->profile], $result] = $callback((array)($profiles[$this->profile] ?? []));
+            $state = ['profiles' => $profiles];
             ftruncate($handle, 0);
             rewind($handle);
             fwrite($handle, json_encode($state, JSON_THROW_ON_ERROR));
             fflush($handle);
-            return true;
+            return (bool)$result;
         } finally {
             flock($handle, LOCK_UN);
             fclose($handle);

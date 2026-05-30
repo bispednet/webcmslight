@@ -419,13 +419,12 @@ function db_log(PDO $pdo, string $action, string $entityType, string $entitySlug
         ->execute([$action, $entityType, $entitySlug, $msg]);
 }
 
-function editorial_html_prompt(array $item, string $brand, string $category, string $language): string
+function editorial_html_prompt(array $item, string $brand, string $category): string
 {
-    $languageLabel = $language === 'en' ? 'English' : 'Italian';
     return <<<PROMPT
 Sei la redazione di bisp&d, negozio e laboratorio tecnologico di Piombino. Trasforma la fonte in un articolo originale, utile e autosufficiente per il lettore. Non copiare frasi estese e non inventare prezzi, date, disponibilita o specifiche assenti dalla fonte.
 
-Scrivi una versione completa in {$languageLabel}, da 400-600 parole. Includi un punto di vista competente bisp&d, contesto pratico, cosa cambia davvero, a chi interessa, cosa verificare prima di acquistare e una conclusione utile. Usa solo HTML semantico: h2, h3, p, ul, ol, li, strong, em, blockquote. Non inserire link: la fonte viene citata separatamente dal sito.
+Scrivi una versione completa in italiano, da 400-600 parole. Includi un punto di vista competente bisp&d, contesto pratico, cosa cambia davvero, a chi interessa, cosa verificare prima di acquistare e una conclusione utile. Usa solo HTML semantico: h2, h3, p, ul, ol, li, strong, em, blockquote. Non inserire link: la fonte viene citata separatamente dal sito.
 Non ripetere, riassumere o commentare queste istruzioni. Il primo carattere della risposta deve essere `<` e il primo elemento deve essere un titolo `<h2>`.
 
 TITOLO FONTE: {$item['title']}
@@ -435,6 +434,18 @@ SINTESI FONTE: {$item['summary']}
 URL FONTE: {$item['link']}
 
 Rispondi esclusivamente con l'HTML dell'articolo, senza markdown e senza spiegazioni.
+PROMPT;
+}
+
+function editorial_translation_prompt(string $htmlIt): string
+{
+    return <<<PROMPT
+Traduci integralmente in inglese l'articolo italiano seguente. Mantieni struttura, significato e tag HTML. Non aggiungere commenti, scalette, markdown, link o informazioni nuove. Il primo carattere della risposta deve essere `<` e il primo elemento deve essere un titolo `<h2>`.
+
+ARTICOLO ITALIANO:
+{$htmlIt}
+
+Rispondi esclusivamente con la traduzione HTML.
 PROMPT;
 }
 
@@ -521,11 +532,11 @@ function editorial_snippet(string $html): string
 
 function generate_editorial(array $item, string $brand, string $category): ?array
 {
-    $htmlIt = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category, 'it'), 8000));
+    $htmlIt = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category), 2800));
     if (!$htmlIt) {
         return null;
     }
-    $htmlEn = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category, 'en'), 8000));
+    $htmlEn = normalize_editorial_html(llm_generate(editorial_translation_prompt($htmlIt), 2800));
     if (!$htmlEn) {
         return null;
     }

@@ -24,6 +24,7 @@ Custom CMS PHP/MariaDB per il rework commerciale di `bisped.net`, pensato per so
 - Dump SQL precedente: `/home/funboy/old_bisped.net.db.sql`, considerato ambiente test/demo.
 - Produzione FTP: usare solo in lettura per analisi e recupero asset.
 - Il cron editoriale e l'ingest offerte sono autonomi nel CMS PHP. CopilotRM non e una dipendenza runtime del sito.
+- Il concierge WhatsApp usa un profilo Gemini Flash Lite separato e prepara il passaggio alla chat umana con le informazioni raccolte.
 
 ## Setup locale
 
