@@ -369,15 +369,29 @@ HTML,
 
 ];
 
+$images = [
+    'samsung-galaxy-s25-ultra-recensione-2025' => '/media/products/samsung-galaxy-s25-256gb.jpg',
+    'iphone-16-pro-max-vs-galaxy-s25-ultra-2025' => '/media/products/apple-iphone-16-128gb.jpg',
+    'macbook-air-m4-guida-acquisto-2025' => '/media/products/apple-macbook-air-13-m3-8gb-256gb.jpg',
+    'nvidia-rtx-5090-recensione-gaming-ai-2025' => '/media/banners/banner-gaming-rig.jpg',
+    'migliori-notebook-gaming-2025-sotto-1000-euro' => '/media/products/asus-tuf-gaming-a15-rtx-4060-ryzen-7.jpg',
+    'airtag-2-vs-samsung-smarttag2-tracker-2025' => '/media/products/apple-airpods-pro-2-gen-usb-c.jpg',
+    'fastweb-vodafone-vs-tim-fibra-2026' => '/media/brands/logo-fastweb.jpg',
+    'amd-ryzen-ai-300-notebook-intelligenza-artificiale-2026' => '/media/products/asus-vivobook-16x-oled-i5-16gb-512gb.jpg',
+    'migliori-smartphone-sotto-400-euro-2026' => '/media/products/google-pixel-9-128gb.jpg',
+    'iliad-vs-wind3-sim-confronto-2026' => '/media/brands/wind.png',
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 $stmt = $pdo->prepare("
     INSERT INTO blog_posts
         (slug, title, published_at, image_url, snippet, content_html, is_published,
          related_product_tags, auto_generated)
     VALUES
-        (:slug, :title, :date, '', :snippet, :html, 1, :tags, 1)
+        (:slug, :title, :date, :image, :snippet, :html, 1, :tags, 1)
     ON DUPLICATE KEY UPDATE
         title = VALUES(title),
+        image_url = VALUES(image_url),
         snippet = VALUES(snippet),
         content_html = VALUES(content_html),
         related_product_tags = VALUES(related_product_tags),
@@ -389,6 +403,7 @@ foreach ($posts as $p) {
         'slug'    => $p['slug'],
         'title'   => $p['title'],
         'date'    => $p['date'],
+        'image'   => $images[$p['slug']] ?? '/media/bisped/fronte_negozio_bisped.png',
         'snippet' => $p['snippet'],
         'html'    => $p['html'],
         'tags'    => $p['tags'],

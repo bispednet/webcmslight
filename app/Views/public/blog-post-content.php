@@ -11,10 +11,18 @@ $imgUrl  = trim((string)($post['image_url'] ?? ''));
 $rawTitle = $locale === 'en' && trim((string)($post['title_en'] ?? '')) !== '' ? $post['title_en'] : $post['title'];
 $rawSnippet = $locale === 'en' && trim((string)($post['snippet_en'] ?? '')) !== '' ? $post['snippet_en'] : ($post['snippet'] ?? '');
 $rawContent = $locale === 'en' && trim((string)($post['content_html_en'] ?? '')) !== '' ? $post['content_html_en'] : $post['content_html'];
-$title   = htmlspecialchars(html_entity_decode((string)$rawTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+$decodeEntities = static function (string $value): string {
+    for ($iteration = 0; $iteration < 3; $iteration++) {
+        $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($decoded === $value) break;
+        $value = $decoded;
+    }
+    return $value;
+};
+$title   = htmlspecialchars($decodeEntities((string)$rawTitle), ENT_QUOTES, 'UTF-8');
 $date    = htmlspecialchars(date('d F Y', strtotime($post['published_at'])), ENT_QUOTES, 'UTF-8');
-$snippet = htmlspecialchars(html_entity_decode((string)$rawSnippet, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8');
-$content = HtmlSanitizer::sanitize((string)$rawContent);
+$snippet = htmlspecialchars($decodeEntities((string)$rawSnippet), ENT_QUOTES, 'UTF-8');
+$content = HtmlSanitizer::sanitize($decodeEntities((string)$rawContent));
 $blogUrl = $locale === 'en' ? '/en/blog' : '/blog';
 
 // Dynamic related products via tag overlap
