@@ -64,7 +64,7 @@ Return only compact JSON: {"reply":"...","ready":false}
 
 Conversation:
 PROMPT;
-        $raw = $client->generate($prompt . "\n" . implode("\n", $history), 280);
+        $raw = $client->generate($prompt . "\n" . implode("\n", $history), 280, 'json');
         $data = $this->decodeJson($raw);
         if (!$data) {
             Response::json(['reply' => $locale === 'en'

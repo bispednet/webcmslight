@@ -41,7 +41,7 @@ if (isset($opts['all'])) {
 }
 
 // ── Gemini editorial bridge ──────────────────────────────────────────────────
-function llm_generate(string $prompt, int $maxTokens = 800): ?string
+function llm_generate(string $prompt, int $maxTokens = 800, string $mode = 'text'): ?string
 {
     static $available = true;
     static $client = null;
@@ -55,7 +55,7 @@ function llm_generate(string $prompt, int $maxTokens = 800): ?string
         $available = false;
         return null;
     }
-    return $client->generate($prompt, $maxTokens);
+    return $client->generate($prompt, $maxTokens, $mode);
 }
 
 // ── RSS fetch helper ─────────────────────────────────────────────────────────
@@ -440,7 +440,7 @@ PROMPT;
 function editorial_translation_prompt(string $htmlIt): string
 {
     return <<<PROMPT
-Traduci integralmente in inglese l'articolo italiano seguente. Mantieni struttura, significato e tag HTML. Non aggiungere commenti, scalette, markdown, link o informazioni nuove. Il primo carattere della risposta deve essere `<` e il primo elemento deve essere un titolo `<h2>`.
+Traduci integralmente in inglese l'articolo italiano seguente. Mantieni struttura, significato e tag HTML. Preserva esattamente brand, aziende, prodotti e nomi propri: per esempio `Altroconsumo` non deve essere tradotto. Non aggiungere commenti, scalette, markdown, link o informazioni nuove. Il primo carattere della risposta deve essere `<` e il primo elemento deve essere un titolo `<h2>`.
 
 ARTICOLO ITALIANO:
 {$htmlIt}
@@ -454,64 +454,20 @@ function normalize_editorial_html(?string $raw): ?string
     if (!$raw) {
         return null;
     }
-    // Gemma may emit a short reasoning outline before the requested final HTML.
-    // Evaluate each possible article start and keep the richest valid final section.
-    preg_match_all('/<h2\b/i', $raw, $matches, PREG_OFFSET_CAPTURE);
-    $starts = array_reverse(array_map(static fn(array $match): int => (int)$match[1], $matches[0] ?? []));
-    if (!$starts) {
-        if (!empty($GLOBALS['verbose'])) {
-            echo "  → Editorial quality rejected: no HTML h2 section\n";
-        }
-        return null;
+    $html = HtmlSanitizer::sanitize(trim($raw));
+    $plainText = clean_text($html, 10000);
+    $length = mb_strlen($plainText, 'UTF-8');
+    $startsWithTitle = (bool)preg_match('/^\s*<h2(?:\s[^>]*)?>.+?<\/h2>/is', $html);
+    $paragraphs = substr_count(strtolower($html), '<p');
+    $echoesPrompt = (bool)preg_match('/(?:editorial team|semantic html|no inventing|rispondi esclusivamente|format:|main title|introduction:|target audience|pre-purchase|no links|check constraints|check length|html only|refining the|what changes:|who is it for\\?|first character|aiming for|headline:|key news:|key features|check html|wait, the source)/i', $plainText);
+    if ($length >= 1200 && $startsWithTitle && $paragraphs >= 4 && !$echoesPrompt) {
+        return $html;
     }
-
-    $best = ['length' => 0, 'title' => false, 'paragraphs' => 0, 'echo' => false];
-    foreach ($starts as $start) {
-        $html = str_replace('`', '', substr($raw, $start));
-        $html = preg_replace('/^\s*\*\s+(?=<)/m', '', trim($html)) ?? '';
-        $html = HtmlSanitizer::sanitize($html);
-        if (substr_count(strtolower($html), '<p') < 4) {
-            $html = normalize_editorial_plaintext($html);
-        }
-        $plainText = clean_text($html, 10000);
-        $length = mb_strlen($plainText, 'UTF-8');
-        $startsWithTitle = (bool)preg_match('/^\s*<h2(?:\s[^>]*)?>.+?<\/h2>/is', $html);
-        $paragraphs = substr_count(strtolower($html), '<p');
-        $echoesPrompt = (bool)preg_match('/(?:editorial team|semantic html|no inventing|rispondi esclusivamente|format:|main title|introduction:|target audience|pre-purchase|no links|check constraints|check length|html only|refining the|what changes:|who is it for\\?|first character|aiming for|headline:|key news:|key features|check html|wait, the source)/i', $plainText);
-        if ($length > $best['length']) {
-            $best = ['length' => $length, 'title' => $startsWithTitle, 'paragraphs' => $paragraphs, 'echo' => $echoesPrompt];
-        }
-        if ($length >= 1200 && $startsWithTitle && $paragraphs >= 4 && !$echoesPrompt) {
-            return $html;
-        }
-    }
-
     if (!empty($GLOBALS['verbose'])) {
-        echo "  → Editorial quality rejected: chars={$best['length']}, h2=" . ($best['title'] ? 'yes' : 'no')
-            . ", paragraphs={$best['paragraphs']}, prompt_echo=" . ($best['echo'] ? 'yes' : 'no') . "\n";
+        echo "  → Editorial quality rejected: chars={$length}, h2=" . ($startsWithTitle ? 'yes' : 'no')
+            . ", paragraphs={$paragraphs}, prompt_echo=" . ($echoesPrompt ? 'yes' : 'no') . "\n";
     }
     return null;
-}
-
-function normalize_editorial_plaintext(string $html): string
-{
-    if (!preg_match('/^\s*(<h2(?:\s[^>]*)?>.+?<\/h2>)(.*)$/is', $html, $match)) {
-        return $html;
-    }
-    $text = clean_text($match[2], 10000);
-    $sentences = preg_split('/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Ý])/u', $text) ?: [];
-    if (mb_strlen($text, 'UTF-8') < 1200 || count($sentences) < 5) {
-        return $html;
-    }
-    $chunkSize = max(1, (int)ceil(count($sentences) / 5));
-    $paragraphs = [];
-    foreach (array_chunk($sentences, $chunkSize) as $chunk) {
-        $paragraph = trim(implode(' ', $chunk));
-        if ($paragraph !== '') {
-            $paragraphs[] = '<p>' . htmlspecialchars($paragraph, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</p>';
-        }
-    }
-    return count($paragraphs) >= 4 ? $match[1] . implode("\n", $paragraphs) : $html;
 }
 
 function editorial_title(string $html, string $fallback): string
@@ -532,11 +488,11 @@ function editorial_snippet(string $html): string
 
 function generate_editorial(array $item, string $brand, string $category): ?array
 {
-    $htmlIt = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category), 2800));
+    $htmlIt = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category), 2800, 'html'));
     if (!$htmlIt) {
         return null;
     }
-    $htmlEn = normalize_editorial_html(llm_generate(editorial_translation_prompt($htmlIt), 2800));
+    $htmlEn = normalize_editorial_html(llm_generate(editorial_translation_prompt($htmlIt), 2800, 'html'));
     if (!$htmlEn) {
         return null;
     }

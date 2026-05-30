@@ -16,9 +16,17 @@ final class GeminiClient
         private readonly int $requestsPerDay,
         private readonly int $cooldownSeconds,
         private readonly int $timeoutSeconds,
-        private readonly array $thinkingConfig = [],
+        private readonly float $temperature = 0.35,
+        private readonly bool $includeThoughts = false,
+        private readonly bool $stripReasoningOutput = true,
+        private readonly string $thinkingLevel = 'minimal',
+        private readonly int $thinkingBudget = 0,
     ) {
     }
+
+    private bool $useThinkingFallback = false;
+    /** @var array<string,bool> */
+    private static array $thinkingFallbackModels = [];
 
     public static function fromConfig(array $config, string $profile = 'editorial'): ?self
     {
@@ -38,61 +46,193 @@ final class GeminiClient
             max(1, (int)($settings['requests_per_day'] ?? 1000)),
             max(0, (int)($settings['cooldown_seconds'] ?? 0)),
             max(5, (int)($settings['timeout_seconds'] ?? 150)),
-            is_array($settings['thinking_config'] ?? null) ? $settings['thinking_config'] : [],
+            (float)($settings['temperature'] ?? 0.35),
+            (bool)($settings['include_thoughts'] ?? false),
+            (bool)($settings['strip_reasoning'] ?? true),
+            (string)($settings['thinking_level'] ?? ($settings['thinking_config']['thinkingLevel'] ?? 'minimal')),
+            (int)($settings['thinking_budget'] ?? 0),
         );
     }
 
-    public function generate(string $prompt, int $maxOutputTokens = 2048): ?string
+    public function generate(string $prompt, int $maxOutputTokens = 8192, string $mode = 'text'): ?string
     {
+        $mode = in_array($mode, ['text', 'html', 'json'], true) ? $mode : 'text';
         $reservation = $this->estimateTokens($prompt, $maxOutputTokens);
         if (!$this->reserveRequest($reservation)) {
             Logger::error('Gemini request skipped: local rate limit reached', ['profile' => $this->profile, 'model' => $this->model]);
             return null;
         }
 
-        $generationConfig = [
-            'temperature' => 0.35,
-            'maxOutputTokens' => $maxOutputTokens,
-        ];
-        if ($this->thinkingConfig) {
-            $generationConfig['thinkingConfig'] = $this->thinkingConfig;
+        $this->useThinkingFallback = self::$thinkingFallbackModels[$this->model] ?? $this->useThinkingFallback;
+        [$status, $response] = $this->request($prompt, $maxOutputTokens, $mode, $this->useThinkingFallback);
+        $error = strtolower((string)($response['error']['message'] ?? ''));
+        if ($status === 400 && !$this->useThinkingFallback && str_contains($error, 'thinking')) {
+            $this->useThinkingFallback = true;
+            self::$thinkingFallbackModels[$this->model] = true;
+            Logger::info('Gemini thinkingConfig fallback enabled', ['profile' => $this->profile, 'model' => $this->model]);
+            [$status, $response] = $this->request($prompt, $maxOutputTokens, $mode, true);
+        }
+        if ($status < 200 || $status >= 300 || !$response) {
+            Logger::error('Gemini generation failed', ['profile' => $this->profile, 'model' => $this->model, 'status' => $status]);
+            return null;
         }
 
+        $actualTokens = (int)($response['usageMetadata']['totalTokenCount'] ?? $reservation);
+        $this->replaceReservation($reservation, max(1, $actualTokens));
+        $text = $this->extractVisibleText($response);
+        return $text === null ? null : $this->normalizeModelOutput($text, $mode);
+    }
+
+    /**
+     * @return array{0:int,1:?array}
+     */
+    private function request(string $prompt, int $maxOutputTokens, string $mode, bool $fallback): array
+    {
+        $thinkingConfig = $fallback
+            ? ['includeThoughts' => $this->includeThoughts]
+            : [
+                'includeThoughts' => $this->includeThoughts,
+                'thinkingLevel' => $this->thinkingLevel,
+                'thinkingBudget' => $this->thinkingBudget,
+            ];
+        $payload = json_encode([
+            'systemInstruction' => ['parts' => [['text' => $this->systemInstructionForMode($mode)]]],
+            'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+            'generationConfig' => [
+                'temperature' => $this->temperature,
+                'maxOutputTokens' => $maxOutputTokens,
+                'thinkingConfig' => $thinkingConfig,
+            ],
+        ], JSON_THROW_ON_ERROR);
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
             . rawurlencode($this->model) . ':generateContent';
-        $payload = json_encode([
-            'contents' => [[
-                'role' => 'user',
-                'parts' => [['text' => $prompt]],
-            ]],
-            'generationConfig' => $generationConfig,
-        ], JSON_THROW_ON_ERROR);
-
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'x-goog-api-key: ' . $this->apiKey,
-            ],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-goog-api-key: ' . $this->apiKey],
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_CONNECTTIMEOUT => 8,
         ]);
         $raw = curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $response = is_string($raw) ? json_decode($raw, true) : null;
+        return [$status, is_array($response) ? $response : null];
+    }
 
-        if (!is_string($raw) || $status < 200 || $status >= 300) {
-            Logger::error('Gemini generation failed', ['profile' => $this->profile, 'model' => $this->model, 'status' => $status]);
+    private function systemInstructionForMode(string $mode): string
+    {
+        $suffix = $mode === 'json'
+            ? 'If JSON mode is active, return only valid JSON.'
+            : ($mode === 'html' ? 'If HTML mode is active, return only the final HTML fragment.' : '');
+        return trim('Return only the final payload requested by the caller.
+Do not expose reasoning, chain-of-thought, thoughts, analysis, scratchpad, hidden reasoning, draft notes, self-checks, markdown fences or explanations.
+' . $suffix);
+    }
+
+    private function extractVisibleText(array $response): ?string
+    {
+        $visible = [];
+        $removedThoughts = 0;
+        foreach ((array)($response['candidates'][0]['content']['parts'] ?? []) as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            if (($part['thought'] ?? false) === true) {
+                $removedThoughts++;
+                continue;
+            }
+            $text = trim((string)($part['text'] ?? ''));
+            if ($text !== '') {
+                $visible[] = $text;
+            }
+        }
+        if ($removedThoughts > 0) {
+            Logger::info('Gemini thought parts removed', ['profile' => $this->profile, 'model' => $this->model, 'parts' => $removedThoughts]);
+        }
+        $text = trim(implode("\n", $visible));
+        return $text === '' ? null : $text;
+    }
+
+    private function normalizeModelOutput(string $text, string $mode = 'text'): ?string
+    {
+        $text = $this->stripReasoningOutput ? $this->stripReasoning($text) : trim($text);
+        $text = $this->unwrapMarkdownFence($text);
+        return match ($mode) {
+            'json' => $this->normalizeJsonOutput($text),
+            'html' => $this->normalizeHtmlOutput($text),
+            default => trim($text) !== '' ? trim($text) : null,
+        };
+    }
+
+    private function stripReasoning(string $text): string
+    {
+        $original = $text;
+        $text = preg_replace('#<(think|thinking|reasoning)\b[^>]*>.*?</\1>#is', '', $text) ?? $text;
+        $text = preg_replace('/<\|channel\|>\s*(?:thought|analysis).*?(?=<\|channel\|>\s*(?:final|answer)|$)/is', '', $text) ?? $text;
+        if (preg_match_all('/(?:^|\n)\s*(?:Final|Answer|Response|assistant)\s*:\s*/i', $text, $matches, PREG_OFFSET_CAPTURE) && $matches[0]) {
+            $last = end($matches[0]);
+            $text = substr($text, (int)$last[1] + strlen((string)$last[0]));
+        }
+        if ($text !== $original) {
+            Logger::info('Gemini textual reasoning removed', ['profile' => $this->profile, 'model' => $this->model, 'before' => strlen($original), 'after' => strlen($text)]);
+        }
+        return trim($text);
+    }
+
+    private function unwrapMarkdownFence(string $text): string
+    {
+        return trim(preg_replace('/^```(?:html|json|text)?\s*|\s*```$/i', '', trim($text)) ?? $text);
+    }
+
+    private function extractBalancedJson(string $text): ?string
+    {
+        $length = strlen($text);
+        for ($start = 0; $start < $length; $start++) {
+            if (!in_array($text[$start], ['{', '['], true)) continue;
+            $stack = [];
+            $quoted = false;
+            $escaped = false;
+            for ($index = $start; $index < $length; $index++) {
+                $char = $text[$index];
+                if ($quoted) {
+                    if ($escaped) $escaped = false;
+                    elseif ($char === '\\') $escaped = true;
+                    elseif ($char === '"') $quoted = false;
+                    continue;
+                }
+                if ($char === '"') $quoted = true;
+                elseif ($char === '{' || $char === '[') $stack[] = $char;
+                elseif ($char === '}' || $char === ']') {
+                    $open = array_pop($stack);
+                    if (($open === '{' && $char !== '}') || ($open === '[' && $char !== ']')) break;
+                    if (!$stack) return substr($text, $start, $index - $start + 1);
+                }
+            }
+        }
+        return null;
+    }
+
+    private function normalizeJsonOutput(string $text): ?string
+    {
+        $json = $this->extractBalancedJson($text);
+        $decoded = $json === null ? null : json_decode($json, true);
+        if ($json === null || json_last_error() !== JSON_ERROR_NONE) {
+            Logger::error('Gemini JSON normalization failed', ['profile' => $this->profile, 'model' => $this->model, 'length' => strlen($text)]);
             return null;
         }
+        return json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
 
-        $response = json_decode($raw, true);
-        $actualTokens = (int)($response['usageMetadata']['totalTokenCount'] ?? $reservation);
-        $this->replaceReservation($reservation, max(1, $actualTokens));
-        $text = $response['candidates'][0]['content']['parts'][0]['text'] ?? null;
-        return is_string($text) && trim($text) !== '' ? trim($text) : null;
+    private function normalizeHtmlOutput(string $text): ?string
+    {
+        if (!preg_match('/<(?:h1|h2|p|section|article|ul|ol)\b/i', $text, $match, PREG_OFFSET_CAPTURE)) {
+            Logger::error('Gemini HTML normalization failed: no useful tag', ['profile' => $this->profile, 'model' => $this->model, 'length' => strlen($text)]);
+            return null;
+        }
+        $html = substr($text, (int)$match[0][1]);
+        return trim($html) !== '' ? trim($html) : null;
     }
 
     private function estimateTokens(string $prompt, int $maxOutputTokens): int

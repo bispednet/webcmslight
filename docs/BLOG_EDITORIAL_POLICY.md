@@ -18,7 +18,13 @@ Il blog bisp&d deve essere utile anche senza aprire la fonte originale. Il cron 
 
 Il modello editoriale riceve prima un prompt strutturato in italiano. Solo se il testo supera il controllo qualita, una seconda richiesta traduce integralmente lo stesso articolo in inglese. Titolo e anteprima vengono derivati dalla rispettiva versione per evitare contenuti ibridi. Se il modello non e disponibile o restituisce contenuti sotto soglia, il cron salta la pubblicazione: il fallback prudente viene usato solo nelle simulazioni tecniche. Gli articoli legacy troppo brevi devono essere rimossi o riscritti prima della pubblicazione.
 
-La redazione automatica usa direttamente Gemini API dal CMS PHP con modello `gemma-4-31b-it`: CopilotRM non e una dipendenza runtime del sito. La chiave resta in `.env.php`, escluso da Git. Il client applica un cooldown persistente di 7 secondi e limiti locali di 10 richieste al minuto, 5.000 token al minuto e 1.000 richieste al giorno. `gemma-4-31b-it` non supporta `thinkingBudget`: il cron di collaudo tenta fino a dieci fonti al giorno e scarta scalette o residui del ragionamento senza pubblicarli.
+La redazione automatica usa direttamente Gemini API dal CMS PHP con modello `gemma-4-31b-it`: CopilotRM non e una dipendenza runtime del sito. La chiave resta in `.env.php`, escluso da Git. Il client applica un cooldown persistente di 7 secondi e limiti locali di 10 richieste al minuto, 5.000 token al minuto e 1.000 richieste al giorno. `gemma-4-31b-it` non supporta `thinkingBudget`: il client ritenta automaticamente con `includeThoughts=false`, esclude le parts marcate come reasoning e restituisce all'ingest solo HTML normalizzato. Il cron di collaudo tenta fino a dieci fonti al giorno e scarta comunque scalette o residui non recuperabili.
+
+Il normalizzatore statico si verifica senza chiamate API con:
+
+```bash
+runtime/bin/frankenphp php-cli scripts/test-gemini-normalizer.php
+```
 
 Prima del deploy su un database esistente eseguire:
 
