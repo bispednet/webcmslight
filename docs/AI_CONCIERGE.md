@@ -1,15 +1,16 @@
-# Team AI Bisped
+# SarAI e agenti digitali Bisped
 
-Il concierge pubblico sostituisce il semplice pulsante WhatsApp con un percorso guidato nativo del CMS.
+Il concierge pubblico si presenta come `SarAI`, Sara Digitale Bisped. Parte da una richiesta libera, raccoglie i dettagli gia presenti nel messaggio e chiede solo cio che manca. Non e un questionario e non finge di essere una persona umana.
 
 ## Flusso
 
-- `AndreAI` gestisce tecnologia, device e assistenza.
+- `SarAI` apre la conversazione e gestisce energia, bollette, pratiche e orientamento iniziale.
+- `AndreAI` prende in carico tecnologia, device e assistenza.
 - `SerenAI` gestisce fibra, internet, mobile e telefonia.
-- `SarAI` gestisce energia, bollette e pratiche.
-- Il router gestisce richieste miste e business.
-- La privacy notice precede la raccolta dei dati personali.
-- Il sistema genera tre percorsi senza inventare prezzi, coperture o disponibilita.
+- Il cambio agente e dichiarato in chat e visibile nell'header.
+- La privacy notice precede il riepilogo per il negozio e la raccolta dei dati personali.
+- SarAI applica il metodo: prima capisco come vivi, poi ti consiglio.
+- Il sistema genera tre pre-preventivi senza inventare prezzi, coperture o disponibilita.
 - Il link WhatsApp viene creato dal backend e il riepilogo viene salvato anche in `contact_messages`.
 
 ## Endpoint
@@ -26,7 +27,7 @@ Il concierge pubblico sostituisce il semplice pulsante WhatsApp con un percorso 
 runtime/bin/frankenphp php-cli scripts/migrate-ai-concierge.php
 ```
 
-Il flusso deterministico resta disponibile senza LLM. Gemini puo essere usato come arricchimento, mai come dipendenza obbligatoria.
+Il flusso deterministico resta disponibile senza LLM. Gemini Flash Lite riscrive le risposte libere in tono naturale, ma non puo superare le regole backend o diventare una dipendenza obbligatoria.
 
 ## Sicurezza
 

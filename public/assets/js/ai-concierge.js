@@ -9,6 +9,11 @@
     var form = root.querySelector('[data-ai-form]');
     var input = form.querySelector('input');
     var handoff = root.querySelector('[data-ai-handoff]');
+    var agentName = root.querySelector('[data-ai-agent-name]');
+    var agentSubtitle = root.querySelector('[data-ai-agent-subtitle]');
+    var agentBadge = root.querySelector('[data-ai-agent-badge]');
+    var agentAvatar = root.querySelector('[data-ai-avatar]');
+    var inputNote = root.querySelector('[data-ai-input-note]');
     var csrf = '';
     var conversationId = '';
     var busy = false;
@@ -19,6 +24,17 @@
         item.textContent = text;
         messages.appendChild(item);
         messages.scrollTop = messages.scrollHeight;
+    }
+    function renderAgent(agent, transition) {
+        if (!agent) return;
+        if (transition) add('transition', transition);
+        agentName.textContent = agent.name;
+        agentSubtitle.textContent = agent.subtitle;
+        agentBadge.textContent = agent.badge;
+        agentAvatar.textContent = agent.name.slice(0, 2).toUpperCase();
+        inputNote.textContent = agent.key === 'sarai'
+            ? 'Scrivi come parleresti al banco. Al resto ci pensa SarAI.'
+            : 'Scrivi pure i dettagli che hai già. ' + agent.name + ' ti chiederà solo ciò che manca.';
     }
     function renderChoices(items) {
         choices.replaceChildren();
@@ -45,6 +61,7 @@
     function apply(data) {
         if (data.csrf) csrf = data.csrf;
         if (data.conversation_id) conversationId = data.conversation_id;
+        renderAgent(data.agent, data.transition);
         add(data.error ? 'error' : 'bot', data.reply || data.error || 'Riprova tra poco.');
         renderChoices(data.choices);
         renderQuotes(data.quotes);

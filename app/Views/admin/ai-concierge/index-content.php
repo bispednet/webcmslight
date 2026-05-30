@@ -1,5 +1,5 @@
 <section class="space-y-6">
-    <div><p class="text-sm uppercase tracking-[.2em] text-cy">Team AI Bisped</p><h1 class="text-2xl font-semibold">Conversazioni concierge</h1></div>
+    <div><p class="text-sm uppercase tracking-[.2em] text-cy">SarAI e agenti digitali</p><h1 class="text-2xl font-semibold">Conversazioni concierge</h1></div>
     <div class="grid gap-4 md:grid-cols-4">
         <?php foreach (['total'=>'Conversazioni','qualified'=>'Qualificate','handed_off'=>'WhatsApp','average_score'=>'Score medio'] as $key=>$label): ?>
             <div class="card"><p class="text-sm text-muted"><?= htmlspecialchars($label) ?></p><p class="mt-2 text-3xl font-semibold"><?= (int)($stats[$key] ?? 0) ?></p></div>

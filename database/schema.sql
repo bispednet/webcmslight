@@ -395,7 +395,7 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
     main_sector VARCHAR(80) NULL,
     urgency ENUM('bassa','media','alta','immediata') NULL,
     lead_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    current_step VARCHAR(80) NOT NULL DEFAULT 'privacy_notice',
+    current_step VARCHAR(80) NOT NULL DEFAULT 'opening',
     structured_data JSON NULL,
     summary TEXT NULL,
     consent_privacy TINYINT(1) NOT NULL DEFAULT 0,

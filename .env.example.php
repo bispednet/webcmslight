@@ -73,7 +73,7 @@ return [
     'ai_concierge' => [
         'enabled' => true,
         'mode' => 'hybrid',
-        'display_name' => 'Team AI Bisped',
+        'display_name' => 'SarAI',
         'whatsapp_number' => '393346582116',
         'max_messages_per_conversation' => 40,
         'rate_limit_per_minute' => 12,

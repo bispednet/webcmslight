@@ -13,6 +13,7 @@ final class ConciergeOrchestrator
     private QuoteBuilder $quotes;
     private SpecialConditionEngine $conditions;
     private WhatsAppHandoffBuilder $whatsapp;
+    private ConversationComposer $composer;
 
     public function __construct(private PDO $db, private array $config)
     {
@@ -21,6 +22,11 @@ final class ConciergeOrchestrator
         $this->quotes = new QuoteBuilder();
         $this->conditions = new SpecialConditionEngine($db);
         $this->whatsapp = new WhatsAppHandoffBuilder();
+        $this->composer = new ConversationComposer(
+            GeminiClient::fromConfig($config, 'concierge'),
+            new PromptBuilder(),
+            new ResponseStyleGuard()
+        );
     }
 
     public function bootstrap(string $sessionId, string $locale, array $context): array
@@ -28,8 +34,8 @@ final class ConciergeOrchestrator
         $publicId = $this->uuid();
         $stmt = $this->db->prepare(
             'INSERT INTO ai_conversations
-             (public_id,session_id,locale,entry_context,entry_url,ip_address,user_agent,structured_data)
-             VALUES (:public_id,:session_id,:locale,:entry_context,:entry_url,:ip,:agent,:data)'
+             (public_id,session_id,locale,current_step,entry_context,entry_url,ip_address,user_agent,structured_data)
+             VALUES (:public_id,:session_id,:locale,"opening",:entry_context,:entry_url,:ip,:agent,:data)'
         );
         $stmt->execute([
             'public_id' => $publicId,
@@ -72,8 +78,12 @@ final class ConciergeOrchestrator
             $this->update((int)$conversation['id'], $reply['updates']);
             $conversation = $this->find($publicId, $sessionId);
         }
+        if ($message !== '' && $choice === null) {
+            $data = json_decode((string)($conversation['structured_data'] ?? '{}'), true) ?: [];
+            $reply['message'] = $this->composer->compose($reply['agent'], $message, $reply['message'], $data);
+        }
         $this->message((int)$conversation['id'], 'assistant', $reply['message']);
-        if ($reply['ready']) {
+        if ($reply['ready'] || $reply['quoteReady']) {
             $reply['quotes'] = $this->ensureLeadAndQuotes($conversation);
         }
 
@@ -125,7 +135,7 @@ final class ConciergeOrchestrator
             'assigned' => (new AgentPersonaRegistry())->forSector($sector)['key'],
         ]);
         $leadId = (int)$this->db->query('SELECT id FROM ai_leads WHERE conversation_id=' . (int)$conversation['id'])->fetchColumn();
-        $quotes = $this->quotes->build($sector, $condition);
+        $quotes = $this->quotes->build($sector, $condition, $data);
         $this->db->prepare('DELETE FROM ai_quotes WHERE conversation_id=:id')->execute(['id' => $conversation['id']]);
         $stmt = $this->db->prepare(
             'INSERT INTO ai_quotes (conversation_id,lead_id,quote_level,title,summary,items_json,special_condition,disclaimers)
@@ -178,7 +188,17 @@ final class ConciergeOrchestrator
 
     private function response(string $publicId, array $reply): array
     {
-        return ['conversation_id' => $publicId, 'reply' => $reply['message'], 'step' => $reply['step'], 'choices' => $reply['choices'], 'quotes' => $reply['quotes'] ?? [], 'ready' => $reply['ready']];
+        return [
+            'conversation_id' => $publicId,
+            'reply' => $reply['message'],
+            'step' => $reply['step'],
+            'choices' => $reply['choices'],
+            'quotes' => $reply['quotes'] ?? [],
+            'ready' => $reply['ready'],
+            'quote_ready' => $reply['quoteReady'] ?? false,
+            'agent' => $reply['agent'] ?? (new AgentPersonaRegistry())->byKey('sarai'),
+            'transition' => $reply['transition'] ?? null,
+        ];
     }
 
     private function uuid(): string

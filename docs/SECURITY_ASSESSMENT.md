@@ -24,7 +24,8 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Aggiornato schema DB con `users.password_hash` e `appointment_requests`.
 - Aggiornata documentazione per evitare credenziali in comandi copiabili.
 - Integrato Gemini direttamente dal CMS PHP con chiave solo in `.env.php`, rate limit persistente e filtro anti-SSRF per acquisizione testi e immagini editoriali.
-- Sostituito il concierge dimostrativo con Team AI Bisped: flusso deterministico persistente, privacy notice prima dei dati personali, endpoint CSRF, rate limit, limite messaggi, filtro spam e handoff WhatsApp generato dal backend.
+- Sostituito il concierge dimostrativo con SarAI e agenti digitali: flusso persistente, privacy notice prima del riepilogo, endpoint CSRF, rate limit, limite messaggi, filtro spam e handoff WhatsApp generato dal backend.
+- Evoluto il concierge in SarAI con estrazione locale dei campi, routing visibile e riscrittura Gemini controllata da style guard; il modello non decide prezzi, condizioni o accessi ai dati.
 - Corretto il sanitizer HTML editoriale: i frammenti vengono interpretati esplicitamente come UTF-8 e lo script `scripts/repair-blog-encoding.php` bonifica in modo idempotente i contenuti gia contaminati.
 
 ## Controlli Eseguiti
@@ -34,7 +35,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Verifica `/install.php`: restituisce `404` senza variabile di abilitazione.
 - Verifica header HTTPS su `solclawn.com`.
 - Smoke test principali su login, pagine inglesi, appuntamenti e admin nelle iterazioni precedenti.
-- Smoke test API completo Team AI Bisped: qualifica TLC, tre quote, lead DB, record `contact_messages` e URL `wa.me`.
+- Smoke test API completo SarAI: qualifica TLC, tre quote, lead DB, record `contact_messages` e URL `wa.me`.
 - Verifica rendering articolo Cherokee dopo bonifica: nessun marker mojibake e accenti UTF-8 corretti.
 
 ## Rischi Residui

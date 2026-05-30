@@ -15,6 +15,7 @@ $db = Database::connection();
 foreach (array_filter(array_map('trim', explode(';', substr($schema, $offset)))) as $statement) {
     $db->exec($statement);
 }
+$db->exec("ALTER TABLE ai_conversations MODIFY COLUMN current_step VARCHAR(80) NOT NULL DEFAULT 'opening'");
 
 $conditions = [
     ['priority_whatsapp', 'Priorita WhatsApp', 'La richiesta qualificata arriva al negozio gia ordinata per una risposta piu rapida.', null, 35],

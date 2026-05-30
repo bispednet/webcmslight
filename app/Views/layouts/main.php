@@ -134,7 +134,7 @@ if ($isAdmin) {
         };
     </script>
     <link rel="stylesheet" href="/assets/css/app.css?v=20260530-concierge">
-    <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260530-team-ai-v2">
+    <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260530-sarai-v1">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>
         <meta name="csrf-token" content="<?= htmlspecialchars($adminCsrf, ENT_QUOTES, 'UTF-8'); ?>">
@@ -165,7 +165,7 @@ if ($isAdmin) {
     ]); ?>
 
     <?php View::renderPartial('partials/ai-concierge-widget'); ?>
-    <script src="/assets/js/ai-concierge.js?v=20260530-team-ai-v2" defer></script>
+    <script src="/assets/js/ai-concierge.js?v=20260530-sarai-v1" defer></script>
 
     <!-- Cookie Banner -->
     <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Cookie policy">

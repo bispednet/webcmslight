@@ -14,7 +14,7 @@ Custom CMS PHP/MariaDB per il rework commerciale di `bisped.net`, pensato per so
 - Seed iniziale per impostazioni, navigazione, prodotti, FAQ, blog, team e testi legali.
 - Asset recuperati in sola lettura da FTP in `public/media/bisped/`.
 - Form contatti e appuntamenti con CSRF, honeypot/rate-limit dove applicabile.
-- Team AI Bisped: concierge nativo con routing AndreAI/SerenAI/SarAI, qualifica guidata, tre percorsi e handoff WhatsApp persistente.
+- SarAI: concierge nativo con richiesta iniziale libera, routing visibile verso AndreAI/SerenAI, tre pre-preventivi e handoff WhatsApp persistente.
 - Audit migrazione in `docs/BISPED_MIGRATION_AUDIT.md`.
 - Security assessment in `docs/SECURITY_ASSESSMENT.md`.
 - Runtime locale portabile in `runtime/` con FrankenPHP, MariaDB e Playwright. La cartella e esclusa da Git.
