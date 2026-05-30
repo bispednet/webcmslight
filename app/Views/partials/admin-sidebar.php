@@ -3,6 +3,7 @@ use App\Core\View;
 use App\Support\Media;
 
 $siteLogoUrl = $siteLogo ?? '';
+$logoutCsrf = $logoutCsrf ?? null;
 if ($siteLogoUrl === '') {
     $siteLogoUrl = Media::assetSvg('logo/site-logo.svg');
 }
@@ -109,6 +110,9 @@ if ($siteLogoUrl === '') {
     </nav>
     <div class="px-4 py-6 border-t border-stroke">
         <form method="post" action="/auth/logout">
+            <?php if (!empty($logoutCsrf)): ?>
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$logoutCsrf, ENT_QUOTES, 'UTF-8'); ?>">
+            <?php endif; ?>
             <button type="submit" class="w-full bg-pri text-white font-semibold py-2 rounded-md hover:bg-pri-700 transition">
                 Logout
             </button>

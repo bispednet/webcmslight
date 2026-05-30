@@ -5,6 +5,7 @@
 
 use App\Core\View;
 use App\Services\Cms\ContentRepository;
+use App\Services\Security\Csrf;
 use App\Support\Media;
 
 $pageTitle = isset($title) ? $title . ' | Bisped Admin' : 'Admin | Bisped';
@@ -51,6 +52,7 @@ $adminSiteLogo = Media::siteLogoUrl($settings['site_logo'] ?? '');
 <body class="bg-bg text-txt min-h-screen flex">
     <?php View::renderPartial('partials/admin-sidebar', [
         'siteLogo' => $adminSiteLogo,
+        'logoutCsrf' => Csrf::token(),
     ]); ?>
     <div class="flex-1 min-h-screen flex flex-col">
         <?php View::renderPartial('partials/admin-header'); ?>

@@ -24,7 +24,9 @@ final class SessionGuard
 
     public function login(int $adminId): void
     {
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
+        }
         $_SESSION['admin_id'] = $adminId;
         $_SESSION['login_time'] = time();
     }
@@ -36,7 +38,8 @@ final class SessionGuard
             $params = session_get_cookie_params();
             setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
         }
-        session_destroy();
-        session_regenerate_id(true);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
     }
 }

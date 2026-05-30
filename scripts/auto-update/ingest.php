@@ -4,7 +4,7 @@ declare(strict_types=1);
  * bisped.net Auto-Update Ingestion Engine
  *
  * Fetches RSS / scrape / API sources from sources.json,
- * enriches content via CopilotRM LLM (localhost:4010) when available,
+ * enriches content via the Gemini API when configured,
  * and upserts products + blog posts in the CMS database.
  *
  * Usage:
@@ -19,6 +19,8 @@ declare(strict_types=1);
 require dirname(__DIR__, 2) . '/app/bootstrap.php';
 
 use App\Core\Database;
+use App\Services\Ai\GeminiClient;
+use App\Support\HtmlSanitizer;
 
 // ── CLI options ──────────────────────────────────────────────────────────────
 $opts     = getopt('', ['source:', 'all', 'dry-run', 'verbose', 'limit:']);
@@ -38,74 +40,22 @@ if (isset($opts['all'])) {
     $activeCategories = array_keys($sources);
 }
 
-// ── CopilotRM LLM bridge ─────────────────────────────────────────────────────
+// ── Gemini editorial bridge ──────────────────────────────────────────────────
 function llm_generate(string $prompt, int $maxTokens = 800): ?string
 {
-    $payload = json_encode([
-        'model'      => 'llama3.2',
-        'prompt'     => $prompt,
-        'max_tokens' => $maxTokens,
-        'stream'     => false,
-    ]);
-    $ch = curl_init('http://localhost:11434/api/generate');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_TIMEOUT        => 30,
-        CURLOPT_CONNECTTIMEOUT => 5,
-    ]);
-    $raw = curl_exec($ch);
-    $err = curl_error($ch);
-
-    if ($err || !$raw) {
+    static $available = true;
+    static $client = null;
+    if (!$available) {
         return null;
     }
-    // Ollama streams JSON lines; collect all response text
-    $text = '';
-    foreach (explode("\n", $raw) as $line) {
-        $line = trim($line);
-        if ($line === '') continue;
-        $obj = json_decode($line, true);
-        if (isset($obj['response'])) {
-            $text .= $obj['response'];
-        }
+    if (!$client instanceof GeminiClient) {
+        $client = GeminiClient::fromConfig($GLOBALS['config'] ?? []);
     }
-    return $text ?: null;
-}
-
-// ── CopilotRM RSS ingest bridge (port 4010) ──────────────────────────────────
-function copilotrm_rss_sync(int $maxItems = 30): ?array
-{
-    $ch = curl_init('http://localhost:4010/api/ingest/rss/sync');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode(['maxItems' => $maxItems]),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Authorization: Bearer dev'],
-        CURLOPT_TIMEOUT        => 20,
-        CURLOPT_CONNECTTIMEOUT => 3,
-    ]);
-    $raw = curl_exec($ch);
-    return $raw ? json_decode($raw, true) : null;
-}
-
-function copilotrm_get_news(string $category = '', int $limit = 20): array
-{
-    $qs = http_build_query(array_filter([
-        'category' => $category,
-        'limit'    => $limit,
-    ]));
-    $ch = curl_init("http://localhost:4010/api/news?{$qs}");
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Authorization: Bearer dev'],
-        CURLOPT_TIMEOUT        => 10,
-        CURLOPT_CONNECTTIMEOUT => 3,
-    ]);
-    $raw = curl_exec($ch);
-    return ($raw ? json_decode($raw, true) : null) ?? [];
+    if (!$client instanceof GeminiClient) {
+        $available = false;
+        return null;
+    }
+    return $client->generate($prompt, $maxTokens);
 }
 
 // ── RSS fetch helper ─────────────────────────────────────────────────────────
@@ -114,6 +64,128 @@ function clean_text(string $value, int $maxLength): string
     $value = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $value = preg_replace('/\s+/', ' ', trim($value));
     return mb_substr($value, 0, $maxLength, 'UTF-8');
+}
+
+function canonical_source_url(string $url): string
+{
+    $parts = parse_url(trim($url));
+    if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+        return trim($url);
+    }
+    $query = [];
+    parse_str((string)($parts['query'] ?? ''), $query);
+    foreach (array_keys($query) as $key) {
+        if (str_starts_with(strtolower((string)$key), 'utm_') || in_array(strtolower((string)$key), ['fbclid', 'gclid'], true)) {
+            unset($query[$key]);
+        }
+    }
+    $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+    $path = $parts['path'] ?? '/';
+    return strtolower($parts['scheme']) . '://' . strtolower($parts['host']) . $port . $path
+        . ($query ? '?' . http_build_query($query) : '');
+}
+
+function source_fingerprint(array $item): string
+{
+    return hash('sha256', canonical_source_url((string)$item['link']) . "\n"
+        . clean_text((string)$item['title'], 500) . "\n"
+        . clean_text((string)$item['summary'], 2000));
+}
+
+function is_safe_public_url(string $url): bool
+{
+    $parts = parse_url($url);
+    if (!$parts || !in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true) || empty($parts['host'])) {
+        return false;
+    }
+    $ip = gethostbyname((string)$parts['host']);
+    return (bool)filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+}
+
+function fetch_article_context(string $url): string
+{
+    if (!is_safe_public_url($url)) {
+        return '';
+    }
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_USERAGENT => 'bisped.net-bot/1.0 (+https://bisped.net)',
+    ]);
+    $body = curl_exec($ch);
+    $mime = strtolower((string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE));
+    if (!is_string($body) || $body === '' || strlen($body) > 3 * 1024 * 1024 || !str_contains($mime, 'text/html')) {
+        return '';
+    }
+
+    $previousLibxml = libxml_use_internal_errors(true);
+    libxml_clear_errors();
+    try {
+        $document = new DOMDocument();
+        if (!$document->loadHTML($body, LIBXML_NOERROR | LIBXML_NOWARNING)) {
+            return '';
+        }
+        foreach (['script', 'style', 'nav', 'footer', 'noscript'] as $tag) {
+            $nodes = $document->getElementsByTagName($tag);
+            while ($nodes->length > 0) {
+                $node = $nodes->item(0);
+                $node?->parentNode?->removeChild($node);
+            }
+        }
+        $article = $document->getElementsByTagName('article')->item(0);
+        return clean_text((string)($article?->textContent ?: $document->textContent), 6000);
+    } finally {
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousLibxml);
+    }
+}
+
+function localize_image(string $url, string $slug): string
+{
+    if ($url === '' || str_starts_with($url, '/')) {
+        return $url;
+    }
+    if (!is_safe_public_url($url)) {
+        return '';
+    }
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_USERAGENT => 'bisped.net-bot/1.0 (+https://bisped.net)',
+    ]);
+    $body = curl_exec($ch);
+    $mime = strtolower((string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE));
+    if (!is_string($body) || $body === '' || strlen($body) > 5 * 1024 * 1024) {
+        return '';
+    }
+    $extension = match (strtok($mime, ';')) {
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+        default => '',
+    };
+    if ($extension === '') {
+        return '';
+    }
+    $subdir = '/media/blog/' . date('Y/m');
+    $directory = dirname(__DIR__, 2) . '/public' . $subdir;
+    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+        return '';
+    }
+    $filename = $slug . '-' . substr(hash('sha256', $url), 0, 10) . '.' . $extension;
+    if (file_put_contents($directory . '/' . $filename, $body, LOCK_EX) === false) {
+        return '';
+    }
+    return $subdir . '/' . $filename;
 }
 
 function absolute_url(string $url, string $baseUrl): string
@@ -261,6 +333,7 @@ function fetch_rss(string $url, array $keywords, string $category, string $brand
                 'link'    => $link,
                 'date'    => date('Y-m-d', strtotime($pubDate) ?: time()),
                 'image'   => $image,
+                'kind'    => 'news',
             ];
         }
     } catch (Exception $e) {
@@ -303,8 +376,11 @@ function fetch_scrape_summary(string $url, array $keywords, string $brand, strin
         $image = absolute_url(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $url);
     }
 
-    $title = clean_text($title ?: "{$brand}: novita e offerte da valutare", 200);
-    $summary = clean_text($summary ?: "Aggiornamento sulle offerte {$brand}: bisp&d seleziona le proposte piu interessanti per famiglie, professionisti e negozi di Piombino.", 500);
+    $title = clean_text($title, 200);
+    $summary = clean_text($summary, 500);
+    if ($title === '' || mb_strlen($summary, 'UTF-8') < 100) {
+        return [];
+    }
     $text = strtolower($title . ' ' . $summary);
     $match = empty($keywords);
     foreach ($keywords as $kw) {
@@ -323,6 +399,7 @@ function fetch_scrape_summary(string $url, array $keywords, string $brand, strin
         'link' => $url,
         'date' => date('Y-m-d'),
         'image' => $image ?: fallback_image_for_category($category, $brand),
+        'kind' => 'offer',
     ]];
 }
 
@@ -342,11 +419,177 @@ function db_log(PDO $pdo, string $action, string $entityType, string $entitySlug
         ->execute([$action, $entityType, $entitySlug, $msg]);
 }
 
+function editorial_html_prompt(array $item, string $brand, string $category, string $language): string
+{
+    $languageLabel = $language === 'en' ? 'English' : 'Italian';
+    return <<<PROMPT
+Sei la redazione di bisp&d, negozio e laboratorio tecnologico di Piombino. Trasforma la fonte in un articolo originale, utile e autosufficiente per il lettore. Non copiare frasi estese e non inventare prezzi, date, disponibilita o specifiche assenti dalla fonte.
+
+Scrivi una versione completa in {$languageLabel}, da 400-600 parole. Includi un punto di vista competente bisp&d, contesto pratico, cosa cambia davvero, a chi interessa, cosa verificare prima di acquistare e una conclusione utile. Usa solo HTML semantico: h2, h3, p, ul, ol, li, strong, em, blockquote. Non inserire link: la fonte viene citata separatamente dal sito.
+Non ripetere, riassumere o commentare queste istruzioni. Il primo carattere della risposta deve essere `<` e il primo elemento deve essere un titolo `<h2>`.
+
+TITOLO FONTE: {$item['title']}
+BRAND: {$brand}
+CATEGORIA: {$category}
+SINTESI FONTE: {$item['summary']}
+URL FONTE: {$item['link']}
+
+Rispondi esclusivamente con l'HTML dell'articolo, senza markdown e senza spiegazioni.
+PROMPT;
+}
+
+function normalize_editorial_html(?string $raw): ?string
+{
+    if (!$raw) {
+        return null;
+    }
+    // Gemma may emit a short reasoning outline before the requested final HTML.
+    // Evaluate each possible article start and keep the richest valid final section.
+    preg_match_all('/<h2\b/i', $raw, $matches, PREG_OFFSET_CAPTURE);
+    $starts = array_reverse(array_map(static fn(array $match): int => (int)$match[1], $matches[0] ?? []));
+    if (!$starts) {
+        if (!empty($GLOBALS['verbose'])) {
+            echo "  → Editorial quality rejected: no HTML h2 section\n";
+        }
+        return null;
+    }
+
+    $best = ['length' => 0, 'title' => false, 'paragraphs' => 0, 'echo' => false];
+    foreach ($starts as $start) {
+        $html = str_replace('`', '', substr($raw, $start));
+        $html = preg_replace('/^\s*\*\s+(?=<)/m', '', trim($html)) ?? '';
+        $html = HtmlSanitizer::sanitize($html);
+        if (substr_count(strtolower($html), '<p') < 4) {
+            $html = normalize_editorial_plaintext($html);
+        }
+        $plainText = clean_text($html, 10000);
+        $length = mb_strlen($plainText, 'UTF-8');
+        $startsWithTitle = (bool)preg_match('/^\s*<h2(?:\s[^>]*)?>.+?<\/h2>/is', $html);
+        $paragraphs = substr_count(strtolower($html), '<p');
+        $echoesPrompt = (bool)preg_match('/(?:editorial team|semantic html|no inventing|rispondi esclusivamente|format:|main title|introduction:|target audience|pre-purchase|no links|check constraints|check length|html only|refining the|what changes:|who is it for\\?|first character|aiming for|headline:|key news:|key features|check html|wait, the source)/i', $plainText);
+        if ($length > $best['length']) {
+            $best = ['length' => $length, 'title' => $startsWithTitle, 'paragraphs' => $paragraphs, 'echo' => $echoesPrompt];
+        }
+        if ($length >= 1200 && $startsWithTitle && $paragraphs >= 4 && !$echoesPrompt) {
+            return $html;
+        }
+    }
+
+    if (!empty($GLOBALS['verbose'])) {
+        echo "  → Editorial quality rejected: chars={$best['length']}, h2=" . ($best['title'] ? 'yes' : 'no')
+            . ", paragraphs={$best['paragraphs']}, prompt_echo=" . ($best['echo'] ? 'yes' : 'no') . "\n";
+    }
+    return null;
+}
+
+function normalize_editorial_plaintext(string $html): string
+{
+    if (!preg_match('/^\s*(<h2(?:\s[^>]*)?>.+?<\/h2>)(.*)$/is', $html, $match)) {
+        return $html;
+    }
+    $text = clean_text($match[2], 10000);
+    $sentences = preg_split('/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Ý])/u', $text) ?: [];
+    if (mb_strlen($text, 'UTF-8') < 1200 || count($sentences) < 5) {
+        return $html;
+    }
+    $chunkSize = max(1, (int)ceil(count($sentences) / 5));
+    $paragraphs = [];
+    foreach (array_chunk($sentences, $chunkSize) as $chunk) {
+        $paragraph = trim(implode(' ', $chunk));
+        if ($paragraph !== '') {
+            $paragraphs[] = '<p>' . htmlspecialchars($paragraph, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</p>';
+        }
+    }
+    return count($paragraphs) >= 4 ? $match[1] . implode("\n", $paragraphs) : $html;
+}
+
+function editorial_title(string $html, string $fallback): string
+{
+    if (preg_match('/<h[12][^>]*>(.*?)<\/h[12]>/is', $html, $match)) {
+        return clean_text($match[1], 200);
+    }
+    return clean_text($fallback, 200);
+}
+
+function editorial_snippet(string $html): string
+{
+    if (preg_match('/<p[^>]*>(.*?)<\/p>/is', $html, $match)) {
+        return clean_text($match[1], 260);
+    }
+    return clean_text($html, 260);
+}
+
+function generate_editorial(array $item, string $brand, string $category): ?array
+{
+    $htmlIt = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category, 'it'), 8000));
+    if (!$htmlIt) {
+        return null;
+    }
+    $htmlEn = normalize_editorial_html(llm_generate(editorial_html_prompt($item, $brand, $category, 'en'), 8000));
+    if (!$htmlEn) {
+        return null;
+    }
+    return [
+        'title_it' => editorial_title($htmlIt, (string)$item['title']),
+        'title_en' => editorial_title($htmlEn, (string)$item['title']),
+        'snippet_it' => editorial_snippet($htmlIt),
+        'snippet_en' => editorial_snippet($htmlEn),
+        'html_it' => $htmlIt,
+        'html_en' => $htmlEn,
+    ];
+}
+
+function fallback_editorial(array $item, string $brand, string $category): array
+{
+    $title = clean_text((string)$item['title'], 200);
+    $summary = clean_text((string)$item['summary'], 900);
+    $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    $safeSummary = htmlspecialchars($summary, ENT_QUOTES, 'UTF-8');
+    $safeBrand = htmlspecialchars($brand, ENT_QUOTES, 'UTF-8');
+    $safeCategory = htmlspecialchars($category, ENT_QUOTES, 'UTF-8');
+
+    $it = <<<HTML
+<h2>{$safeTitle}: cosa significa davvero per chi acquista</h2>
+<p>{$safeSummary}</p>
+<p>Una novita tecnologica diventa utile solo quando si capisce quale problema risolve. Per questo la lettura di <strong>bisp&amp;d</strong> parte dai bisogni concreti: durata nel tempo, compatibilita con i dispositivi gia in uso, qualita dell'assistenza e rapporto tra spesa e vantaggi reali.</p>
+<h3>Il punto della notizia</h3>
+<p>La fonte segnala un aggiornamento legato a <strong>{$safeBrand}</strong> nell'area {$safeCategory}. Prima di decidere conviene distinguere il messaggio promozionale dagli elementi verificabili: caratteristiche incluse, eventuali vincoli, disponibilita effettiva e costi complessivi. Sono questi dettagli a determinare se la proposta e adatta a una famiglia, a un professionista o a un'attivita locale.</p>
+<h3>Cosa controllare prima di scegliere</h3>
+<ul><li>Confrontare il beneficio concreto con il prodotto o servizio gia utilizzato.</li><li>Verificare compatibilita, copertura, vincoli e costi accessori quando pertinenti.</li><li>Valutare assistenza post-vendita e possibilita di configurazione corretta.</li><li>Chiedere conferma delle condizioni aggiornate prima dell'acquisto.</li></ul>
+<h3>Il punto di vista bisp&amp;d</h3>
+<p>A Piombino vediamo ogni giorno che la scelta migliore non coincide automaticamente con la novita piu rumorosa. Il nostro lavoro e mettere la tecnologia nella situazione reale del cliente, chiarire cosa serve davvero e scartare cio che aggiunge costo senza valore. Se l'aggiornamento e pertinente al tuo caso, possiamo confrontarlo con alternative equivalenti e aiutarti a configurarlo bene fin dal primo giorno.</p>
+<h3>Come orientarsi</h3>
+<p>Porta con te dubbi, dispositivi gia presenti o l'ultima fattura se il tema riguarda servizi e tariffe. In negozio possiamo trasformare una notizia generica in una scelta consapevole, con una verifica puntuale delle condizioni disponibili al momento della richiesta.</p>
+HTML;
+    $en = <<<HTML
+<h2>{$safeTitle}: what it really means before you buy</h2>
+<p>{$safeSummary}</p>
+<p>A technology update becomes useful only when it solves a real problem. At <strong>bisp&amp;d</strong>, we start from practical needs: long-term value, compatibility with the devices you already use, support quality and the balance between cost and meaningful benefits.</p>
+<h3>The relevant part of the news</h3>
+<p>The source highlights an update from <strong>{$safeBrand}</strong> in the {$safeCategory} area. Before making a decision, separate the promotional message from verifiable details: included features, possible constraints, actual availability and overall cost. These points determine whether an option fits a family, a professional or a local business.</p>
+<h3>What to check first</h3>
+<ul><li>Compare the practical benefit with your current product or service.</li><li>Check compatibility, coverage, constraints and additional costs where relevant.</li><li>Consider after-sales support and correct setup.</li><li>Confirm the latest conditions before purchasing.</li></ul>
+<h3>The bisp&amp;d perspective</h3>
+<p>In Piombino, we see every day that the best choice is not automatically the loudest new release. Our job is to place technology in the customer's real situation, clarify what is useful and remove unnecessary cost. If this update is relevant to you, we can compare equivalent alternatives and help configure the right solution from day one.</p>
+<h3>How to make a clear decision</h3>
+<p>Bring your questions, your existing devices or your latest bill when services and tariffs are involved. In store, we can turn a general news item into an informed choice and verify the conditions available when you ask.</p>
+HTML;
+    return [
+        'title_it' => $title,
+        'title_en' => "{$brand}: a practical guide to the latest update",
+        'snippet_it' => mb_substr($summary, 0, 240, 'UTF-8'),
+        'snippet_en' => "A practical bisp&d guide to the latest {$brand} update: what changed, what to check and how to make an informed choice.",
+        'html_it' => HtmlSanitizer::sanitize($it),
+        'html_en' => HtmlSanitizer::sanitize($en),
+    ];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN INGESTION LOOP
 // ─────────────────────────────────────────────────────────────────────────────
 $totalProcessed = 0;
 $totalInserted  = 0;
+$totalGenerationAttempts = 0;
 
 foreach ($activeCategories as $category) {
     if (!isset($sources[$category])) {
@@ -371,11 +614,7 @@ foreach ($activeCategories as $category) {
         } elseif ($srcType === 'scrape') {
             $items = fetch_scrape_summary($url, $keywords, $brand, $category);
         } elseif ($srcType === 'api' && ($source['arera_source'] ?? false)) {
-            // For ARERA open data — delegate to CopilotRM if running
-            $result = copilotrm_rss_sync(20);
-            if ($result) {
-                echo "  → CopilotRM RSS sync triggered: " . json_encode($result) . "\n";
-            }
+            if ($verbose) echo "  → Structured API adapter not configured: skipped\n";
             continue;
         }
 
@@ -387,72 +626,65 @@ foreach ($activeCategories as $category) {
         foreach ($items as $item) {
             $totalProcessed++;
 
-            // Generate a blog post from each news item via LLM
+            $sourceUrl = canonical_source_url((string)$item['link']);
+            $fingerprint = source_fingerprint($item);
             $postSlug = auto_slug(substr($item['title'], 0, 80)) . '-' . $item['date'];
 
-            // Check if already exists
-            $stmt = $pdo->prepare("SELECT id FROM blog_posts WHERE slug = ?");
-            $stmt->execute([$postSlug]);
+            // A static offers page is a source, not a daily news item. Republish
+            // only when its extracted content changes.
+            $stmt = $pdo->prepare("SELECT id FROM blog_posts WHERE slug = ? OR source_url = ? OR source_fingerprint = ? LIMIT 1");
+            $stmt->execute([$postSlug, $sourceUrl, $fingerprint]);
             $row = $stmt->fetch();
             if ($row) {
-                if ($verbose) echo "  → Already exists: {$postSlug}\n";
+                if ($verbose) echo "  → Already imported source: {$postSlug}\n";
                 continue;
             }
 
-            // Build prompt for LLM
-            $prompt = <<<PROMPT
-Sei un copywriter SEO italiano che scrive per bisped.net, un negozio di informatica e telefonia a Piombino (LI).
-Scrivi un articolo blog ottimizzato SEO in italiano, in HTML (senza tag html/head/body), di circa 500-700 parole su questa notizia:
-
-TITOLO: {$item['title']}
-BRAND: {$brand}
-CATEGORIA: {$category}
-SINTESI: {$item['summary']}
-FONTE: {$item['link']}
-
-L'articolo deve:
-- Iniziare con un <h2> accattivante
-- Avere 3-4 sezioni con <h3>
-- Menzionare bisped.net di Piombino come punto di acquisto/consulenza
-- Concludere con un invito a visitare il negozio o contattarci
-- Usare tag <strong> per i termini importanti
-- Evitare qualsiasi script o tag non semantico
-
-Rispondi SOLO con l'HTML dell'articolo.
-PROMPT;
-
-            if (!$dryRun) {
-                $html = llm_generate($prompt, 1200);
-            } else {
-                $html = null;
+            if (($item['kind'] ?? '') === 'offer'
+                && !preg_match('/(?:\\d+[,.]?\\d*\\s*(?:€|euro|gb|giga|mbps|mese)|promo|sconto|offerta|fibra|5g)/iu', (string)$item['title'] . ' ' . (string)$item['summary'])) {
+                if ($verbose) echo "  → Offer page without a measurable update: skipped\n";
+                continue;
             }
 
-            if (!$html) {
-                // Fallback: minimal HTML article without LLM
-                $html  = "<h2>" . htmlspecialchars($item['title'], ENT_QUOTES) . "</h2>\n";
-                $html .= "<p>" . htmlspecialchars($item['summary'], ENT_QUOTES) . "</p>\n";
-                $html .= "<p><a href=\"" . htmlspecialchars($item['link'], ENT_QUOTES) . "\">Leggi la fonte originale</a></p>\n";
-                $html .= "<p>Per acquistare, configurare o scegliere l'offerta giusta, <strong>vieni da bisp&amp;d a Piombino</strong>: siamo in Piazza della Costituzione 68, telefono <strong>0565 31136</strong>, WhatsApp <strong>334 658 2116</strong>.</p>";
+            $sourceContext = fetch_article_context($sourceUrl);
+            if ($sourceContext !== '') {
+                $item['summary'] = clean_text((string)$item['summary'] . ' ' . $sourceContext, 6000);
             }
 
-            $snippet = strip_tags($html);
-            $snippet = mb_substr(preg_replace('/\s+/', ' ', $snippet), 0, 200, 'UTF-8');
+            if (!$dryRun) {
+                $totalGenerationAttempts++;
+            }
+            $article = $dryRun ? fallback_editorial($item, $brand, $category) : generate_editorial($item, $brand, $category);
+            if (!$article) {
+                echo "  → Editorial LLM unavailable or below quality threshold: skipped\n";
+                if ($totalGenerationAttempts >= $limit) {
+                    break 3;
+                }
+                continue;
+            }
 
             if (!$dryRun) {
+                $imageUrl = localize_image((string)($item['image'] ?? ''), $postSlug)
+                    ?: fallback_image_for_category($category, $brand);
                 $pdo->prepare("
                     INSERT INTO blog_posts
-                        (slug, title, published_at, image_url, snippet, content_html,
-                         is_published, related_product_tags, source_url, auto_generated)
-                    VALUES (?,?,?,?,?,?,1,?,?,1)
+                        (slug, title, title_en, published_at, image_url, snippet, snippet_en,
+                         content_html, content_html_en, is_published, related_product_tags,
+                         source_url, source_fingerprint, auto_generated)
+                    VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,1)
                 ")->execute([
                     $postSlug,
-                    $item['title'],
+                    $article['title_it'],
+                    $article['title_en'],
                     $item['date'],
-                    $item['image'] ?: fallback_image_for_category($category, $brand),
-                    $snippet,
-                    $html,
+                    $imageUrl,
+                    clean_text((string)$article['snippet_it'], 260),
+                    clean_text((string)$article['snippet_en'], 260),
+                    $article['html_it'],
+                    $article['html_en'],
                     implode(',', $keywords),
-                    $item['link'],
+                    $sourceUrl,
+                    $fingerprint,
                 ]);
 
                 db_log($pdo, 'blog_post_created', 'blog_post', $postSlug,
@@ -461,20 +693,14 @@ PROMPT;
             }
 
             echo "  + " . ($dryRun ? '[DRY] ' : '') . "Post: {$postSlug}\n";
+            if ($totalInserted >= $limit) {
+                break 3;
+            }
         }
     }
 }
 
-// ── Try pulling fresh data from CopilotRM news API ──────────────────────────
-echo "\n[CopilotRM] Polling /api/news for cross-reference...\n";
-$news = copilotrm_get_news('', 30);
-if ($news) {
-    echo "  → " . count($news) . " news items from CopilotRM\n";
-    // Future: cross-reference these with product catalog
-} else {
-    echo "  → CopilotRM not running (localhost:4010) — skipped\n";
-}
-
 echo "\n─────────────────────────────────────────────────\n";
 echo "Processed: {$totalProcessed} | Inserted: {$totalInserted}" . ($dryRun ? ' [DRY RUN]' : '') . "\n";
+echo "Editorial attempts: {$totalGenerationAttempts}\n";
 echo "Done at " . date('Y-m-d H:i:s') . "\n";

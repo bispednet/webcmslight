@@ -6,8 +6,8 @@ use App\Support\Session;
 
 Session::ensureStarted();
 $csrfToken = Csrf::token();
-$successMsg = Flash::get('contact_success');
-$errorMsg   = Flash::get('contact_error');
+$successMsg = Flash::pull('contact_success');
+$errorMsg   = Flash::pull('contact_error');
 ?>
 
 <div class="space-y-12">
@@ -155,7 +155,7 @@ $errorMsg   = Flash::get('contact_error');
                     </div>
                     <div>
                         <label class="form-label">Sistema operativo</label>
-                        <select name="phone" class="form-select w-full"
+                        <select name="operating_system" class="form-select w-full"
                                 style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
                             <option value="">— seleziona —</option>
                             <option>Windows 11</option>

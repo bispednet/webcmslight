@@ -8,7 +8,7 @@ return [
         ['setting_key' => 'contact_email', 'setting_value' => 'info@bisped.net'],
         ['setting_key' => 'business_telegram', 'setting_value' => 'mailto:info@bisped.net'],
         ['setting_key' => 'hero_title_home', 'setting_value' => 'Tecnologia concreta per casa, lavoro e impresa.'],
-        ['setting_key' => 'hero_subtitle_home', 'setting_value' => 'Bisped porta online negozio, laboratorio, catalogo prodotti, preventivi e assistenza: un sito custom leggero, amministrabile e pronto per integrarsi con CopilotRM.'],
+        ['setting_key' => 'hero_subtitle_home', 'setting_value' => 'Bisped porta online negozio, laboratorio, catalogo prodotti, preventivi e assistenza: un sito custom leggero, amministrabile e pensato per risolvere esigenze reali.'],
         ['setting_key' => 'hero_image_home', 'setting_value' => '/media/bisped/fronte_negozio_bisped.png'],
         ['setting_key' => 'hero_badge_home', 'setting_value' => 'Nuova piattaforma Bisped: meno WordPress, piu velocita, gestione e lead tracciabili.'],
         ['setting_key' => 'site_logo', 'setting_value' => '/media/bisped/bisped_logo.png'],
@@ -492,7 +492,7 @@ return [
     ],
     'faq_items' => [
         ['question' => 'Il nuovo sito sostituisce subito WordPress?', 'answer' => 'No. La produzione resta intatta finche il nuovo sito non viene validato e pubblicato.'],
-        ['question' => 'Posso chiedere un preventivo online?', 'answer' => 'Si. Il form contatti raccoglie gia richieste strutturate; il passo successivo e collegarle a CopilotRM.'],
+        ['question' => 'Posso chiedere un preventivo online?', 'answer' => 'Si. Il form contatti raccoglie richieste strutturate e permette al team di ricontattarti con una proposta mirata.'],
         ['question' => 'Il catalogo prodotti e definitivo?', 'answer' => 'No. Le aree prodotto iniziali sono una base amministrabile da popolare con prodotti reali, prezzi e disponibilita.'],
     ],
     'blog_posts' => [

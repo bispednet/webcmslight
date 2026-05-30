@@ -41,6 +41,13 @@ return [
             'bisped@gmail.com',
         ],
     ],
+    'gemini' => [
+        'api_key' => '',
+        'model' => 'gemma-4-31b-it',
+        'requests_per_minute' => 10,
+        'requests_per_day' => 5000,
+        'cooldown_seconds' => 7,
+    ],
     'calendar' => [
         'enabled' => true,
         'calendar_id' => 'primary',

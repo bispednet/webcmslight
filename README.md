@@ -23,7 +23,7 @@ Custom CMS PHP/MariaDB per il rework commerciale di `bisped.net`, pensato per so
 - Dump SQL corretto: `/home/funboy/uu4c5pdm_wpb.sql`, importato in `bisped_wp_legacy`.
 - Dump SQL precedente: `/home/funboy/old_bisped.net.db.sql`, considerato ambiente test/demo.
 - Produzione FTP: usare solo in lettura per analisi e recupero asset.
-- CopilotRM: `/home/funboy/copilotrm`, da ispezionare e integrare senza modificarlo da questo progetto.
+- Il cron editoriale e l'ingest offerte sono autonomi nel CMS PHP. CopilotRM non e una dipendenza runtime del sito.
 
 ## Setup locale
 

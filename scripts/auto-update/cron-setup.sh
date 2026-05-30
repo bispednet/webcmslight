@@ -16,7 +16,7 @@ fi
 
 mkdir -p "$LOGDIR"
 
-CRON_LINE="0 6 * * * flock -n ${LOCKFILE} ${FRANKENPHP} php-cli ${INGEST} --all --limit=3 >> ${LOGDIR}/ingest-cron.log 2>&1"
+CRON_LINE="0 6 * * * flock -n ${LOCKFILE} ${FRANKENPHP} php-cli ${INGEST} --all --limit=1 >> ${LOGDIR}/ingest-cron.log 2>&1"
 
 # Add to crontab if not already present
 (crontab -l 2>/dev/null | grep -F "$INGEST") && {

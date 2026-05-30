@@ -1,14 +1,20 @@
 <?php
 /** @var array $post */
 
+use App\Support\I18n;
+
+$locale = I18n::currentLocale();
 $imgUrl = trim((string)($post['image_url'] ?? ''));
 $slug   = htmlspecialchars($post['slug'], ENT_QUOTES, 'UTF-8');
-$title  = htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8');
+$rawTitle = $locale === 'en' && trim((string)($post['title_en'] ?? '')) !== '' ? $post['title_en'] : $post['title'];
+$rawSnippet = $locale === 'en' && trim((string)($post['snippet_en'] ?? '')) !== '' ? $post['snippet_en'] : ($post['snippet'] ?? '');
+$title  = htmlspecialchars(html_entity_decode((string)$rawTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8');
 $date   = htmlspecialchars(date('d/m/Y', strtotime($post['published_at'])), ENT_QUOTES, 'UTF-8');
-$snippet = htmlspecialchars($post['snippet'] ?? '', ENT_QUOTES, 'UTF-8');
+$snippet = htmlspecialchars(html_entity_decode((string)$rawSnippet, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+$postUrl = ($locale === 'en' ? '/en/blog/' : '/blog/') . $slug;
 ?>
 
-<a href="/blog/<?= $slug ?>" class="block group h-full">
+<a href="<?= $postUrl ?>" class="block group h-full">
     <div class="blog-card h-full">
         <?php if ($imgUrl !== ''): ?>
             <div style="aspect-ratio:16/9;overflow:hidden;background:#fff">

@@ -2,6 +2,28 @@
 declare(strict_types=1);
 
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+if (PHP_SAPI !== 'cli') {
+    header_remove('X-Powered-By');
+    $pathLocale = (($_GET['lang'] ?? '') === 'it')
+        ? 'it'
+        : (str_starts_with($requestPath, '/en') ? 'en' : (str_starts_with($requestPath, '/it') ? 'it' : null));
+    if ($pathLocale !== null) {
+        setcookie('bisped_locale', $pathLocale, [
+            'expires' => time() + 31536000,
+            'path' => '/',
+            'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https',
+            'httponly' => false,
+            'samesite' => 'Lax',
+        ]);
+    } elseif ($requestPath === '/' && !isset($_COOKIE['bisped_locale'])) {
+        $browserLocale = strtolower((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''));
+        if (str_starts_with($browserLocale, 'en')) {
+            header('Location: /en/', true, 302);
+            exit;
+        }
+    }
+}
 if ($requestPath === '/health/db') {
     require __DIR__ . '/health-db.php';
     exit;
@@ -48,11 +70,13 @@ $router->get('/en/contact', [PageController::class, 'contact']);
 $router->get('/contatti/', [PageController::class, 'contact']);
 $router->post('/contatti', [ContactController::class, 'submit']);
 $router->post('/contatti/', [ContactController::class, 'submit']);
+$router->post('/en/contact', [ContactController::class, 'submit']);
 $router->get('/appuntamenti', [AppointmentController::class, 'show']);
 $router->get('/appointments', [AppointmentController::class, 'show']);
 $router->get('/en/appointments', [AppointmentController::class, 'show']);
 $router->post('/appuntamenti', [AppointmentController::class, 'submit']);
 $router->post('/appointments', [AppointmentController::class, 'submit']);
+$router->post('/en/appointments', [AppointmentController::class, 'submit']);
 $router->get('/products', [PageController::class, 'products']);
 $router->get('/it/prodotti', [PageController::class, 'products']);
 $router->get('/en/products', [PageController::class, 'products']);
@@ -82,10 +106,13 @@ $router->get('/auth/wallet/nonce', [AuthController::class, 'issueWalletNonce']);
 $router->post('/auth/wallet/verify', [AuthController::class, 'verifyWallet']);
 $router->post('/auth/logout', [AuthController::class, 'logout']);
 $router->get('/login', [AuthController::class, 'showLogin']);
+$router->get('/en/login', [AuthController::class, 'showLogin']);
 $router->post('/login', [AuthController::class, 'passwordLogin']);
+$router->post('/en/login', [AuthController::class, 'passwordLogin']);
 $router->get('/register', [AuthController::class, 'showRegister']);
 $router->get('/en/register', [AuthController::class, 'showRegister']);
 $router->post('/register', [AuthController::class, 'register']);
+$router->post('/en/register', [AuthController::class, 'register']);
 $router->get('/area-clienti', [PageController::class, 'customerArea']);
 $router->get('/it/area-clienti', [PageController::class, 'customerArea']);
 $router->get('/en/customer-area', [PageController::class, 'customerArea']);

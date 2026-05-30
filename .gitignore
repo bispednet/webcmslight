@@ -16,6 +16,9 @@ airewagcms_mysql_db.sql
 /storage/sessions/*
 /storage/tmp/*
 /storage/imports/*
+/storage/ingest-cron.log
+/storage/ingest.lock
+/storage/gemini-rate-limit.json
 /_migration.local/
 /runtime/
 /vendor/

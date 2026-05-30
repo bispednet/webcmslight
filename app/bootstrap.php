@@ -6,8 +6,8 @@ if (defined('APP_BOOTSTRAPPED')) {
 }
 define('APP_BOOTSTRAPPED', true);
 
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
 
 define('BASE_PATH', dirname(__DIR__));
@@ -24,6 +24,11 @@ if (!file_exists($configPath)) {
 }
 
 $config = require $configPath;
+
+if ((bool)($config['app']['debug'] ?? false)) {
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+}
 
 date_default_timezone_set($config['app']['timezone'] ?? 'UTC');
 

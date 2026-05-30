@@ -1,6 +1,6 @@
 # Security Assessment
 
-Data: 2026-05-27
+Data: 2026-05-30
 
 Ambiente valutato: preview `https://solclawn.com`, repo `bispednet/webcmslight`, runtime FrankenPHP + MariaDB locale.
 
@@ -14,7 +14,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 
 - Rimossi segreti FTP hardcoded da `scripts/ftp-download-images.php`; ora usa `BISPED_FTP_USER`, `BISPED_FTP_PASS`, `BISPED_FTP_UPLOADS_URL`.
 - Disabilitato `public/install.php` di default; richiede `BISPED_ALLOW_WEB_INSTALL=1`.
-- Aggiunta verifica CSRF su login, registrazione e logout.
+- Aggiunta verifica CSRF su login e registrazione; il logout POST chiude sempre la sessione anche se il token e scaduto o gia consumato.
 - Aggiornato CSRF per supportare piu token concorrenti e consumo one-time.
 - Aggiunto rate limit sessione per login e registrazione.
 - Aggiunti header `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` e HSTS su HTTPS.
@@ -23,6 +23,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Sanitizzati i valori usati negli header email del form contatti.
 - Aggiornato schema DB con `users.password_hash` e `appointment_requests`.
 - Aggiornata documentazione per evitare credenziali in comandi copiabili.
+- Integrato Gemini direttamente dal CMS PHP con chiave solo in `.env.php`, rate limit persistente e filtro anti-SSRF per acquisizione testi e immagini editoriali.
 
 ## Controlli Eseguiti
 
@@ -35,6 +36,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 ## Rischi Residui
 
 - `.env.php` locale contiene credenziali reali di test/servizi: e ignorato da Git, ma va protetto a filesystem e ruotato prima della produzione se condiviso.
+- La chiave Gemini e configurata localmente e non viene tracciata: va ruotata prima della produzione perche condivisa durante il setup.
 - Google Calendar non puo sincronizzare finche manca un refresh token OAuth con scope Calendar.
 - Google OAuth richiede redirect autorizzati per dominio di preview e produzione.
 - Invio email usa ancora `mail()` nel controller contatti; la config SMTP e presente ma serve un mailer SMTP applicativo per affidabilita e audit.

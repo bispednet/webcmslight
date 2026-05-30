@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services\Cms;
 
 use App\Core\Database;
+use App\Support\I18n;
 use PDO;
 
 final class ContentRepository
@@ -110,13 +111,19 @@ final class ContentRepository
 
     public function getBlogPosts(): array
     {
-        $stmt = $this->db->query('SELECT * FROM blog_posts WHERE is_published = 1 ORDER BY published_at DESC');
+        $where = I18n::currentLocale() === 'en'
+            ? "is_published = 1 AND title_en != '' AND content_html_en IS NOT NULL AND content_html_en != ''"
+            : 'is_published = 1';
+        $stmt = $this->db->query("SELECT * FROM blog_posts WHERE {$where} ORDER BY published_at DESC");
         return $stmt->fetchAll() ?: [];
     }
 
     public function getBlogPostBySlug(string $slug): ?array
     {
-        $stmt = $this->db->prepare('SELECT * FROM blog_posts WHERE slug = :slug LIMIT 1');
+        $translated = I18n::currentLocale() === 'en'
+            ? " AND title_en != '' AND content_html_en IS NOT NULL AND content_html_en != ''"
+            : '';
+        $stmt = $this->db->prepare("SELECT * FROM blog_posts WHERE slug = :slug{$translated} LIMIT 1");
         $stmt->execute(['slug' => $slug]);
         $post = $stmt->fetch();
 

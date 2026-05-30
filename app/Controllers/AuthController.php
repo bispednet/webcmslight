@@ -355,10 +355,7 @@ final class AuthController extends Controller
     {
         Session::ensureStarted();
         $token = $_POST['csrf_token'] ?? null;
-        if (!Csrf::verify(is_string($token) ? $token : null)) {
-            Flash::set('auth_error', 'Sessione scaduta. Riprova.');
-            $this->redirect('/login');
-        }
+        $csrfValid = Csrf::verify(is_string($token) ? $token : null);
 
         $sessionId = session_id();
 
@@ -370,7 +367,9 @@ final class AuthController extends Controller
         $guard = new SessionGuard();
         $guard->logout();
 
-        Flash::set('auth_notice', 'Sei uscito dalla tua area riservata.');
+        Flash::set('auth_notice', $csrfValid
+            ? 'Sei uscito dalla tua area riservata.'
+            : 'Sessione chiusa correttamente.');
         $this->redirect('/login');
     }
 
@@ -477,7 +476,6 @@ final class AuthController extends Controller
         ]);
         $raw = curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
 
         if (!is_string($raw) || $status < 200 || $status >= 300) {
             return null;
@@ -494,7 +492,6 @@ final class AuthController extends Controller
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12]);
         $raw = curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
 
         if (!is_string($raw) || $status < 200 || $status >= 300) {
             return null;

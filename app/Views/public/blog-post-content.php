@@ -3,11 +3,19 @@
 /** @var array  $relatedProducts */
 
 use App\Core\Database;
+use App\Support\HtmlSanitizer;
+use App\Support\I18n;
 
+$locale = I18n::currentLocale();
 $imgUrl  = trim((string)($post['image_url'] ?? ''));
-$title   = htmlspecialchars($post['title'], ENT_QUOTES, 'UTF-8');
+$rawTitle = $locale === 'en' && trim((string)($post['title_en'] ?? '')) !== '' ? $post['title_en'] : $post['title'];
+$rawSnippet = $locale === 'en' && trim((string)($post['snippet_en'] ?? '')) !== '' ? $post['snippet_en'] : ($post['snippet'] ?? '');
+$rawContent = $locale === 'en' && trim((string)($post['content_html_en'] ?? '')) !== '' ? $post['content_html_en'] : $post['content_html'];
+$title   = htmlspecialchars(html_entity_decode((string)$rawTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8');
 $date    = htmlspecialchars(date('d F Y', strtotime($post['published_at'])), ENT_QUOTES, 'UTF-8');
-$snippet = htmlspecialchars($post['snippet'] ?? '', ENT_QUOTES, 'UTF-8');
+$snippet = htmlspecialchars(html_entity_decode((string)$rawSnippet, ENT_QUOTES | ENT_HTML5, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+$content = HtmlSanitizer::sanitize((string)$rawContent);
+$blogUrl = $locale === 'en' ? '/en/blog' : '/blog';
 
 // Dynamic related products via tag overlap
 $relatedProducts = $relatedProducts ?? [];
@@ -29,7 +37,7 @@ if (empty($relatedProducts) && !empty($post['related_product_tags'])) {
 <article class="max-w-3xl mx-auto" data-animate>
 
     <!-- Back -->
-    <a href="/blog" class="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest mb-8 transition-colors hover:text-red-400" style="color:var(--bisped-red)">
+    <a href="<?= $blogUrl ?>" class="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest mb-8 transition-colors hover:text-red-400" style="color:var(--bisped-red)">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
         </svg>
@@ -56,8 +64,16 @@ if (empty($relatedProducts) && !empty($post['related_product_tags'])) {
 
     <!-- Content -->
     <div class="info-card blog-body">
-        <?= $post['content_html'] ?>
+        <?= $content ?>
     </div>
+
+    <?php if (!empty($post['source_url'])): ?>
+        <p class="mt-5 text-xs" style="color:var(--c-muted)">
+            <a href="<?= htmlspecialchars((string)$post['source_url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener noreferrer" class="underline hover:text-red-400">
+                <?= $locale === 'en' ? 'Original source' : 'Fonte originale' ?> ↗
+            </a>
+        </p>
+    <?php endif; ?>
 
     <!-- Related products -->
     <?php if (!empty($relatedProducts)): ?>
@@ -92,7 +108,7 @@ if (empty($relatedProducts) && !empty($post['related_product_tags'])) {
 
     <!-- Back link bottom -->
     <div class="mt-10 pt-8 border-t" style="border-color:var(--c-border)">
-        <a href="/blog" class="btn-outline">
+        <a href="<?= $blogUrl ?>" class="btn-outline">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
             </svg>

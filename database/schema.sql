@@ -331,13 +331,22 @@ CREATE TABLE IF NOT EXISTS blog_posts (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     slug VARCHAR(150) NOT NULL UNIQUE,
     title VARCHAR(200) NOT NULL,
+    title_en VARCHAR(200) NOT NULL DEFAULT '',
     published_at DATE NOT NULL,
     image_url VARCHAR(255) NOT NULL,
     snippet TEXT NOT NULL,
+    snippet_en TEXT NULL,
     content_html LONGTEXT NOT NULL,
+    content_html_en LONGTEXT NULL,
     is_published TINYINT(1) NOT NULL DEFAULT 1,
+    related_product_tags VARCHAR(255) NULL,
+    source_url VARCHAR(500) NULL,
+    source_fingerprint CHAR(64) NULL,
+    auto_generated TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_blog_source_url (source_url(191)),
+    INDEX idx_blog_source_fingerprint (source_fingerprint)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS contact_messages (
