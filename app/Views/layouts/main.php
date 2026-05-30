@@ -134,7 +134,7 @@ if ($isAdmin) {
             }
         };
     </script>
-    <link rel="stylesheet" href="/assets/css/app.css">
+    <link rel="stylesheet" href="/assets/css/app.css?v=20260530-concierge">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>
         <meta name="csrf-token" content="<?= htmlspecialchars($adminCsrf, ENT_QUOTES, 'UTF-8'); ?>">
@@ -193,7 +193,7 @@ if ($isAdmin) {
           'fallback' => $isEnglish ? 'I can prepare the handoff now. Continue on WhatsApp and add any useful details.' : 'Posso preparare il passaggio. Continua su WhatsApp e aggiungi eventuali dettagli utili.',
       ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) ?>;
     </script>
-    <script src="/assets/js/concierge.js" defer></script>
+    <script src="/assets/js/concierge.js?v=20260530-concierge" defer></script>
 
     <!-- Cookie Banner -->
     <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Cookie policy">
