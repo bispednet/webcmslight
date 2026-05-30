@@ -41,7 +41,7 @@ use App\Controllers\PageController;
 use App\Controllers\AuthController;
 use App\Controllers\ContactController;
 use App\Controllers\AppointmentController;
-use App\Controllers\ConciergeController;
+use App\Controllers\AiConciergeController;
 
 $router = new Router();
 
@@ -78,7 +78,10 @@ $router->get('/en/appointments', [AppointmentController::class, 'show']);
 $router->post('/appuntamenti', [AppointmentController::class, 'submit']);
 $router->post('/appointments', [AppointmentController::class, 'submit']);
 $router->post('/en/appointments', [AppointmentController::class, 'submit']);
-$router->post('/api/concierge', [ConciergeController::class, 'reply']);
+$router->get('/ai/concierge/bootstrap', [AiConciergeController::class, 'bootstrap']);
+$router->post('/ai/concierge/message', [AiConciergeController::class, 'message']);
+$router->post('/ai/concierge/choice', [AiConciergeController::class, 'choice']);
+$router->post('/ai/concierge/handoff/whatsapp', [AiConciergeController::class, 'whatsappHandoff']);
 $router->get('/products', [PageController::class, 'products']);
 $router->get('/it/prodotti', [PageController::class, 'products']);
 $router->get('/en/products', [PageController::class, 'products']);

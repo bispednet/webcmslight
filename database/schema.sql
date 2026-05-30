@@ -378,3 +378,113 @@ CREATE TABLE IF NOT EXISTS appointment_requests (
     INDEX idx_appointment_status_start (status, starts_at),
     INDEX idx_appointment_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_conversations (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    public_id CHAR(36) NOT NULL UNIQUE,
+    session_id VARCHAR(128) NOT NULL,
+    channel ENUM('site_widget','admin_test') NOT NULL DEFAULT 'site_widget',
+    locale ENUM('it','en') NOT NULL DEFAULT 'it',
+    status ENUM('open','qualified','handed_to_whatsapp','appointment_requested','closed','spam','error') NOT NULL DEFAULT 'open',
+    entry_context VARCHAR(120) NULL,
+    entry_url VARCHAR(500) NULL,
+    customer_name VARCHAR(150) NULL,
+    customer_phone VARCHAR(80) NULL,
+    customer_email VARCHAR(190) NULL,
+    customer_type ENUM('privato','business','non_definito') NOT NULL DEFAULT 'non_definito',
+    main_sector VARCHAR(80) NULL,
+    urgency ENUM('bassa','media','alta','immediata') NULL,
+    lead_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    current_step VARCHAR(80) NOT NULL DEFAULT 'privacy_notice',
+    structured_data JSON NULL,
+    summary TEXT NULL,
+    consent_privacy TINYINT(1) NOT NULL DEFAULT 0,
+    ip_address VARBINARY(16) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ai_conv_session (session_id),
+    INDEX idx_ai_conv_status (status),
+    INDEX idx_ai_conv_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_messages (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    conversation_id BIGINT UNSIGNED NOT NULL,
+    role ENUM('assistant','user','handoff') NOT NULL,
+    content LONGTEXT NOT NULL,
+    content_json JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE,
+    INDEX idx_ai_msg_conversation (conversation_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_leads (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    conversation_id BIGINT UNSIGNED NOT NULL UNIQUE,
+    status ENUM('new','qualified','contacted','quoted','won','lost','archived') NOT NULL DEFAULT 'new',
+    name VARCHAR(150) NULL,
+    phone VARCHAR(80) NULL,
+    email VARCHAR(190) NULL,
+    customer_type ENUM('privato','business','non_definito') NOT NULL DEFAULT 'non_definito',
+    sector VARCHAR(80) NOT NULL,
+    need_summary TEXT NOT NULL,
+    urgency ENUM('bassa','media','alta','immediata') NULL,
+    lead_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    assigned_to VARCHAR(120) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_quotes (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    conversation_id BIGINT UNSIGNED NOT NULL,
+    lead_id BIGINT UNSIGNED NULL,
+    quote_level ENUM('base','smart','premium') NOT NULL,
+    title VARCHAR(190) NOT NULL,
+    summary TEXT NOT NULL,
+    items_json JSON NOT NULL,
+    special_condition TEXT NULL,
+    disclaimers TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (lead_id) REFERENCES ai_leads(id) ON DELETE SET NULL,
+    INDEX idx_ai_quotes_conversation (conversation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_knowledge_sources (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    source_type ENUM('page','product','blog_post','faq','service','manual') NOT NULL,
+    source_ref VARCHAR(190) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content_hash CHAR(64) NOT NULL,
+    locale ENUM('it','en') NOT NULL DEFAULT 'it',
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_ai_knowledge_source (source_type, source_ref, locale)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_knowledge_chunks (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    source_id BIGINT UNSIGNED NOT NULL,
+    chunk_index INT UNSIGNED NOT NULL DEFAULT 0,
+    content TEXT NOT NULL,
+    keywords VARCHAR(500) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_id) REFERENCES ai_knowledge_sources(id) ON DELETE CASCADE,
+    FULLTEXT KEY ft_ai_chunk_content (content)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_special_conditions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    condition_key VARCHAR(80) NOT NULL UNIQUE,
+    title VARCHAR(190) NOT NULL,
+    description TEXT NOT NULL,
+    sector VARCHAR(80) NULL,
+    min_lead_score TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

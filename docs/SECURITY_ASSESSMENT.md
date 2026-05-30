@@ -24,7 +24,8 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Aggiornato schema DB con `users.password_hash` e `appointment_requests`.
 - Aggiornata documentazione per evitare credenziali in comandi copiabili.
 - Integrato Gemini direttamente dal CMS PHP con chiave solo in `.env.php`, rate limit persistente e filtro anti-SSRF per acquisizione testi e immagini editoriali.
-- Aggiunto concierge WhatsApp con endpoint CSRF, cronologia limitata, rate limit di sessione e profilo Gemini separato.
+- Sostituito il concierge dimostrativo con Team AI Bisped: flusso deterministico persistente, privacy notice prima dei dati personali, endpoint CSRF, rate limit, limite messaggi, filtro spam e handoff WhatsApp generato dal backend.
+- Corretto il sanitizer HTML editoriale: i frammenti vengono interpretati esplicitamente come UTF-8 e lo script `scripts/repair-blog-encoding.php` bonifica in modo idempotente i contenuti gia contaminati.
 
 ## Controlli Eseguiti
 
@@ -33,6 +34,8 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Verifica `/install.php`: restituisce `404` senza variabile di abilitazione.
 - Verifica header HTTPS su `solclawn.com`.
 - Smoke test principali su login, pagine inglesi, appuntamenti e admin nelle iterazioni precedenti.
+- Smoke test API completo Team AI Bisped: qualifica TLC, tre quote, lead DB, record `contact_messages` e URL `wa.me`.
+- Verifica rendering articolo Cherokee dopo bonifica: nessun marker mojibake e accenti UTF-8 corretti.
 
 ## Rischi Residui
 
@@ -44,6 +47,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Tailwind CDN e ancora caricato dai layout: accettabile in preview, da sostituire con build locale prima della produzione.
 - Non esiste ancora un sistema completo di password reset/verify email per utenti registrati.
 - Alcuni contenuti legacy non pubblici restano nel repo finche non vengono rimossi o archiviati.
+- Il concierge salva dati di qualifica: definire la retention definitiva e una procedura admin di cancellazione/esportazione prima della produzione.
 
 ## Checklist Pre-Produzione
 

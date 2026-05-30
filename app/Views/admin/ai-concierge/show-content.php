@@ -1,0 +1,6 @@
+<section class="space-y-6">
+    <a class="text-sm text-cy hover:underline" href="/admin/ai-concierge">Torna alle conversazioni</a>
+    <div class="card"><h1 class="text-xl font-semibold">Conversazione <?= htmlspecialchars((string)$conversation['public_id']) ?></h1><p class="mt-2 text-sm text-muted">Settore: <?= htmlspecialchars((string)($conversation['main_sector'] ?: '-')) ?> | Urgenza: <?= htmlspecialchars((string)($conversation['urgency'] ?: '-')) ?> | Score: <?= (int)$conversation['lead_score'] ?></p></div>
+    <div class="card space-y-3"><h2 class="font-semibold">Transcript</h2><?php foreach ($messages as $message): ?><p class="text-sm"><strong><?= htmlspecialchars((string)$message['role']) ?>:</strong> <?= nl2br(htmlspecialchars((string)$message['content'])) ?></p><?php endforeach; ?></div>
+    <div class="grid gap-4 md:grid-cols-3"><?php foreach ($quotes as $quote): ?><article class="card"><p class="text-xs uppercase tracking-wide text-cy"><?= htmlspecialchars((string)$quote['quote_level']) ?></p><h2 class="mt-2 font-semibold"><?= htmlspecialchars((string)$quote['title']) ?></h2><p class="mt-2 text-sm text-muted"><?= htmlspecialchars((string)$quote['summary']) ?></p></article><?php endforeach; ?></div>
+</section>

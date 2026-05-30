@@ -14,6 +14,7 @@ Custom CMS PHP/MariaDB per il rework commerciale di `bisped.net`, pensato per so
 - Seed iniziale per impostazioni, navigazione, prodotti, FAQ, blog, team e testi legali.
 - Asset recuperati in sola lettura da FTP in `public/media/bisped/`.
 - Form contatti e appuntamenti con CSRF, honeypot/rate-limit dove applicabile.
+- Team AI Bisped: concierge nativo con routing AndreAI/SerenAI/SarAI, qualifica guidata, tre percorsi e handoff WhatsApp persistente.
 - Audit migrazione in `docs/BISPED_MIGRATION_AUDIT.md`.
 - Security assessment in `docs/SECURITY_ASSESSMENT.md`.
 - Runtime locale portabile in `runtime/` con FrankenPHP, MariaDB e Playwright. La cartella e esclusa da Git.
@@ -36,6 +37,7 @@ Poi configurare database MySQL, URL, chiave applicazione e wallet admin in `.env
 
 ```bash
 mysql -u bisped_user -p bisped_net < database/schema.sql
+runtime/bin/frankenphp php-cli scripts/migrate-ai-concierge.php
 ```
 
 L'installer web `public/install.php` e disabilitato di default per sicurezza. Abilitarlo solo in setup controllato con `BISPED_ALLOW_WEB_INSTALL=1`, poi rimuovere subito l'accesso.
@@ -48,6 +50,7 @@ L'installer web `public/install.php` e disabilitato di default per sicurezza. Ab
 - Il catalogo preview e amministrabile dal pannello `/admin/products`.
 - Il tunnel di preview usa `https://solclawn.com`, gia configurato via cloudflared verso `127.0.0.1:4000`.
 - Il deploy produzione richiede aggiornamento di `.env.php`, redirect OAuth Google, SMTP, DNS e refresh token Calendar se si vuole il sync automatico.
+- I file locali `BISPED_*_PLAN*.md` e `BISPED_HANDOFF.md` sono note operative escluse dal repository.
 
 ## Runtime preview attuale
 

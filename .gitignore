@@ -2,6 +2,8 @@
 .env.*.php
 !.env.example.php
 BISPED_NET_REWORK_PLAN_v2.md
+/BISPED_HANDOFF.md
+/BISPED_*_PLAN*.md
 env.php
 *.env
 *.sql

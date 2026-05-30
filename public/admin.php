@@ -26,6 +26,7 @@ use App\Controllers\Admin\NavigationController;
 use App\Controllers\Admin\IngestController;
 use App\Controllers\Admin\MessagesController;
 use App\Controllers\Admin\AppointmentsController;
+use App\Controllers\Admin\AiConciergeController as AdminAiConciergeController;
 
 $router = new Router();
 
@@ -154,5 +155,7 @@ $router->post('/admin/messages/archive/{id}', [MessagesController::class, 'archi
 $router->get('/admin/appointments', [AppointmentsController::class, 'index'], [$requireAdmin]);
 $router->post('/admin/appointments/accept/{id}', [AppointmentsController::class, 'accept'], [$requireAdmin]);
 $router->post('/admin/appointments/reject/{id}', [AppointmentsController::class, 'reject'], [$requireAdmin]);
+$router->get('/admin/ai-concierge', [AdminAiConciergeController::class, 'index'], [$requireAdmin]);
+$router->get('/admin/ai-concierge/conversations/{id}', [AdminAiConciergeController::class, 'show'], [$requireAdmin]);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

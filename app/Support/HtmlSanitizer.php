@@ -28,7 +28,9 @@ final class HtmlSanitizer
 
         $doc = new \DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
-        $html = '<!DOCTYPE html><html><body>' . $value . '</body></html>';
+        // libxml otherwise assumes a legacy encoding for HTML fragments and
+        // silently turns valid UTF-8 accents into mojibake.
+        $html = '<?xml encoding="UTF-8"><!DOCTYPE html><html><body>' . $value . '</body></html>';
         $doc->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
@@ -171,4 +173,3 @@ final class HtmlSanitizer
         return '';
     }
 }
-

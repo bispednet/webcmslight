@@ -82,6 +82,9 @@ if ($siteLogoUrl === '') {
             <a href="/admin/appointments" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
                 <span class="text-muted">Appuntamenti</span>
             </a>
+            <a href="/admin/ai-concierge" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
+                <span class="text-muted">AI Concierge</span>
+            </a>
         </div>
 
         <div class="space-y-2">
