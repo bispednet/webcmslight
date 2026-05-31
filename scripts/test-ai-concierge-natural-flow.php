@@ -6,7 +6,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 use App\Services\Ai\AgentPersonaRegistry;
 use App\Services\Ai\ConciergeStateMachine;
 use App\Services\Ai\NeedClassifier;
-use App\Services\Ai\ResponseStyleGuard;
+use App\Services\WhatsApp\WhatsAppHandoffBuilder;
 
 function assertTrue(bool $condition, string $message): void
 {
@@ -26,32 +26,46 @@ function advance(ConciergeStateMachine $machine, array &$conversation, string $m
 }
 
 $machine = new ConciergeStateMachine(new AgentPersonaRegistry(), new NeedClassifier());
-$conversation = ['locale' => 'it', 'current_step' => 'opening', 'structured_data' => '{}'];
-assertTrue(!str_contains($machine->greeting('it')['message'], 'sono SarAI'), 'Opening must not expose internal persona copy');
-
-$reply = advance($machine, $conversation, 'Ciao, ho una connessione lenta vorrei velocizzare perchè gioco');
-assertTrue($reply['agent']['key'] === 'serenai', 'Gaming connection must route to SerenAI');
-assertTrue($reply['step'] === 'tlc_operator', 'First TLC question must ask operator');
-$reply = advance($machine, $conversation, 'vodafone, sono in FWA');
-assertTrue($reply['step'] === 'tlc_scope', 'Vodafone FWA must ask a contextual scope question');
-$data = json_decode($conversation['structured_data'], true);
-assertTrue($data['operator'] === 'Vodafone' && $data['access_type'] === 'FWA', 'Operator and FWA extraction failed');
-$reply = advance($machine, $conversation, 'Mi sta bloccando');
-assertTrue($reply['step'] === 'phone', 'Urgent TLC case must ask only phone');
-$reply = advance($machine, $conversation, '3346582115');
-assertTrue($reply['ready'] === true && $reply['step'] === 'ready', 'TLC lead with phone must be ready');
 
 $conversation = ['locale' => 'it', 'current_step' => 'opening', 'structured_data' => '{}'];
-$reply = advance($machine, $conversation, 'spendo troppo in azienda, chiamatemi al 3346582115');
-assertTrue($reply['agent']['key'] === 'sarai' && $reply['step'] === 'urgency', 'Business energy must ask only urgency');
+$reply = advance($machine, $conversation, 'non mi va il cell, non so se ho finito i giga');
 $data = json_decode($conversation['structured_data'], true);
-assertTrue(($data['trigger'] ?? '') === 'costo_alto', 'Callback request must not become a commercial-call trigger');
-assertTrue(($data['callback_requested'] ?? false) === true, 'Callback request must remain available to the handoff');
-$reply = advance($machine, $conversation, 'Mi sta bloccando');
-assertTrue($reply['ready'] === true, 'Urgent business energy case with phone must be ready');
+assertTrue($reply['agent']['key'] === 'serenai', 'Mobile data issue must route to SerenAI');
+assertTrue($reply['ready'] === true, 'An actionable mobile issue must open WhatsApp immediately');
+assertTrue(($data['service_kind'] ?? '') === 'mobile_data', 'Mobile data context must be retained');
+assertTrue(empty($data['usage_context']['gaming']), 'The system must never infer gaming from an unrelated TLC request');
 
-$guard = new ResponseStyleGuard();
-assertTrue($guard->validateAgentMessage('sarai', 'Capisco perfettamente. Posso usare queste risposte?', 'fallback') === 'fallback', 'Internal AI copy must be rejected');
-assertTrue($guard->validateAgentMessage('sarai', 'Ti contatto al numero indicato.', 'fallback') === 'fallback', 'The assistant must not promise a callback while opening WhatsApp');
+$conversation = ['locale' => 'it', 'current_step' => 'opening', 'structured_data' => '{}'];
+$reply = advance($machine, $conversation, 'boh non so');
+assertTrue($reply['ready'] === false && $reply['step'] === 'understand_need', 'A vague first message gets one open clarification');
+$reply = advance($machine, $conversation, 'nessuna delle cose che hai detto');
+assertTrue($reply['ready'] === true, 'A vague customer must not be trapped in a clarification loop');
+
+$conversation = ['locale' => 'it', 'current_step' => 'opening', 'structured_data' => '{}'];
+$reply = advance($machine, $conversation, 'ho bisogno di una nuova linea internet, posso scrivervi io su whatsapp?');
+$data = json_decode($conversation['structured_data'], true);
+assertTrue($reply['ready'] === true && $reply['agent']['key'] === 'serenai', 'Direct WhatsApp request must be honored without phone collection');
+assertTrue(empty($conversation['customer_phone']), 'Outbound WhatsApp handoff must not require a phone number');
+assertTrue(($data['request_type'] ?? '') === 'new_line', 'New line intent must be extracted');
+
+$conversation = ['locale' => 'it', 'current_step' => 'opening', 'structured_data' => '{}'];
+advance($machine, $conversation, 'la linea fastweb lagga quando gioco');
+advance($machine, $conversation, 'chi ti ha detto che gioco?');
+$data = json_decode($conversation['structured_data'], true);
+assertTrue(empty($data['usage_context']['gaming']), 'An explicit customer correction must clear a previously collected fact');
+
+$builder = new WhatsAppHandoffBuilder();
+$handoff = $builder->build('393346582116', [
+    'main_sector' => 'tlc',
+    'customer_phone' => null,
+    'urgency' => null,
+    'structured_data' => json_encode([
+        'need_summary' => 'Verifica linea mobile o traffico dati',
+        'service_kind' => 'mobile_data',
+        'symptoms' => ['mobile_not_working' => true, 'data_allowance_uncertain' => true],
+    ], JSON_UNESCAPED_UNICODE),
+], []);
+assertTrue(!str_contains($handoff['summary'], 'gaming'), 'WhatsApp summary must not contain inferred gaming');
+assertTrue(!str_contains($handoff['summary'], 'Telefono cliente: non indicato'), 'WhatsApp summary must omit unavailable phone data');
 
 fwrite(STDOUT, "Natural concierge workflow tests passed\n");

@@ -13,20 +13,20 @@ final class ConciergeOrchestrator
     private QuoteBuilder $quotes;
     private SpecialConditionEngine $conditions;
     private WhatsAppHandoffBuilder $whatsapp;
-    private ConversationComposer $composer;
 
     public function __construct(private PDO $db, private array $config)
     {
-        $this->machine = new ConciergeStateMachine(new AgentPersonaRegistry(), new NeedClassifier());
+        $conciergeClient = GeminiClient::fromConfig($config, 'concierge');
+        $prompts = new PromptBuilder();
+        $this->machine = new ConciergeStateMachine(
+            new AgentPersonaRegistry(),
+            new NeedClassifier(),
+            new ConversationalAnalyzer($conciergeClient, $prompts)
+        );
         $this->guard = new PromptInjectionGuard();
         $this->quotes = new QuoteBuilder();
         $this->conditions = new SpecialConditionEngine($db);
         $this->whatsapp = new WhatsAppHandoffBuilder();
-        $this->composer = new ConversationComposer(
-            GeminiClient::fromConfig($config, 'concierge'),
-            new PromptBuilder(),
-            new ResponseStyleGuard()
-        );
     }
 
     public function bootstrap(string $sessionId, string $locale, array $context): array
@@ -77,10 +77,6 @@ final class ConciergeOrchestrator
         if (!empty($reply['updates'])) {
             $this->update((int)$conversation['id'], $reply['updates']);
             $conversation = $this->find($publicId, $sessionId);
-        }
-        if ($message !== '' && $choice === null) {
-            $data = json_decode((string)($conversation['structured_data'] ?? '{}'), true) ?: [];
-            $reply['message'] = $this->composer->compose($reply['agent'], $message, $reply['message'], $data);
         }
         $this->message((int)$conversation['id'], 'assistant', $reply['message']);
         if ($reply['ready']) {

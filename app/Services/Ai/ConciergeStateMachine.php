@@ -9,7 +9,8 @@ final class ConciergeStateMachine
 
     public function __construct(
         private AgentPersonaRegistry $agents,
-        private NeedClassifier $classifier
+        private NeedClassifier $classifier,
+        private ?ConversationalAnalyzer $analyzer = null
     ) {
         $this->extractor = new LeadExtractor($classifier);
     }
@@ -19,30 +20,44 @@ final class ConciergeStateMachine
         return $this->reply(
             'opening',
             $locale === 'en'
-                ? 'Hi, tell me what you need. I will ask only what is missing, then prepare the WhatsApp message for the shop.'
-                : 'Ciao, dimmi pure cosa ti serve. Ti faccio solo le domande che mancano e poi preparo il messaggio WhatsApp per il negozio.',
+                ? 'Hi, tell me what is happening or what you would like to get done. If useful, I will prepare a WhatsApp summary for the shop.'
+                : 'Ciao, raccontami cosa succede o cosa vorresti fare. Se serve, ti preparo subito il messaggio WhatsApp per il negozio.',
             $this->agents->byKey('sarai')
         );
     }
 
     public function advance(array $conversation, string $input, ?string $choice = null): array
     {
-        $locale = ($conversation['locale'] ?? 'it') === 'en' ? 'en' : 'it';
-        $step = (string)($conversation['current_step'] ?? 'opening');
         $data = json_decode((string)($conversation['structured_data'] ?? '{}'), true) ?: [];
+        $locale = ($conversation['locale'] ?? 'it') === 'en' ? 'en' : 'it';
         $previousAgent = (string)($data['active_agent'] ?? 'sarai');
-        $data = $this->extractor->extract($input !== '' ? $input : (string)$choice, $data);
-        $this->captureContext($step, $data);
-
+        $message = $input !== '' ? $input : (string)$choice;
+        $data = $this->extractor->extract($message, $data);
+        if ($this->analyzer && $this->classifier->classify($message) === 'guidance' && empty($data['handoff_requested'])) {
+            $data = $this->analyzer->enrich($message, $data);
+        }
         $sector = (string)($data['detected_sector'] ?? $conversation['main_sector'] ?? 'guidance');
         $agent = $this->agents->forSector($sector);
         $data['active_agent'] = $agent['key'];
-        $reply = match ($sector) {
-            'tlc' => $this->planTlc($data, $agent),
-            'energia_amministrativo' => $this->planEnergy($data, $agent),
-            'informatica' => $this->planTech($data, $agent),
-            default => $this->reply('clarify_need', 'Dimmi qual è il problema concreto: linea internet, tecnologia, bolletta o una pratica?', $agent),
-        };
+
+        if (!empty($data['handoff_requested'])) {
+            $reply = $this->ready($sector, $data, $agent, $locale);
+        } elseif ($sector === 'guidance') {
+            $data['clarification_count'] = (int)($data['clarification_count'] ?? 0) + 1;
+            $reply = $data['clarification_count'] >= 2
+                ? $this->ready($sector, $data, $agent, $locale)
+                : $this->reply(
+                    'understand_need',
+                    $locale === 'en'
+                        ? 'Tell me in your own words what is not working or what you would like to achieve. If you prefer not to go into detail here, I can open WhatsApp directly.'
+                        : 'Raccontami con parole tue cosa non funziona o cosa vorresti ottenere. Se preferisci non approfondire qui, ti apro direttamente WhatsApp.',
+                    $agent,
+                    ['need']
+                );
+        } else {
+            $reply = $this->ready($sector, $data, $agent, $locale);
+        }
+
         if ($previousAgent !== $agent['key']) {
             $reply['transition'] = 'Ti segue ' . $agent['name'] . '.';
         }
@@ -62,80 +77,60 @@ final class ConciergeStateMachine
         ], $data, $reply);
     }
 
-    private function planTlc(array $data, array $agent): array
+    private function ready(string $sector, array $data, array $agent, string $locale): array
     {
-        if (empty($data['operator']) && empty($data['access_type'])) {
-            $context = !empty($data['usage_context']['gaming'])
-                ? 'Se giochi non guardiamo solo la velocità: contano soprattutto stabilità e ping.'
-                : 'Per capire se il limite è la linea o la rete di casa mi serve un dato.';
+        if ($locale === 'en') {
+            $message = match ($sector) {
+                'tlc' => $this->tlcReadyMessage($data, $locale),
+                'informatica' => 'I understood the technical issue. I am opening WhatsApp with a short summary, so the shop can start from the right point.',
+                'energia_amministrativo' => 'I noted the request. I am opening WhatsApp with a summary, so the shop can check the specific situation.',
+                default => 'There is no need to classify the issue any further here. I am opening WhatsApp: you can write to the shop with a summary of what you told me.',
+            };
 
-            return $this->reply('tlc_operator', $context . ' Che operatore hai adesso?', $agent, ['operator_or_access_type']);
+            return $this->reply('ready', $message, $agent, [], true);
         }
-        if (empty($data['scope_declared'])) {
-            $prefix = trim(implode(' ', array_filter([$data['operator'] ?? null, $data['access_type'] ?? null])));
-            return $this->reply('tlc_scope', 'Ok, ' . $prefix . '. Ti succede solo durante il gioco o la connessione è lenta anche con streaming e navigazione?', $agent, ['scope']);
-        }
-        if (empty($data['urgency'])) {
-            return $this->reply('urgency', 'Chiaro. Quanto ti sta creando problemi: è una verifica con calma o ti sta bloccando?', $agent, ['urgency']);
-        }
+        $message = match ($sector) {
+            'tlc' => $this->tlcReadyMessage($data, $locale),
+            'informatica' => 'Ho capito il problema tecnico. Ti apro WhatsApp con un riepilogo breve, così il negozio parte già dal punto giusto.',
+            'energia_amministrativo' => 'Ho segnato la richiesta. Ti apro WhatsApp con il riepilogo, così il negozio può verificare la situazione concreta.',
+            default => 'Non serve incasellare meglio il problema qui. Ti apro WhatsApp: scrivi pure al negozio con il riepilogo di quello che mi hai raccontato.',
+        };
 
-        return $this->phoneOrReady($data, $agent, 'Ho già segnato il problema di connessione' . (!empty($data['operator']) ? ' con ' . $data['operator'] : '') . '.');
+        return $this->reply('ready', $message, $agent, [], true);
     }
 
-    private function planEnergy(array $data, array $agent): array
+    private function tlcReadyMessage(array $data, string $locale): string
     {
-        if (empty($data['trigger'])) {
-            return $this->reply('energy_reason', 'Dimmi il punto principale: spesa troppo alta, bolletta aumentata, proposta ricevuta oppure una pratica da sistemare?', $agent, ['reason']);
+        if ($locale === 'en') {
+            if (($data['service_kind'] ?? '') === 'mobile_data') {
+                return 'It could be your data allowance, the mobile line or the data settings. I am opening WhatsApp with the summary, so the shop can check the specific case without making you repeat everything.';
+            }
+            if (($data['request_type'] ?? '') === 'new_line') {
+                return 'I noted that you want to activate a new internet line. I am opening WhatsApp with the summary, so the shop can check coverage and available alternatives.';
+            }
+
+            return 'I noted the connection issue. I am opening WhatsApp with the summary, so the shop can check the specific situation.';
         }
-        if (empty($data['urgency'])) {
-            $context = ($data['customer_type'] ?? '') === 'business' ? 'Ho segnato che riguarda la tua attività.' : 'Ok, ho segnato il motivo.';
-            return $this->reply('urgency', $context . ' Quanto è urgente?', $agent, ['urgency']);
+        if (($data['service_kind'] ?? '') === 'mobile_data') {
+            return 'Potrebbero essere i giga terminati, la linea mobile oppure le impostazioni dati. Ti apro WhatsApp con il riepilogo: il negozio controlla il caso concreto senza farti ripetere tutto.';
+        }
+        if (($data['request_type'] ?? '') === 'new_line') {
+            return 'Ho segnato che vuoi attivare una nuova linea internet. Ti apro WhatsApp con il riepilogo, così il negozio può verificare copertura e alternative disponibili.';
         }
 
-        return $this->phoneOrReady($data, $agent, 'Ho già il quadro essenziale della richiesta.');
-    }
-
-    private function planTech(array $data, array $agent): array
-    {
-        if (empty($data['tech_detail_declared'])) {
-            return $this->reply('tech_detail', 'Per capire come intervenire senza farti perdere tempo: cosa succede esattamente al dispositivo?', $agent, ['device_detail']);
-        }
-        if (empty($data['urgency'])) {
-            return $this->reply('urgency', 'Ok, chiaro. Ti sta bloccando adesso oppure possiamo ragionarci con calma?', $agent, ['urgency']);
-        }
-
-        return $this->phoneOrReady($data, $agent, 'Ho segnato il problema tecnico e la priorità.');
-    }
-
-    private function phoneOrReady(array $data, array $agent, string $prefix): array
-    {
-        if (empty($data['phone'])) {
-            return $this->reply('phone', $prefix . ' Mi manca solo un numero WhatsApp per passarti al negozio con il riepilogo pronto.', $agent, ['phone']);
-        }
-
-        return $this->reply('ready', 'Perfetto, ho abbastanza per non farti ripartire da zero. Ti apro WhatsApp con il riepilogo già pronto.', $agent, [], true);
-    }
-
-    private function captureContext(string $step, array &$data): void
-    {
-        if ($step === 'tlc_scope') {
-            $data['scope_declared'] = true;
-        }
-        if ($step === 'tech_detail') {
-            $data['tech_detail_declared'] = true;
-        }
+        return 'Ho segnato il problema di connessione. Ti apro WhatsApp con il riepilogo, così il negozio può verificare la situazione concreta.';
     }
 
     private function score(array $data, bool $ready): int
     {
         $score = 15;
-        foreach (['detected_sector', 'need_summary', 'operator', 'access_type', 'urgency', 'phone', 'customer_type', 'trigger'] as $field) {
+        foreach (['detected_sector', 'need_summary', 'operator', 'access_type', 'urgency', 'phone', 'customer_type', 'trigger', 'service_kind', 'request_type'] as $field) {
             if (!empty($data[$field])) {
-                $score += 10;
+                $score += 8;
             }
         }
 
-        return min(100, $ready ? max(80, $score) : $score);
+        return min(100, $ready ? max(65, $score) : $score);
     }
 
     private function reply(string $step, string $message, array $agent, array $missingFields = [], bool $ready = false): array

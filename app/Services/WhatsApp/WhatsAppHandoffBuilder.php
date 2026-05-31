@@ -19,13 +19,18 @@ final class WhatsAppHandoffBuilder
             '',
             'Settore: ' . ($conversation['main_sector'] ?: 'da verificare'),
             'Agente: ' . ucfirst((string)($data['active_agent'] ?? 'da verificare')),
-            'Telefono cliente: ' . ($conversation['customer_phone'] ?: 'non indicato'),
-            'Cliente: ' . ($conversation['customer_name'] ?: 'non indicato'),
-            'Urgenza: ' . ($conversation['urgency'] ?: 'non indicata'),
-            'Esigenza: ' . ($data['need_summary'] ?? 'da approfondire'),
             '',
-            'Vorrei continuare con una verifica umana senza ricominciare da zero.',
+            'Esigenza: ' . ($data['need_summary'] ?? 'da approfondire'),
         ];
+        foreach (array_filter([
+            !empty($conversation['customer_name']) ? 'Cliente: ' . $conversation['customer_name'] : null,
+            !empty($conversation['customer_phone']) ? 'Telefono lasciato in chat: ' . $conversation['customer_phone'] : null,
+            !empty($conversation['urgency']) ? 'Urgenza dichiarata: ' . $conversation['urgency'] : null,
+        ]) as $detail) {
+            $lines[] = $detail;
+        }
+        $lines[] = '';
+        $lines[] = 'Vorrei continuare con una verifica umana senza ricominciare da zero.';
         $text = implode("\n", $lines);
 
         return ['summary' => $text, 'url' => 'https://wa.me/' . preg_replace('/\D+/', '', $number) . '?text=' . rawurlencode($text)];
@@ -36,22 +41,33 @@ final class WhatsAppHandoffBuilder
         $lines = [
             'Ciao Bisped, arrivo dal sito.',
             '',
-            'Settore: internet / connessione',
+            'Settore: telefonia / connessione',
             'Agente: SerenAI',
-            'Telefono cliente: ' . ($conversation['customer_phone'] ?: 'non indicato'),
-            'Urgenza: ' . ($conversation['urgency'] ?: 'non indicata'),
             '',
             'Richiesta:',
-            $data['need_summary'] ?? 'Connessione da verificare.',
-            '',
-            'Dati raccolti:',
-            '- Operatore attuale: ' . ($data['operator'] ?? 'non indicato'),
-            '- Tecnologia: ' . ($data['access_type'] ?? 'da verificare'),
-            '- Problema: ' . (!empty($data['usage_context']['gaming']) ? 'velocità/stabilità per giocare' : 'prestazioni connessione'),
-            '- Nota: ' . (($conversation['urgency'] ?? '') === 'alta' ? 'il cliente dice che la situazione lo sta bloccando' : 'richiesta da approfondire'),
-            '',
-            'Vorrei continuare da qui senza ricominciare da zero.',
+            $data['need_summary'] ?? 'Richiesta TLC da verificare.',
         ];
+        $details = array_filter([
+            !empty($data['operator']) ? '- Operatore citato: ' . $data['operator'] : null,
+            !empty($data['access_type']) ? '- Tecnologia citata: ' . $data['access_type'] : null,
+            ($data['service_kind'] ?? '') === 'mobile_data' ? '- Ambito: linea mobile / traffico dati' : null,
+            ($data['request_type'] ?? '') === 'change_offer' ? '- Obiettivo dichiarato: valutare cambio offerta' : null,
+            ($data['request_type'] ?? '') === 'new_line' ? '- Obiettivo dichiarato: attivare una nuova linea internet' : null,
+            !empty($data['symptoms']['mobile_not_working']) ? '- Segnalazione: il telefono o la linea mobile non funziona come previsto' : null,
+            !empty($data['symptoms']['data_allowance_uncertain']) ? '- Segnalazione: il cliente non sa se ha terminato i giga' : null,
+            !empty($data['usage_context']['gaming']) ? '- Uso dichiarato: gaming online' : null,
+            !empty($data['pain_points']['lentezza']) ? '- Segnalazione: lentezza o blocchi' : null,
+            !empty($data['pain_points']['stabilita_ping']) ? '- Segnalazione: lag, ping o stabilità' : null,
+            ($conversation['urgency'] ?? '') === 'alta' ? '- Urgenza dichiarata: alta' : null,
+            !empty($conversation['customer_phone']) ? '- Telefono lasciato in chat: ' . $conversation['customer_phone'] : null,
+        ]);
+        if ($details) {
+            $lines[] = '';
+            $lines[] = 'Dati dichiarati:';
+            array_push($lines, ...$details);
+        }
+        $lines[] = '';
+        $lines[] = 'Vorrei continuare da qui senza ricominciare da zero.';
         $text = mb_substr(implode("\n", $lines), 0, 1800, 'UTF-8');
 
         return ['summary' => $text, 'url' => 'https://wa.me/' . preg_replace('/\D+/', '', $number) . '?text=' . rawurlencode($text)];
@@ -65,26 +81,30 @@ final class WhatsAppHandoffBuilder
                 $devices[] = $label;
             }
         }
-        $cost = isset($data['current_cost_amount'])
-            ? $data['current_cost_amount'] . ' euro / ' . ($data['current_cost_period'] ?? 'periodo da verificare')
-            : 'non ricordato dal cliente';
         $lines = [
             'Ciao Bisped, arrivo dal sito con riepilogo SarAI.',
             '',
-            'Tipo cliente: ' . ($conversation['customer_type'] ?: 'non indicato'),
-            'Telefono cliente: ' . ($conversation['customer_phone'] ?: 'non indicato'),
-            'Urgenza: ' . ($conversation['urgency'] ?: 'non indicata'),
-            'Motivo: ' . ($data['trigger'] ?? 'da approfondire'),
-            'Luce/Gas/Pratica: ' . ($data['commodity'] ?? 'da verificare'),
-            'Abitazione: ' . ($data['home_type'] ?? 'non indicata') . ' - ' . ($data['family_size'] ?? '?') . ' persone',
-            'Dispositivi rilevanti: ' . ($devices ? implode(', ', $devices) : 'nessuno segnalato'),
-            'Costo attuale: ' . $cost,
-            'Proposta ricevuta: ' . ($data['offer_type'] ?? 'da verificare'),
-            'Obiettivo: ' . ($data['primary_goal'] ?? 'da approfondire'),
-            'Rischi da controllare: ' . (!empty($data['risk_flags']) ? implode(', ', $data['risk_flags']) : 'nessuno segnalato'),
-            '',
-            'Vorrei continuare da qui senza ricominciare da zero.',
+            'Richiesta:',
+            $data['need_summary'] ?? 'Situazione energia o pratica da verificare.',
         ];
+        $details = array_filter([
+            !empty($conversation['customer_type']) && $conversation['customer_type'] !== 'non_definito' ? '- Tipo cliente: ' . $conversation['customer_type'] : null,
+            !empty($conversation['customer_phone']) ? '- Telefono lasciato in chat: ' . $conversation['customer_phone'] : null,
+            !empty($conversation['urgency']) ? '- Urgenza dichiarata: ' . $conversation['urgency'] : null,
+            !empty($data['trigger']) ? '- Motivo dichiarato: ' . $data['trigger'] : null,
+            !empty($data['commodity']) ? '- Ambito: ' . $data['commodity'] : null,
+            !empty($data['home_type']) ? '- Abitazione o attività: ' . $data['home_type'] : null,
+            !empty($data['family_size']) ? '- Persone: ' . $data['family_size'] : null,
+            $devices ? '- Dispositivi rilevanti citati: ' . implode(', ', $devices) : null,
+            isset($data['current_cost_amount']) ? '- Costo dichiarato: ' . $data['current_cost_amount'] . ' euro' : null,
+        ]);
+        if ($details) {
+            $lines[] = '';
+            $lines[] = 'Dati dichiarati:';
+            array_push($lines, ...$details);
+        }
+        $lines[] = '';
+        $lines[] = 'Vorrei continuare da qui senza ricominciare da zero.';
         $text = mb_substr(implode("\n", $lines), 0, 1800, 'UTF-8');
 
         return ['summary' => $text, 'url' => 'https://wa.me/' . preg_replace('/\D+/', '', $number) . '?text=' . rawurlencode($text)];

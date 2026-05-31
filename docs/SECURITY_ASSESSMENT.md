@@ -25,8 +25,9 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Aggiornata documentazione per evitare credenziali in comandi copiabili.
 - Integrato Gemini direttamente dal CMS PHP con chiave solo in `.env.php`, rate limit persistente e filtro anti-SSRF per acquisizione testi e immagini editoriali.
 - Sostituito il concierge dimostrativo con agenti digitali specializzati: flusso persistente, endpoint CSRF, rate limit, limite messaggi, filtro spam e handoff WhatsApp generato dal backend.
-- Evoluto il concierge con estrazione locale dei campi, routing contestuale e riscrittura Gemini controllata da style guard; il modello non decide prezzi, condizioni o accessi ai dati.
+- Evoluto il concierge con estrazione locale dei campi e analisi semantica Gemini JSON vincolata solo per i turni ambigui; il modello non riscrive le risposte pubbliche e non decide prezzi, condizioni o accessi ai dati.
 - Rimosse dal widget pubblico le scelte multiple, le card preventivo e i passaggi tecnici: quando gli slot minimi sono completi il backend genera il riepilogo e apre automaticamente WhatsApp. Resta disponibile un link di fallback se il browser blocca il popup.
+- Eliminata la raccolta obbligatoria del telefono nel click-to-chat: il cliente puo aprire WhatsApp direttamente. Il riepilogo viene costruito per inclusione di soli fatti dichiarati; Gemini contribuisce al routing con JSON vincolato ma non genera il messaggio operativo.
 - Corretto il sanitizer HTML editoriale: i frammenti vengono interpretati esplicitamente come UTF-8 e lo script `scripts/repair-blog-encoding.php` bonifica in modo idempotente i contenuti gia contaminati.
 
 ## Controlli Eseguiti

@@ -13,12 +13,13 @@ final class LeadExtractor
     {
         $text = mb_strtolower(trim($message), 'UTF-8');
         $data = $known;
-        $sector = $this->classifier->classify($text);
-        if ($sector !== 'guidance') {
-            $data['detected_sector'] = $sector;
+        $evidence = $this->classifier->evidence($text);
+        if ($evidence['sector'] !== 'guidance') {
+            $data['detected_sector'] = $evidence['sector'];
+            $data['routing_confidence'] = $evidence['confidence'];
         }
         $data['raw_need'] = trim(implode("\n", array_filter([$data['raw_need'] ?? '', $message])));
-        $data['last_user_intent'] = $message;
+        $data['last_user_intent'] = trim($message);
 
         if (preg_match('/(?:\+39[\s.-]*)?(3\d{2}[\s.-]?\d{3}[\s.-]?\d{3,4})/u', $text, $match)) {
             $data['phone'] = preg_replace('/\D+/', '', $match[1]);
@@ -37,24 +38,42 @@ final class LeadExtractor
         } elseif (preg_match('/\bfibra\b/u', $text)) {
             $data['access_type'] = 'fibra';
         }
+        if (preg_match('/giga|sim|rete mobile|dati mobil/u', $text)) {
+            $data['service_kind'] = 'mobile_data';
+        }
+        if (preg_match('/non (?:mi )?va (?:il )?(?:cell|telefono)|telefono non va|cellulare non va/u', $text)) {
+            $data['symptoms']['mobile_not_working'] = true;
+        }
+        if (preg_match('/finit[oi] i giga|giga finit|non so se ho finit/u', $text)) {
+            $data['symptoms']['data_allowance_uncertain'] = true;
+        }
+        if (preg_match('/cambiar(?:e|ei) offerta|offerta nuova|nuova offerta/u', $text)) {
+            $data['request_type'] = 'change_offer';
+        }
+        if (preg_match('/linea (?:internet )?nuova|nuova linea|attivare (?:una )?linea/u', $text)) {
+            $data['request_type'] = 'new_line';
+        }
         if (preg_match('/gioco|giocare|gaming|ping|lag|\bms\b|partite online/u', $text)) {
             $data['usage_context']['gaming'] = true;
             $data['pain_points']['stabilita_ping'] = true;
         }
-        if (preg_match('/lent[aoe]|velocizz|si blocca|instabil/u', $text)) {
+        if (preg_match('/chi ti ha detto che gioco|non (?:ho detto|gioco)|niente gaming/u', $text)) {
+            unset($data['usage_context']['gaming'], $data['pain_points']['stabilita_ping']);
+        }
+        if (preg_match('/lent[aoe]|si blocca|instabil/u', $text)) {
             $data['pain_points']['lentezza'] = true;
         }
-        if (preg_match('/mi sta bloccando|non riesco a lavorare|urgent|subito|oggi|bloccat/u', $text)) {
+        if (preg_match('/mi sta bloccando|non riesco a lavorare|urgent|subito|oggi|bloccat|mi serve subito/u', $text)) {
             $data['urgency'] = 'alta';
         }
         if (preg_match('/azienda|attivit[àa]|ufficio|negozio|piva|partita iva/u', $text)) {
             $data['customer_type'] = 'business';
         }
-        if (preg_match('/chiamatemi|richiamatemi|sentiamoci|whatsapp/u', $text)) {
+        if (preg_match('/chiamatemi|richiamatemi|sentiamoci/u', $text)) {
             $data['callback_requested'] = true;
         }
-        if (preg_match('/(?:sono|abito|zona|comune)(?:\s+(?:a|di|in))?\s+([a-zà-ÿ][a-zà-ÿ\\s]{2,40})/ui', $text, $match)) {
-            $data['location_hint'] = trim($match[1]);
+        if (preg_match('/whatsapp|posso scriverti|scrivo io/u', $text)) {
+            $data['handoff_requested'] = true;
         }
 
         $this->extractEnergy($text, $data);
@@ -70,43 +89,29 @@ final class LeadExtractor
             $data['commodity'] = str_contains($text, 'gas') && str_contains($text, 'luce') ? 'luce_gas' : (str_contains($text, 'gas') ? 'gas' : 'luce');
         }
         if (preg_match('/voltura|subentro|pratica/u', $text)) {
-            $data['commodity'] = 'pratica';
             $data['trigger'] = 'voltura_subentro';
         } elseif (preg_match('/mi hanno chiamat|telefonat|devo cambiare/u', $text)) {
             $data['trigger'] = 'chiamata_commerciale';
-            $data['has_competing_offer'] = true;
-            $data['offer_type'] = 'telefonica';
         } elseif (preg_match('/proposta scritta|preventivo|offerta scritta/u', $text)) {
             $data['trigger'] = 'proposta_scritta';
-            $data['has_competing_offer'] = true;
-            $data['offer_type'] = 'scritta';
         } elseif (preg_match('/aument|pago troppo|spendo troppo|risparmi/u', $text)) {
             $data['trigger'] = 'costo_alto';
-        }
-        if (preg_match('/\b(appartamento|villetta|ufficio|negozio|attivit[àa]|azienda)\b/u', $text, $match)) {
-            $data['home_type'] = $match[1];
-        }
-        if (preg_match('/(?:siamo|viviamo|famiglia(?: di)?|in casa siamo)\s+(?:in\s+)?(\d{1,2})/u', $text, $match)) {
-            $data['family_size'] = (int)$match[1];
-        }
-        foreach (['has_air_conditioning' => 'climatizz|condizion', 'has_heat_pump' => 'pompa di calore', 'has_induction' => 'induzion', 'has_ev' => 'auto elettrica'] as $field => $pattern) {
-            if (preg_match('/' . $pattern . '/u', $text)) {
-                $data[$field] = true;
-            }
-        }
-        if (preg_match('/(?:pago|spendo|bolletta(?: da| di)?|circa)\s*(?:€\s*)?(\d+(?:[.,]\d{1,2})?)/u', $text, $match)) {
-            $data['current_cost_amount'] = (float)str_replace(',', '.', $match[1]);
         }
     }
 
     private function summarize(array $data): string
     {
         if (($data['detected_sector'] ?? '') === 'tlc') {
-            $usage = !empty($data['usage_context']['gaming']) ? ' per gaming online' : '';
-            return 'Connessione da verificare' . $usage . (!empty($data['pain_points']['lentezza']) ? ': velocità o stabilità insufficienti' : '');
+            if (($data['service_kind'] ?? '') === 'mobile_data') {
+                return 'Verifica linea mobile o traffico dati' . (($data['request_type'] ?? '') === 'change_offer' ? ' e possibile cambio offerta' : '');
+            }
+            return ($data['request_type'] ?? '') === 'new_line' ? 'Richiesta nuova linea internet' : 'Verifica connessione internet';
         }
         if (($data['detected_sector'] ?? '') === 'energia_amministrativo') {
-            return ($data['customer_type'] ?? '') === 'business' ? 'Costi aziendali da verificare' : 'Situazione energia o pratica da verificare';
+            return ($data['customer_type'] ?? '') === 'business' ? 'Verifica costi energia aziendali' : 'Verifica energia o pratica amministrativa';
+        }
+        if (($data['detected_sector'] ?? '') === 'informatica') {
+            return 'Assistenza tecnica dispositivo';
         }
 
         return mb_substr(trim((string)($data['raw_need'] ?? 'Richiesta da approfondire')), 0, 240, 'UTF-8');
@@ -115,10 +120,16 @@ final class LeadExtractor
     private function facts(array $data): array
     {
         return array_filter([
-            'operator' => $data['operator'] ?? null, 'access_type' => $data['access_type'] ?? null,
-            'usage_context' => $data['usage_context'] ?? null, 'pain_points' => $data['pain_points'] ?? null,
-            'urgency' => $data['urgency'] ?? null, 'phone' => $data['phone'] ?? null,
-            'customer_type' => $data['customer_type'] ?? null, 'location_hint' => $data['location_hint'] ?? null,
+            'operator' => $data['operator'] ?? null,
+            'access_type' => $data['access_type'] ?? null,
+            'service_kind' => $data['service_kind'] ?? null,
+            'request_type' => $data['request_type'] ?? null,
+            'symptoms' => $data['symptoms'] ?? null,
+            'usage_context' => $data['usage_context'] ?? null,
+            'pain_points' => $data['pain_points'] ?? null,
+            'urgency' => $data['urgency'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'customer_type' => $data['customer_type'] ?? null,
         ], static fn (mixed $value): bool => $value !== null && $value !== []);
     }
 }
