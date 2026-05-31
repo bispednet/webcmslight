@@ -1,95 +1,199 @@
-# Bisped.net WebCMSLight
+# Bisped.net — WebCMS Light + AI Concierge
 
-Custom CMS PHP/MariaDB per il rework commerciale di `bisped.net`, pensato per sostituire WordPress/WooCommerce solo dopo validazione completa in preview.
+> CMS PHP/MariaDB custom per [bisped.net](https://bisped.net) — negozio informatica, telefonia ed energia a Piombino (LI).
+> Sostituisce WordPress/WooCommerce dopo validazione completa in preview su `https://solclawn.com`.
 
-## Stato
+---
 
-- Base PHP/MySQL server-rendered con document root in `public/`.
-- Pagine pubbliche Bisped: `/`, `/azienda`, `/servizi`, `/sostenibilita`, `/contatti`, `/appuntamenti`, `/products`, `/blog`, `/faq`, `/legal`.
-- Route statiche inglesi per preview: `/en`, `/en/company`, `/en/services`, `/en/contact`, `/en/appointments`, `/en/legal`, `/en/find-us`, `/en/sustainability`, `/en/faq`.
-- Admin: prodotti, blog, media, impostazioni, ingest, messaggi contatto e appuntamenti.
-- Auth: password locale, Google OAuth, wallet EVM/Solana; ruoli `admin`, `commesso`, `cliente`.
-- Agenda: richieste appuntamento pubbliche e accettazione admin; sync Google Calendar pronta, attiva solo dopo refresh token OAuth.
-- Ingest: job giornaliero per news/offerte con immagini e deduplica.
-- Seed iniziale per impostazioni, navigazione, prodotti, FAQ, blog, team e testi legali.
-- Asset recuperati in sola lettura da FTP in `public/media/bisped/`.
-- Form contatti e appuntamenti con CSRF, honeypot/rate-limit dove applicabile.
-- WhatsApp guidato Bisped: concierge nativo con routing semantico prudente verso SarAI/AndreAI/SerenAI e handoff WhatsApp immediato per richieste azionabili.
-- Audit migrazione in `docs/BISPED_MIGRATION_AUDIT.md`.
-- Security assessment in `docs/SECURITY_ASSESSMENT.md`.
-- Runtime locale portabile in `runtime/` con FrankenPHP, MariaDB e Playwright. La cartella e esclusa da Git.
+## Stack e tecnologie
 
-## Sorgenti legacy
+![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php&logoColor=white)
+![MariaDB](https://img.shields.io/badge/MariaDB-10.x-003545?logo=mariadb&logoColor=white)
+![FrankenPHP](https://img.shields.io/badge/FrankenPHP-runtime-6B21A8?logo=php&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-AI-4285F4?logo=google&logoColor=white)
+![WhatsApp](https://img.shields.io/badge/WhatsApp-Handoff-25D366?logo=whatsapp&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6-F7DF1E?logo=javascript&logoColor=black)
+![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?logo=playwright&logoColor=white)
+![Cloudflare](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?logo=cloudflare&logoColor=white)
+![License](https://img.shields.io/badge/license-proprietary-red)
 
-- Dump SQL corretto: `/home/funboy/uu4c5pdm_wpb.sql`, importato in `bisped_wp_legacy`.
-- Dump SQL precedente: `/home/funboy/old_bisped.net.db.sql`, considerato ambiente test/demo.
-- Produzione FTP: usare solo in lettura per analisi e recupero asset.
-- Il cron editoriale e l'ingest offerte sono autonomi nel CMS PHP. CopilotRM non e una dipendenza runtime del sito.
-- Il concierge WhatsApp usa un profilo Gemini Flash Lite separato e prepara il passaggio alla chat umana con le informazioni raccolte.
+---
+
+## AI Concierge — Professional Agent Swarm
+
+Il componente principale del rework: agenti commerciali specializzati che qualificano i lead in chat con handoff WhatsApp automatico e summary precompilato.
+
+```
+Cliente scrive → ConversationSupervisor (invisibile)
+                         │
+              ┌──────────┼──────────┐
+              ▼          ▼          ▼
+           SerenAI    AndreAI    SarAI
+          TLC/fibra  IT/device  Energia
+              │          │          │
+              └──────────┴──────────┘
+                         │
+                 ConversationMemory
+                 AgentTurnPlanner
+                 BispedBusinessContext
+                 ResponseComposer
+                         │
+                         ▼
+              WhatsApp automatico
+           con summary precompilato
+```
+
+### Agenti specializzati
+
+| Agente | Settore | Cosa qualifica |
+|--------|---------|----------------|
+| **SerenAI** | TLC — fibra, FWA, mobile, operatori | Operatore attuale, impatto problema, cross-sell |
+| **AndreAI** | Informatica — device, PC, upgrade, repair | Brand, modello, budget, acquisto diretto vs operatore |
+| **SarAI** | Energia — luce, gas, volture, business | Tipo utenza, costo attuale, opportunità risparmio |
+
+### Esempio — Samsung Z Fold
+
+```
+Cliente  →  "vorrei un fold"
+AndreAI  →  "Bene, il Galaxy Z Fold parte ~1700€ in acquisto diretto
+             ma con operatore si scende parecchio.
+             Hai un budget in mente?"
+Cliente  →  "ho 1200 euro, con operatore"
+AndreAI  →  "Ok, ho tutto. Lasciami un numero."
+Cliente  →  "3346582115"
+             ↓
+WhatsApp si apre automaticamente con:
+  Richiesta: Acquisto Samsung Galaxy Z Fold
+  Budget: 1200€ | Acquisto: con operatore
+  Telefono: 3346582115
+```
+
+---
+
+## Architettura
+
+```
+bisped.net/
+├── app/
+│   ├── Controllers/
+│   │   ├── AiConciergeController.php
+│   │   └── Admin/AiConciergeController.php
+│   └── Services/
+│       ├── Ai/
+│       │   ├── ConversationSupervisor.php    ← cervello principale
+│       │   ├── ConversationMemory.php         ← stato live
+│       │   ├── AgentSwarmRouter.php           ← routing agente
+│       │   ├── AgentTurnPlanner.php           ← prossima mossa
+│       │   ├── BispedBusinessContext.php      ← knowledge prodotti/prezzi
+│       │   ├── ResponseComposer.php           ← risposta naturale
+│       │   ├── HandoffDecisionEngine.php      ← criteri handoff
+│       │   ├── CommercialReportBuilder.php    ← report admin
+│       │   ├── ResponseStyleGuard.php         ← blocca frasi vietate
+│       │   ├── ConversationRepair.php         ← correzioni esplicite
+│       │   ├── LeadExtractor.php              ← slot extraction
+│       │   └── NeedClassifier.php             ← routing settore
+│       └── WhatsApp/
+│           └── WhatsAppHandoffBuilder.php     ← summary wa.me
+├── public/assets/
+│   ├── js/ai-concierge.js     ← UI WhatsApp-like, auto-redirect
+│   └── css/ai-concierge.css   ← dark mode WhatsApp styling
+├── database/schema.sql
+├── docs/
+│   ├── AI_CONCIERGE.md
+│   └── SECURITY_ASSESSMENT.md
+└── scripts/
+    └── test-ai-concierge-professional-swarm.php  ← 106 test
+```
+
+---
+
+## Funzionalità CMS
+
+- **Pagine pubbliche** — home, azienda, servizi, sostenibilita, contatti, appuntamenti, products, blog, faq, legal + route `/en/*`
+- **Admin** — prodotti, blog, media, impostazioni, messaggi, appuntamenti, conversazioni AI con report commerciale, temperatura lead, cross-sell suggeriti
+- **Auth** — password locale, Google OAuth, wallet EVM/Solana; ruoli `admin`, `commesso`, `cliente`
+- **Agenda** — richieste appuntamento pubbliche + accettazione admin; sync Google Calendar opzionale
+- **Ingest editoriale** — job giornaliero news/offerte con immagini e deduplica (Gemini Flash)
+- **AI Concierge** — swarm 3 agenti, memoria persistente, slot extraction continua, handoff WhatsApp automatico, report commerciale admin
+
+---
 
 ## Setup locale
 
 ```bash
 cp .env.example.php .env.php
+# configurare: database, app.url, app.key, gemini.api_key, whatsapp.phone_number
 ```
-
-Poi configurare database MySQL, URL, chiave applicazione e wallet admin in `.env.php`.
 
 ```bash
 mysql -u bisped_user -p bisped_net < database/schema.sql
 runtime/bin/frankenphp php-cli scripts/migrate-ai-concierge.php
 ```
 
-L'installer web `public/install.php` e disabilitato di default per sicurezza. Abilitarlo solo in setup controllato con `BISPED_ALLOW_WEB_INSTALL=1`, poi rimuovere subito l'accesso.
+**MariaDB:**
+```bash
+runtime/mariadb/bin/mariadbd \
+  --basedir=runtime/mariadb --datadir=runtime/mariadb-data \
+  --socket=runtime/mariadb.sock --port=3307 \
+  --pid-file=runtime/mariadb.pid --skip-networking=0 --bind-address=127.0.0.1
+```
+
+**Server (tunnel solclawn.com → 127.0.0.1:4000):**
+```bash
+runtime/bin/frankenphp php-server --root public --listen 127.0.0.1:4000 --access-log
+```
+
+---
+
+## Test
+
+```bash
+# AI Concierge swarm — 106 test (routing, memory, handoff, summary, frasi vietate)
+runtime/bin/frankenphp php-cli scripts/test-ai-concierge-professional-swarm.php
+
+# Natural flow legacy
+runtime/bin/frankenphp php-cli scripts/test-ai-concierge-natural-flow.php
+
+# E2E browser
+runtime/venv/bin/python runtime/playwright_check.py
+```
+
+---
+
+## Sicurezza
+
+- Secrets **solo in `.env.php`** (gitignored) — **non committare mai `.env.php`**
+- Numero WhatsApp configurato esclusivamente in `.env.php` → `whatsapp.phone_number`
+- CSRF token su tutti gli endpoint POST (concierge + admin)
+- Rate limit sessione: 12 req/min per utente
+- Prepared statements PDO su tutte le query DB
+- Output LLM inserito via `textContent` — nessun rischio XSS
+- URL WhatsApp sanificato backend: `preg_replace('/\D+/', '', $number)` + `rawurlencode()`
+- `PromptInjectionGuard`: strip_tags + limite 1500 char su ogni messaggio
+- `public/install.php` disabilitato di default (richiede `BISPED_ALLOW_WEB_INSTALL=1`)
+
+Revisione completa → [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.md)
+
+---
 
 ## Note operative
 
-- Non committare `.env.php`, dump SQL, backup, log, credenziali FTP/SMTP/OAuth o dati cliente.
-- Non modificare la produzione WordPress via FTP durante lo sviluppo.
-- Il dump `uu4c5pdm_wpb.sql` contiene 116 tabelle importate, WooCommerce 10.7.0, 66 prodotti pubblicati e ordini legacy.
-- Il catalogo preview e amministrabile dal pannello `/admin/products`.
-- Il tunnel di preview usa `https://solclawn.com`, gia configurato via cloudflared verso `127.0.0.1:4000`.
-- Il deploy produzione richiede aggiornamento di `.env.php`, redirect OAuth Google, SMTP, DNS e refresh token Calendar se si vuole il sync automatico.
-- I file locali `BISPED_*_PLAN*.md` e `BISPED_HANDOFF.md` sono note operative escluse dal repository.
+- Non modificare la produzione WordPress via FTP durante lo sviluppo
+- Preview attiva su `https://solclawn.com` via cloudflared
+- `runtime/` è esclusa da Git (FrankenPHP, MariaDB, Playwright, venv)
+- `BispedBusinessContext.php` contiene stime di prezzo indicative — aggiornare manualmente se cambiano
+- Deploy produzione richiede: rotazione `app.key`, credenziali OAuth/SMTP, `app.url=https://bisped.net`
 
-## Runtime preview attuale
+---
 
-Avvio MariaDB locale:
+## Documentazione
 
-```bash
-cd /home/funboy/bisped.net
-runtime/mariadb/bin/mariadbd \
-  --basedir=/home/funboy/bisped.net/runtime/mariadb \
-  --datadir=/home/funboy/bisped.net/runtime/mariadb-data \
-  --socket=/home/funboy/bisped.net/runtime/mariadb.sock \
-  --port=3307 \
-  --pid-file=/home/funboy/bisped.net/runtime/mariadb.pid \
-  --skip-networking=0 \
-  --bind-address=127.0.0.1
-```
+- [`docs/AI_CONCIERGE.md`](docs/AI_CONCIERGE.md) — architettura e API del concierge
+- [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.md) — security audit completo
+- [`docs/BISPED_MIGRATION_AUDIT.md`](docs/BISPED_MIGRATION_AUDIT.md) — audit migrazione da WordPress
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — procedura deploy produzione
 
-Avvio sito sul tunnel `solclawn.com`:
+---
 
-```bash
-cd /home/funboy/bisped.net
-runtime/bin/frankenphp php-server \
-  --root /home/funboy/bisped.net/public \
-  --listen 127.0.0.1:4000 \
-  --access-log >> runtime/frankenphp.log 2>&1
-```
-
-Test Playwright:
-
-```bash
-runtime/venv/bin/python runtime/playwright_check.py
-runtime/venv/bin/python runtime/playwright_mobile_links.py
-```
-
-Security check rapido:
-
-```bash
-rg -n "REAL_SECRET_PREFIX|FTP_PASSWORD|OAUTH_SECRET|SMTP_PASSWORD|TEMP_ADMIN_PASSWORD" \
-  --glob '!runtime/**' --glob '!storage/**' --glob '!.env.php'
-curl -I https://solclawn.com/
-curl -s -o /tmp/install -w '%{http_code}\n' https://solclawn.com/install.php
-```
+*Repo privato — Bisp&d s.r.l., Piombino (LI)*

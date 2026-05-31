@@ -8,25 +8,20 @@ use PDO;
 
 final class ConciergeOrchestrator
 {
-    private ConciergeStateMachine $machine;
+    private ConversationSupervisor $supervisor;
     private PromptInjectionGuard $guard;
-    private QuoteBuilder $quotes;
-    private SpecialConditionEngine $conditions;
     private WhatsAppHandoffBuilder $whatsapp;
+    private AgentPersonaRegistry $agents;
 
     public function __construct(private PDO $db, private array $config)
     {
         $conciergeClient = GeminiClient::fromConfig($config, 'concierge');
         $prompts = new PromptBuilder();
-        $this->machine = new ConciergeStateMachine(
-            new AgentPersonaRegistry(),
-            new NeedClassifier(),
-            new ConversationalAnalyzer($conciergeClient, $prompts)
-        );
+        $analyzer = new ConversationalAnalyzer($conciergeClient, $prompts);
+        $this->supervisor = new ConversationSupervisor($analyzer);
         $this->guard = new PromptInjectionGuard();
-        $this->quotes = new QuoteBuilder();
-        $this->conditions = new SpecialConditionEngine($db);
         $this->whatsapp = new WhatsAppHandoffBuilder();
+        $this->agents = new AgentPersonaRegistry();
     }
 
     public function bootstrap(string $sessionId, string $locale, array $context): array
@@ -48,7 +43,7 @@ final class ConciergeOrchestrator
             'data' => '{}',
         ]);
         $conversation = $this->find($publicId, $sessionId);
-        $reply = $this->machine->greeting($locale);
+        $reply = $this->supervisor->greeting($locale);
         $this->message((int)$conversation['id'], 'assistant', $reply['message']);
 
         return $this->response($publicId, $reply);
@@ -69,18 +64,24 @@ final class ConciergeOrchestrator
         $count->execute(['id' => $conversation['id']]);
         $max = (int)($this->config['ai_concierge']['max_messages_per_conversation'] ?? 40);
         if ((int)$count->fetchColumn() >= $max) {
-            throw new \InvalidArgumentException('Per non farti perdere tempo, passiamo al negozio: completa il riepilogo WhatsApp.');
+            throw new \InvalidArgumentException('Per non farti perdere tempo, ti apro WhatsApp con il riepilogo di quello che ci siamo detti.');
         }
 
-        $this->message((int)$conversation['id'], 'user', $message !== '' ? $message : (string)$choice);
-        $reply = $this->machine->advance($conversation, $message, $choice);
+        $userMessage = $message !== '' ? $message : (string)$choice;
+        $this->message((int)$conversation['id'], 'user', $userMessage);
+
+        // Delegate to supervisor
+        $reply = $this->supervisor->handleTurn($conversation, $userMessage);
+
         if (!empty($reply['updates'])) {
             $this->update((int)$conversation['id'], $reply['updates']);
             $conversation = $this->find($publicId, $sessionId);
         }
         $this->message((int)$conversation['id'], 'assistant', $reply['message']);
+
         if ($reply['ready']) {
-            $reply['handoff'] = $this->handoff($publicId, $sessionId);
+            $handoff = $this->buildHandoff($publicId, $sessionId, $conversation, $reply);
+            $reply['handoff'] = $handoff;
             $reply['action'] = 'redirect_whatsapp';
         }
 
@@ -90,63 +91,107 @@ final class ConciergeOrchestrator
     public function handoff(string $publicId, string $sessionId): array
     {
         $conversation = $this->find($publicId, $sessionId);
-        if (($conversation['current_step'] ?? '') !== 'ready') {
-            throw new \InvalidArgumentException('Completa prima le domande essenziali.');
-        }
-        $quotes = $this->ensureLeadAndQuotes($conversation);
-        $number = (string)($this->config['whatsapp']['phone_number'] ?? $this->config['ai_concierge']['whatsapp_number'] ?? '393346582116');
-        $handoff = $this->whatsapp->build($number, $conversation, $quotes);
+        // Allow handoff even if not fully ready (customer may have requested it manually)
+        $number = (string)($this->config['whatsapp']['phone_number'] ?? $this->config['ai_concierge']['whatsapp_number'] ?? '');
+        $handoff = $this->whatsapp->build($number, $conversation, []);
         if (($conversation['status'] ?? '') !== 'handed_to_whatsapp') {
             $this->update((int)$conversation['id'], ['status' => 'handed_to_whatsapp', 'summary' => $handoff['summary']]);
             $this->message((int)$conversation['id'], 'handoff', $handoff['summary']);
-            $stmt = $this->db->prepare(
-                'INSERT INTO contact_messages (name,email,message,ip_address,user_agent,status) VALUES (:name,:email,:message,:ip,:agent,"new")'
-            );
-            $stmt->execute([
-                'name' => $conversation['customer_name'] ?: 'Lead AI Concierge',
-                'email' => $conversation['customer_email'] ?: 'concierge@bisped.net',
-                'message' => "[AI Concierge Lead]\n" . $handoff['summary'],
-                'ip' => $conversation['ip_address'],
-                'agent' => $conversation['user_agent'],
-            ]);
+            $this->persistContactMessage($conversation, $handoff['summary']);
         }
 
         return ['url' => $handoff['url'], 'summary' => $handoff['summary']];
     }
 
-    private function ensureLeadAndQuotes(array $conversation): array
+    private function buildHandoff(string $publicId, string $sessionId, array $conversation, array $reply): array
     {
-        $sector = (string)($conversation['main_sector'] ?: 'guidance');
-        $score = (int)$conversation['lead_score'];
+        if (($conversation['status'] ?? '') === 'handed_to_whatsapp') {
+            // Already handed off, just return url
+            $number = (string)($this->config['whatsapp']['phone_number'] ?? $this->config['ai_concierge']['whatsapp_number'] ?? '');
+
+            return $this->whatsapp->build($number, $conversation, [])['url'] ? $this->whatsapp->build($number, $conversation, []) : ['url' => '', 'summary' => ''];
+        }
+
+        $number = (string)($this->config['whatsapp']['phone_number'] ?? $this->config['ai_concierge']['whatsapp_number'] ?? '');
+
+        // Re-fetch after update to get latest structured_data
+        $conversation = $this->find($publicId, $sessionId);
+        $handoff = $this->whatsapp->build($number, $conversation, []);
+
+        $this->update((int)$conversation['id'], ['status' => 'handed_to_whatsapp', 'summary' => $handoff['summary']]);
+        $this->message((int)$conversation['id'], 'handoff', $handoff['summary']);
+        $this->persistContactMessage($conversation, $handoff['summary']);
+
+        // Persist commercial report in ai_conversation_reports if table exists
         $data = json_decode((string)($conversation['structured_data'] ?? '{}'), true) ?: [];
-        $condition = $this->conditions->find($sector, $score);
+        if (!empty($data['commercial_report'])) {
+            $this->persistReport((int)$conversation['id'], 'commercial_report', $data['commercial_report']);
+        }
+        if (!empty($data['analytics'])) {
+            $this->persistReport((int)$conversation['id'], 'analytics', null, $data['analytics']);
+        }
+        $this->persistReport((int)$conversation['id'], 'whatsapp_summary', $handoff['summary']);
+
+        // Persist lead record
+        $this->ensureLead($conversation);
+
+        return ['url' => $handoff['url'], 'summary' => $handoff['summary']];
+    }
+
+    private function ensureLead(array $conversation): void
+    {
+        $data = json_decode((string)($conversation['structured_data'] ?? '{}'), true) ?: [];
+        $sector = (string)($conversation['main_sector'] ?: 'guidance');
+        $agent = $this->agents->forSector($sector);
         $lead = $this->db->prepare(
             'INSERT INTO ai_leads (conversation_id,status,name,phone,email,customer_type,sector,need_summary,urgency,lead_score,assigned_to)
              VALUES (:conversation_id,"qualified",:name,:phone,:email,:customer_type,:sector,:need,:urgency,:score,:assigned)
              ON DUPLICATE KEY UPDATE status="qualified",name=VALUES(name),phone=VALUES(phone),lead_score=VALUES(lead_score)'
         );
         $lead->execute([
-            'conversation_id' => $conversation['id'], 'name' => $conversation['customer_name'], 'phone' => $conversation['customer_phone'],
-            'email' => $conversation['customer_email'], 'customer_type' => $conversation['customer_type'], 'sector' => $sector,
-            'need' => (string)($data['need_summary'] ?? 'Da approfondire'), 'urgency' => $conversation['urgency'], 'score' => $score,
-            'assigned' => (new AgentPersonaRegistry())->forSector($sector)['key'],
+            'conversation_id' => $conversation['id'],
+            'name' => $conversation['customer_name'],
+            'phone' => $conversation['customer_phone'],
+            'email' => $conversation['customer_email'],
+            'customer_type' => $conversation['customer_type'],
+            'sector' => $sector,
+            'need' => (string)($data['need_summary'] ?? 'Da approfondire'),
+            'urgency' => $conversation['urgency'],
+            'score' => (int)$conversation['lead_score'],
+            'assigned' => $agent['key'],
         ]);
-        $leadId = (int)$this->db->query('SELECT id FROM ai_leads WHERE conversation_id=' . (int)$conversation['id'])->fetchColumn();
-        $quotes = $this->quotes->build($sector, $condition, $data);
-        $this->db->prepare('DELETE FROM ai_quotes WHERE conversation_id=:id')->execute(['id' => $conversation['id']]);
-        $stmt = $this->db->prepare(
-            'INSERT INTO ai_quotes (conversation_id,lead_id,quote_level,title,summary,items_json,special_condition,disclaimers)
-             VALUES (:conversation_id,:lead_id,:level,:title,:summary,:items,:condition,:disclaimers)'
-        );
-        foreach ($quotes as $quote) {
-            $stmt->execute([
-                'conversation_id' => $conversation['id'], 'lead_id' => $leadId, 'level' => $quote['level'], 'title' => $quote['title'],
-                'summary' => $quote['summary'], 'items' => json_encode($quote['items'], JSON_UNESCAPED_UNICODE),
-                'condition' => $quote['condition'], 'disclaimers' => 'Prezzi, disponibilita, copertura e condizioni finali richiedono verifica umana.',
-            ]);
-        }
+    }
 
-        return $quotes;
+    private function persistContactMessage(array $conversation, string $summary): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO contact_messages (name,email,message,ip_address,user_agent,status) VALUES (:name,:email,:message,:ip,:agent,"new")'
+        );
+        $stmt->execute([
+            'name' => $conversation['customer_name'] ?: 'Lead AI Concierge',
+            'email' => $conversation['customer_email'] ?: 'concierge@bisped.net',
+            'message' => "[AI Concierge Lead]\n" . $summary,
+            'ip' => $conversation['ip_address'],
+            'agent' => $conversation['user_agent'],
+        ]);
+    }
+
+    private function persistReport(int $conversationId, string $type, ?string $content, ?array $contentJson = null): void
+    {
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO ai_conversation_reports (conversation_id,report_type,content,content_json) VALUES (:id,:type,:content,:json)
+                 ON DUPLICATE KEY UPDATE content=VALUES(content),content_json=VALUES(content_json)'
+            );
+            $stmt->execute([
+                'id' => $conversationId,
+                'type' => $type,
+                'content' => $content,
+                'json' => $contentJson ? json_encode($contentJson, JSON_UNESCAPED_UNICODE) : null,
+            ]);
+        } catch (\Throwable) {
+            // Table may not exist yet; graceful degradation
+        }
     }
 
     private function find(string $publicId, string $sessionId): array
@@ -194,7 +239,7 @@ final class ConciergeOrchestrator
             'ready' => $reply['ready'],
             'action' => $reply['action'] ?? null,
             'handoff' => $reply['handoff'] ?? null,
-            'agent' => $reply['agent'] ?? (new AgentPersonaRegistry())->byKey('sarai'),
+            'agent' => $reply['agent'] ?? $this->agents->byKey('sarai'),
             'transition' => $reply['transition'] ?? null,
         ];
     }

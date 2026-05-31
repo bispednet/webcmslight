@@ -9,6 +9,15 @@ final class ConversationalAnalyzer
     {
     }
 
+    public function generateRaw(string $prompt, int $maxTokens = 200): ?string
+    {
+        if (!$this->client) {
+            return null;
+        }
+
+        return $this->client->generate($prompt, $maxTokens, 'text');
+    }
+
     public function enrich(string $message, array $data): array
     {
         if (!$this->client || trim($message) === '') {

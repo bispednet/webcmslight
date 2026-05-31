@@ -1,21 +1,299 @@
-.ai-concierge { position: fixed; right: 24px; bottom: 24px; z-index: 210; font-family: 'Barlow', sans-serif; }
-.ai-concierge__launcher { position: relative; display: grid; grid-template-columns: 12px auto; column-gap: 9px; padding: 13px 18px; border: 1px solid rgba(74,222,128,.72); border-radius: 16px; color: #fff; background: linear-gradient(135deg,#075e54 0%,#128c7e 100%); box-shadow: 0 10px 34px rgba(18,140,126,.34); text-align: left; cursor: pointer; }
-.ai-concierge__launcher small { grid-column: 2; color: #d1fae5; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.ai-concierge__pulse { align-self: center; width: 10px; height: 10px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 5px rgba(74,222,128,.18),0 0 18px #4ade80; }
-.ai-concierge__panel { position: absolute; right: 0; bottom: 76px; width: min(410px,calc(100vw - 32px)); overflow: hidden; border: 1px solid rgba(239,68,68,.55); border-radius: 18px; color: var(--c-txt); background: linear-gradient(160deg,var(--c-surface),var(--c-bg)); box-shadow: 0 26px 70px rgba(0,0,0,.5),0 0 30px rgba(229,9,20,.13); }
-.ai-concierge__header { display: flex; align-items: center; gap: 10px; padding: 14px; color: #fff; background: linear-gradient(120deg,#0c0c0d,#35080d); }
-.ai-concierge__header span { display: block; color: #fca5a5; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.ai-concierge__header em { display: inline-block; margin-top: 4px; padding: 2px 6px; border: 1px solid rgba(252,165,165,.34); border-radius: 999px; color: #fecaca; font-size: 10px; font-style: normal; letter-spacing: .04em; }
-.ai-concierge__header button { margin-left: auto; border: 0; color: #fff; background: transparent; font-size: 25px; cursor: pointer; }
-.ai-concierge__avatar { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid #ef4444; border-radius: 10px; color: #fff; background: #e50914; font-weight: 900; }
-.ai-concierge__messages { min-height: 190px; max-height: 330px; overflow-y: auto; padding: 14px; }
-.ai-concierge__message { max-width: 88%; margin: 0 0 9px; padding: 10px 12px; border: 1px solid var(--c-border); border-radius: 13px; font-size: 13px; line-height: 1.48; background: var(--c-bg2); }
-.ai-concierge__message--user { margin-left: auto; border-color: rgba(229,9,20,.44); color: #fff; background: #4a0b10; }
-.ai-concierge__message--error { border-color: #ef4444; color: #fecaca; }
-.ai-concierge__message--transition { max-width: 100%; border-color: rgba(251,191,36,.5); color: #fde68a; background: rgba(120,53,15,.35); font-size: 12px; text-align: center; }
-.ai-concierge__form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--c-border); }
-.ai-concierge__form input { min-width: 0; flex: 1; border: 1px solid var(--c-border); border-radius: 12px; padding: 10px; color: var(--c-txt); background: var(--c-bg); }
-.ai-concierge__form button,.ai-concierge__handoff { border: 0; border-radius: 10px; padding: 10px 13px; color: #fff; background: #e50914; font-weight: 800; cursor: pointer; }
-.ai-concierge__actions { padding: 0 14px; }.ai-concierge__handoff { display: block; width: 100%; text-align: center; text-decoration: none; background: #168447; }.ai-concierge__handoff[hidden] { display: none; }
-.ai-concierge__privacy { margin: 9px 14px 12px; color: var(--c-muted); font-size: 10px; line-height: 1.35; }
-@media (max-width:520px) { .ai-concierge { right: 16px; bottom: 16px; }.ai-concierge__panel { position: fixed; right: 12px; bottom: 84px; width: calc(100vw - 24px); }.ai-concierge__messages { max-height: 42vh; } }
+/* ── AI Concierge – WhatsApp floating icon + chat ──────────────────────── */
+:root {
+  --wa-green:      #25d366;
+  --wa-green-btn:  #128c7e;
+  --wa-green-dark: #075e54;
+  --wa-bg:         #0b141a;
+  --wa-surface:    #202c33;
+  --wa-bubble-in:  #202c33;
+  --wa-bubble-out: #005c4b;
+  --wa-txt:        #e9edef;
+  --wa-txt-dim:    #8696a0;
+  --wa-border:     #2a3942;
+  --wa-input:      #2a3942;
+}
+
+/* ── Contenitore fisso ─────────────────────────────────────────────────── */
+.ai-concierge {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+/* ── Launcher: cerchio verde flottante ────────────────────────────────── */
+.ai-concierge__launcher {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 50%;
+  background: var(--wa-green-btn);
+  box-shadow: 0 4px 18px rgba(0,0,0,.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, box-shadow .15s, transform .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ai-concierge__launcher:hover {
+  background: var(--wa-green-dark);
+  box-shadow: 0 6px 24px rgba(0,0,0,.55);
+  transform: scale(1.05);
+}
+.ai-concierge__launcher svg { display: block; pointer-events: none; }
+
+/* pulse verde in basso a destra del cerchio */
+.ai-concierge__pulse {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--wa-green);
+  border: 2px solid #111;
+  box-shadow: 0 0 0 3px rgba(37,211,102,.25);
+  animation: wa-pulse 2s infinite;
+}
+@keyframes wa-pulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(37,211,102,.25); }
+  50%      { box-shadow: 0 0 0 6px rgba(37,211,102,.06); }
+}
+
+/* ── Panel chat ────────────────────────────────────────────────────────── */
+.ai-concierge__panel {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: min(380px, calc(100vw - 24px));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--wa-bg);
+  box-shadow: 0 8px 40px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04);
+  display: flex;
+  flex-direction: column;
+  max-height: min(640px, calc(100vh - 100px));
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+.ai-concierge__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--wa-surface);
+  border-bottom: 1px solid var(--wa-border);
+  flex-shrink: 0;
+}
+.ai-concierge__avatar {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--wa-green-btn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-concierge__header-info { flex: 1; min-width: 0; }
+.ai-concierge__header-info strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wa-txt);
+  line-height: 1.25;
+}
+.ai-concierge__header-info span {
+  display: block;
+  font-size: 12px;
+  color: var(--wa-txt-dim);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-concierge__header-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--wa-txt-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+}
+.ai-concierge__header-close:hover { background: rgba(255,255,255,.08); color: var(--wa-txt); }
+
+/* ── Messaggi ──────────────────────────────────────────────────────────── */
+.ai-concierge__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px 10px;
+  background: var(--wa-bg);
+  min-height: 180px;
+  max-height: 340px;
+  scroll-behavior: smooth;
+}
+.ai-concierge__messages::-webkit-scrollbar { width: 3px; }
+.ai-concierge__messages::-webkit-scrollbar-thumb { background: var(--wa-input); border-radius: 3px; }
+/* clearfix */
+.ai-concierge__messages::after { content: ''; display: table; clear: both; }
+
+/* Bubble base */
+.ai-concierge__message {
+  position: relative;
+  display: block;
+  max-width: 80%;
+  padding: 7px 11px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  word-break: break-word;
+  clear: both;
+}
+
+/* Bot → sinistra, bubble grigio scuro, coda in alto-sinistra */
+.ai-concierge__message--bot {
+  float: left;
+  background: var(--wa-bubble-in);
+  color: var(--wa-txt);
+  border-top-left-radius: 0;
+  margin-left: 10px;
+}
+.ai-concierge__message--bot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -9px;
+  border: 9px solid transparent;
+  border-top-color: var(--wa-bubble-in);
+  border-right-color: var(--wa-bubble-in);
+  border-radius: 0 2px 0 0;
+  width: 0; height: 0;
+}
+
+/* User → destra, bubble verde scuro, coda in alto-destra */
+.ai-concierge__message--user {
+  float: right;
+  background: var(--wa-bubble-out);
+  color: #e9edef;
+  border-top-right-radius: 0;
+  margin-right: 10px;
+}
+.ai-concierge__message--user::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -9px;
+  border: 9px solid transparent;
+  border-top-color: var(--wa-bubble-out);
+  border-left-color: var(--wa-bubble-out);
+  border-radius: 2px 0 0 0;
+  width: 0; height: 0;
+}
+
+/* Error */
+.ai-concierge__message--error {
+  float: left;
+  background: #1e1010;
+  color: #fca5a5;
+  border-left: 3px solid #dc2626;
+  margin-left: 10px;
+}
+
+/* ── Input ─────────────────────────────────────────────────────────────── */
+.ai-concierge__form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--wa-surface);
+  border-top: 1px solid var(--wa-border);
+  flex-shrink: 0;
+}
+.ai-concierge__form input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 22px;
+  padding: 9px 15px;
+  font-size: 14px;
+  color: var(--wa-txt);
+  background: var(--wa-input);
+  outline: none;
+  font-family: inherit;
+}
+.ai-concierge__form input::placeholder { color: var(--wa-txt-dim); }
+.ai-concierge__form input:focus { background: #34454f; }
+.ai-concierge__send-btn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: var(--wa-green-btn);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.ai-concierge__send-btn:hover { background: var(--wa-green-dark); }
+
+/* ── Fallback WhatsApp ─────────────────────────────────────────────────── */
+.ai-concierge__actions {
+  padding: 8px 10px;
+  background: var(--wa-surface);
+  border-top: 1px solid var(--wa-border);
+  flex-shrink: 0;
+}
+.ai-concierge__handoff {
+  display: block;
+  width: 100%;
+  padding: 11px;
+  border: none;
+  border-radius: 22px;
+  background: var(--wa-green-btn);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s;
+}
+.ai-concierge__handoff:hover { background: var(--wa-green-dark); }
+
+/* ── Privacy ───────────────────────────────────────────────────────────── */
+.ai-concierge__privacy {
+  text-align: center;
+  padding: 5px 12px 8px;
+  color: var(--wa-txt-dim);
+  font-size: 10.5px;
+  background: var(--wa-surface);
+  border-top: 1px solid var(--wa-border);
+  flex-shrink: 0;
+}
+
+/* ── Mobile ────────────────────────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .ai-concierge { right: 14px; bottom: 14px; }
+  .ai-concierge__panel {
+    position: fixed;
+    right: 0; left: 0; bottom: 0;
+    width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: 85vh;
+  }
+  .ai-concierge__messages { max-height: 50vh; }
+}

@@ -1,6 +1,6 @@
 # Security Assessment
 
-Data: 2026-05-30
+Data ultima revisione: 2026-06-01 (aggiornato per rework Professional Agent Swarm Concierge)
 
 Ambiente valutato: preview `https://solclawn.com`, repo `bispednet/webcmslight`, runtime FrankenPHP + MariaDB locale.
 
@@ -11,6 +11,20 @@ Lo stato attuale e idoneo a una preview controllata. Sono stati corretti i probl
 Prima della produzione servono ancora rotazione/validazione dei segreti reali, hardening infrastrutturale e configurazione OAuth/SMTP definitiva.
 
 ## Correzioni Applicate
+
+## Correzioni rework Professional Agent Swarm Concierge (2026-06-01)
+
+- Rimosso numero WhatsApp hardcoded `393346582116` dal sorgente `ConciergeOrchestrator.php`; ora richiesto solo da `.env.php` via `whatsapp.phone_number` o `ai_concierge.whatsapp_number`.
+- Corretto falso positivo `customer_type=business`: la parola "negozio" nel contesto "porto in negozio" non viene più interpretata come cliente business.
+- Confermato: tutte le query DB nel layer AI usano prepared statements PDO.
+- Confermato: l'output LLM (Gemini) viene inserito nel DOM tramite `textContent` (non `innerHTML`) — nessun rischio XSS.
+- Confermato: il messaggio utente entra nel prompt LLM già sanitizzato da `PromptInjectionGuard` (strip_tags, 1500 char, rimozione blocchi ripetuti).
+- Confermato: la colonna `customer_email` è esclusa dall'`$allowed` di `update()` per design — l'email è persistita solo nel JSON `structured_data`.
+- Confermato: l'URL WhatsApp è costruito esclusivamente dal backend con `preg_replace('/\D+/', '', $number)` + `rawurlencode($text)` — nessun open redirect.
+- Confermato: rate limit (12 req/min), CSRF token, limite messaggi (40), spam check mantenuti nella nuova architettura swarm.
+- Nota: `BispedBusinessContext.php` contiene stime di prezzo indicative (es. ~1700€ per Z Fold6). Non è un dato utente né un segreto, ma va aggiornato manualmente se i prezzi cambiano.
+
+## Correzioni precedenti
 
 - Rimossi segreti FTP hardcoded da `scripts/ftp-download-images.php`; ora usa `BISPED_FTP_USER`, `BISPED_FTP_PASS`, `BISPED_FTP_UPLOADS_URL`.
 - Disabilitato `public/install.php` di default; richiede `BISPED_ALLOW_WEB_INSTALL=1`.

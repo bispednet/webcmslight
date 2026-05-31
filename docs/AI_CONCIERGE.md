@@ -1,54 +1,199 @@
-# WhatsApp guidato Bisped
+# AI Concierge — Professional Agent Swarm
 
-Il launcher pubblico si presenta come `WhatsApp Bisped`. Apre una chat interna essenziale, interpreta la richiesta e apre WhatsApp non appena esiste un problema azionabile. Il cliente non deve completare una qualifica commerciale prima di poter scrivere al negozio.
+Il componente AI Concierge di Bisped implementa un'architettura a swarm di agenti con supervisore invisibile. Il cliente vede solo una chat WhatsApp-like. Il sistema opera come un operatore consapevole, non come un form guidato.
 
-## Flusso
+## Architettura
 
-- Il cliente non vede step interni, scelte multiple, card preventivo o raccolta obbligatoria del numero.
-- Una richiesta concreta produce un handoff immediato; una richiesta incomprensibile riceve al massimo un chiarimento aperto prima del fallback WhatsApp.
-- Il recapito non e obbligatorio: con il click-to-chat e il cliente ad aprire WhatsApp dal proprio account.
-- `SarAI` gestisce energia, bollette, pratiche e orientamento iniziale.
-- `AndreAI` prende in carico tecnologia, device e assistenza.
-- `SerenAI` gestisce fibra, internet, mobile e telefonia.
-- Il cambio agente e dichiarato in chat e visibile nell'header.
-- La disclosure privacy resta discreta nel footer del widget.
-- SarAI applica il metodo: prima capisco come vivi, poi ti consiglio.
-- Il sistema genera tre pre-preventivi solo per il negozio, senza esporli nel widget o nel messaggio WhatsApp e senza inventare prezzi, coperture o disponibilita.
-- Il link WhatsApp viene creato dal backend e il riepilogo viene salvato anche in `contact_messages`.
-
-## Architettura conversazionale
-
-- `NeedClassifier` usa evidenze pesate e resta prudente sui casi ambigui.
-- `LeadExtractor` salva memoria conversazionale e fatti espliciti, comprese le correzioni del cliente.
-- `ConversationalAnalyzer` usa Gemini Flash Lite soltanto sui turni ambigui e accetta esclusivamente JSON vincolato.
-- `ConciergeStateMachine` non e piu un questionario: una richiesta azionabile passa subito a WhatsApp; una richiesta vaga riceve al massimo un chiarimento aperto.
-- `WhatsAppHandoffBuilder` costruisce il testo per inclusione: non mostra valori mancanti e non aggiunge diagnosi o ipotesi.
-
-Il design segue pattern consolidati: slot come memoria, compilazione silenziosa e validata, required slot dinamici e handoff contestuale verso specialisti o umani.
-
-Riferimenti:
-
-- Rasa slots: `https://rasa.com/docs/reference/primitives/slots`
-- Rasa forms dinamici: `https://rasa.com/docs/rasa/forms/`
-- Microsoft Semantic Kernel handoff orchestration: `https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-orchestration/handoff`
-- OpenAI Agents SDK handoffs: `https://openai.github.io/openai-agents-python/handoffs/`
-
-## Endpoint
-
-- `GET /ai/concierge/bootstrap`
-- `POST /ai/concierge/message`
-- `POST /ai/concierge/choice`
-- `POST /ai/concierge/handoff/whatsapp`
-- `GET /admin/ai-concierge`
-
-## Setup
-
-```bash
-runtime/bin/frankenphp php-cli scripts/migrate-ai-concierge.php
+```
+WhatsApp-like UI
+  → ConversationSupervisor (invisibile al cliente)
+  → AgentSwarmRouter
+  → agente attivo: SerenAI / AndreAI / SarAI
+  → ConversationMemory (stato persistente per turno)
+  → LeadExtractor (slot extraction continua)
+  → AgentTurnPlanner (prossima mossa)
+  → ResponseComposer (risposta naturale)
+  → ResponseStyleGuard (blocca frasi vietate)
+  → HandoffDecisionEngine (quando passare a WhatsApp)
+  → CommercialReportBuilder (report per admin)
+  → WhatsApp automatico + summary precompilato
 ```
 
-Il flusso deterministico resta disponibile senza LLM ed evita chiamate esterne quando le evidenze locali sono gia sufficienti. Gemini Flash Lite esegue una sola analisi semantica JSON vincolata esclusivamente sui turni ambigui, ma non decide il workflow, non riscrive le risposte pubbliche e non scrive il riepilogo operativo. Il messaggio WhatsApp include soltanto fatti dichiarati dal cliente.
+## Agenti
 
-## Sicurezza
+| Agente | Settore | Keywords principali |
+|--------|---------|---------------------|
+| **SerenAI** | TLC | fibra, FWA, modem, operatori, ping, gaming legato alla linea |
+| **AndreAI** | Informatica | PC, notebook, device, riparazioni, assistenza hardware |
+| **SarAI** | Energia / Amministrativo | luce, gas, bollette, volture, subentri, pratiche |
 
-Le richieste mutative usano CSRF e rate limit per sessione. I messaggi sono ripuliti da HTML, limitati in lunghezza e rifiutati in caso di spam evidente. Nel widget non vanno richiesti documenti, IBAN o altri dati sensibili.
+**Regola gaming**: gaming + connessione/ping/FWA/fibra/operatori → **SerenAI** (non AndreAI). AndreAI diventa agente secondario solo se emergono segnali hardware (PC, scheda video, driver, temperatura).
+
+## Flusso di un turno
+
+1. **LeadExtractor** analizza ogni messaggio: estrae telefono, operatore, tecnologia, urgenza, tipo cliente, segnali gaming, correzioni esplicite.
+2. **ConversationRepair** rileva correzioni ("chi ti ha detto che gioco?") e le applica alla memoria.
+3. **ConversationMemory** viene aggiornata: i dati espliciti battono sempre le inferenze precedenti.
+4. **AgentSwarmRouter** sceglie l'agente attivo in base al settore e ai segnali.
+5. **AgentTurnPlanner** decide la prossima mossa: `ask_one_question`, `handoff`, `repair`, `clarify`.
+6. **HandoffDecisionEngine** sovrascrive il piano se i criteri di handoff sono soddisfatti.
+7. **ResponseComposer** genera la risposta cliente (naturale, senza workflow interno).
+8. **ResponseStyleGuard** verifica e ripulisce la risposta da frasi vietate.
+9. Se `handoff_ready=true`, **CommercialReportBuilder** genera il report admin e **WhatsAppHandoffBuilder** genera il summary cliente.
+
+## Criteri di handoff automatico
+
+- Cliente chiede esplicitamente umano o WhatsApp → **immediato**
+- Cliente è irritato e il settore è noto → **immediato**
+- Telefono presente + settore + esigenza → **immediato**
+- Urgenza alta + settore + esigenza + ≥2 turni → **immediato**
+- Dopo 4 turni utili con settore + esigenza → handoff anche senza telefono
+- Callback richiesto + telefono presente → **immediato**
+
+## ConversationMemory
+
+Struttura dati live della conversazione, persistita in `ai_conversations.structured_data`:
+
+```json
+{
+  "active_agent": "serenai",
+  "main_sector": "tlc",
+  "phone": "3346582115",
+  "urgency": "alta",
+  "need_summary": "Connessione Vodafone FWA lenta, gaming online",
+  "facts": {
+    "operator": "Vodafone",
+    "access_type": "FWA",
+    "usage_context": {"gaming": true},
+    "pain_points": {"stabilita_ping": true}
+  },
+  "handoff_ready": true,
+  "handoff_reason": "phone_and_context_complete",
+  "useful_turn_count": 3,
+  "commercial_report": "...",
+  "analytics": {
+    "lead_temperature": "hot",
+    "commercial_intent": "solve_blocking_problem",
+    "sales_angle": "stability_not_price",
+    "cross_sell": ["Controllo modem/router"]
+  }
+}
+```
+
+## Regole UX pubblico
+
+- Niente scelte multiple nel flow pubblico
+- Niente card Essenziale/Intelligente/Completa
+- Niente copy interno ("posso usare queste risposte?", "Scrivi come parleresti al banco")
+- Niente "Capisco perfettamente" ripetuto
+- Una domanda per messaggio (al massimo due se strettamente collegate)
+- Il launcher apre la chat AI, non WhatsApp direttamente
+- WhatsApp si apre automaticamente quando `action=redirect_whatsapp`
+- Se il popup è bloccato, compare il bottone "Apri WhatsApp"
+
+## Frasi vietate (ResponseStyleGuard)
+
+```
+Capisco perfettamente | Gentile cliente | La ringraziamo | Siamo lieti
+Assistente digitale autorizzato | Configurata sul metodo | Tre strade sensate
+Essenziale | Intelligente | Completa | Posso usare queste risposte
+Sì, prepara il riepilogo | Quanto è urgente? | Scrivi come parleresti al banco
+Al resto ci pensa | Ti trasferisco | Passo la parola
+```
+
+## Endpoint API
+
+| Metodo | Path | Descrizione |
+|--------|------|-------------|
+| `GET` | `/ai/concierge/bootstrap` | Avvia conversazione, restituisce greeting |
+| `POST` | `/ai/concierge/message` | Invia messaggio, riceve risposta |
+| `POST` | `/ai/concierge/handoff/whatsapp` | Forza handoff WhatsApp |
+| `GET` | `/admin/ai-concierge` | Lista conversazioni admin |
+| `GET` | `/admin/ai-concierge/conversations/{id}` | Dettaglio con report commerciale |
+
+## Risposta API con handoff
+
+```json
+{
+  "conversation_id": "uuid",
+  "reply": "Perfetto. Ti apro WhatsApp con il riepilogo pronto.",
+  "action": "redirect_whatsapp",
+  "handoff": {
+    "url": "https://wa.me/393346582116?text=...",
+    "summary": "..."
+  },
+  "agent": {
+    "key": "serenai",
+    "name": "SerenAI"
+  }
+}
+```
+
+## Database
+
+Tabelle utilizzate:
+- `ai_conversations` — stato conversazione + `structured_data` JSON
+- `ai_messages` — transcript
+- `ai_leads` — lead qualificati
+- `contact_messages` — notifica al personale
+- `ai_conversation_reports` — report commerciali (graceful degradation se assente)
+
+Migration opzionale consigliata:
+
+```sql
+CREATE TABLE IF NOT EXISTS ai_conversation_reports (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    conversation_id BIGINT UNSIGNED NOT NULL,
+    report_type ENUM('whatsapp_summary','commercial_report','analytics') NOT NULL,
+    content LONGTEXT NULL,
+    content_json JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id) ON DELETE CASCADE,
+    INDEX idx_ai_reports_conversation (conversation_id),
+    INDEX idx_ai_reports_type (report_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+## File reworkati
+
+**Nuovi servizi:**
+- `app/Services/Ai/ConversationSupervisor.php`
+- `app/Services/Ai/ConversationMemory.php`
+- `app/Services/Ai/AgentSwarmRouter.php`
+- `app/Services/Ai/AgentTurnPlanner.php`
+- `app/Services/Ai/ResponseComposer.php`
+- `app/Services/Ai/ResponseStyleGuard.php`
+- `app/Services/Ai/HandoffDecisionEngine.php`
+- `app/Services/Ai/CommercialReportBuilder.php`
+- `app/Services/Ai/ConversationAnalyticsBuilder.php`
+- `app/Services/Ai/ConversationRepair.php`
+
+**Reworkati:**
+- `app/Services/Ai/ConciergeOrchestrator.php`
+- `app/Services/Ai/NeedClassifier.php`
+- `app/Services/Ai/LeadExtractor.php`
+- `app/Services/Ai/PromptBuilder.php`
+- `app/Services/WhatsApp/WhatsAppHandoffBuilder.php`
+- `public/assets/js/ai-concierge.js`
+- `app/Views/partials/ai-concierge-widget.php`
+- `app/Views/admin/ai-concierge/show-content.php`
+- `app/Views/admin/ai-concierge/index-content.php`
+
+## Test
+
+```bash
+php scripts/test-ai-concierge-professional-swarm.php
+```
+
+Coverage: SerenAI gaming FWA, energia business, correzione, handoff immediato, frasi vietate, classifier, extractor, handoff engine, style guard, report builder, WhatsApp summary.
+
+## Variabili d'ambiente
+
+Vedi `.env.example.php`. Flag rilevanti:
+
+```
+AI_CONCIERGE_WHATSAPP_NUMBER=393346582116
+AI_CONCIERGE_MAX_MESSAGES=40
+AI_CONCIERGE_RATE_LIMIT=12
+GEMINI_CONCIERGE_MODEL=gemini-2.0-flash
+```
