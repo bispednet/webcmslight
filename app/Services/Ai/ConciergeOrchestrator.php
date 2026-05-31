@@ -83,8 +83,9 @@ final class ConciergeOrchestrator
             $reply['message'] = $this->composer->compose($reply['agent'], $message, $reply['message'], $data);
         }
         $this->message((int)$conversation['id'], 'assistant', $reply['message']);
-        if ($reply['ready'] || $reply['quoteReady']) {
-            $reply['quotes'] = $this->ensureLeadAndQuotes($conversation);
+        if ($reply['ready']) {
+            $reply['handoff'] = $this->handoff($publicId, $sessionId);
+            $reply['action'] = 'redirect_whatsapp';
         }
 
         return $this->response($publicId, $reply);
@@ -131,7 +132,7 @@ final class ConciergeOrchestrator
         $lead->execute([
             'conversation_id' => $conversation['id'], 'name' => $conversation['customer_name'], 'phone' => $conversation['customer_phone'],
             'email' => $conversation['customer_email'], 'customer_type' => $conversation['customer_type'], 'sector' => $sector,
-            'need' => (string)($data['need'] ?? 'Da approfondire'), 'urgency' => $conversation['urgency'], 'score' => $score,
+            'need' => (string)($data['need_summary'] ?? 'Da approfondire'), 'urgency' => $conversation['urgency'], 'score' => $score,
             'assigned' => (new AgentPersonaRegistry())->forSector($sector)['key'],
         ]);
         $leadId = (int)$this->db->query('SELECT id FROM ai_leads WHERE conversation_id=' . (int)$conversation['id'])->fetchColumn();
@@ -192,10 +193,11 @@ final class ConciergeOrchestrator
             'conversation_id' => $publicId,
             'reply' => $reply['message'],
             'step' => $reply['step'],
-            'choices' => $reply['choices'],
-            'quotes' => $reply['quotes'] ?? [],
+            'choices' => [],
+            'quotes' => [],
             'ready' => $reply['ready'],
-            'quote_ready' => $reply['quoteReady'] ?? false,
+            'action' => $reply['action'] ?? null,
+            'handoff' => $reply['handoff'] ?? null,
             'agent' => $reply['agent'] ?? (new AgentPersonaRegistry())->byKey('sarai'),
             'transition' => $reply['transition'] ?? null,
         ];

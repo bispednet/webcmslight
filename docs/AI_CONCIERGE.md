@@ -1,16 +1,17 @@
-# SarAI e agenti digitali Bisped
+# WhatsApp guidato Bisped
 
-Il concierge pubblico si presenta come `SarAI`, Sara Digitale Bisped. Parte da una richiesta libera, raccoglie i dettagli gia presenti nel messaggio e chiede solo cio che manca. Non e un questionario e non finge di essere una persona umana.
+Il launcher pubblico si presenta come `WhatsApp Bisped`. Apre una chat interna essenziale, raccoglie i dettagli gia presenti nel messaggio e chiede solo cio che manca. Quando il quadro e sufficiente apre automaticamente WhatsApp con il riepilogo pronto.
 
 ## Flusso
 
-- `SarAI` apre la conversazione e gestisce energia, bollette, pratiche e orientamento iniziale.
+- Il cliente non vede step interni, scelte multiple o card preventivo.
+- `SarAI` gestisce energia, bollette, pratiche e orientamento iniziale.
 - `AndreAI` prende in carico tecnologia, device e assistenza.
 - `SerenAI` gestisce fibra, internet, mobile e telefonia.
 - Il cambio agente e dichiarato in chat e visibile nell'header.
-- La privacy notice precede il riepilogo per il negozio e la raccolta dei dati personali.
+- La disclosure privacy resta discreta nel footer del widget.
 - SarAI applica il metodo: prima capisco come vivi, poi ti consiglio.
-- Il sistema genera tre pre-preventivi senza inventare prezzi, coperture o disponibilita.
+- Il sistema genera tre pre-preventivi solo per il negozio, senza esporli nel widget o nel messaggio WhatsApp e senza inventare prezzi, coperture o disponibilita.
 - Il link WhatsApp viene creato dal backend e il riepilogo viene salvato anche in `contact_messages`.
 
 ## Endpoint

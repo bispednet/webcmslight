@@ -11,22 +11,48 @@ final class WhatsAppHandoffBuilder
         if (($conversation['main_sector'] ?? '') === 'energia_amministrativo') {
             return $this->buildSarAI($number, $conversation, $quotes, $data);
         }
+        if (($conversation['main_sector'] ?? '') === 'tlc') {
+            return $this->buildSerenAI($number, $conversation, $quotes, $data);
+        }
         $lines = [
-            'Ciao bisp&d, ho completato il percorso Team AI Bisped.',
+            'Ciao Bisped, arrivo dal sito.',
             '',
             'Settore: ' . ($conversation['main_sector'] ?: 'da verificare'),
+            'Agente: ' . ucfirst((string)($data['active_agent'] ?? 'da verificare')),
+            'Telefono cliente: ' . ($conversation['customer_phone'] ?: 'non indicato'),
             'Cliente: ' . ($conversation['customer_name'] ?: 'non indicato'),
             'Urgenza: ' . ($conversation['urgency'] ?: 'non indicata'),
-            'Esigenza: ' . ($data['need'] ?? 'da approfondire'),
+            'Esigenza: ' . ($data['need_summary'] ?? 'da approfondire'),
             '',
-            'Percorsi valutati:',
+            'Vorrei continuare con una verifica umana senza ricominciare da zero.',
         ];
-        foreach ($quotes as $quote) {
-            $lines[] = '- ' . $quote['title'] . ': ' . $quote['summary'];
-        }
-        $lines[] = '';
-        $lines[] = 'Vorrei continuare con una verifica umana.';
         $text = implode("\n", $lines);
+
+        return ['summary' => $text, 'url' => 'https://wa.me/' . preg_replace('/\D+/', '', $number) . '?text=' . rawurlencode($text)];
+    }
+
+    private function buildSerenAI(string $number, array $conversation, array $quotes, array $data): array
+    {
+        $lines = [
+            'Ciao Bisped, arrivo dal sito.',
+            '',
+            'Settore: internet / connessione',
+            'Agente: SerenAI',
+            'Telefono cliente: ' . ($conversation['customer_phone'] ?: 'non indicato'),
+            'Urgenza: ' . ($conversation['urgency'] ?: 'non indicata'),
+            '',
+            'Richiesta:',
+            $data['need_summary'] ?? 'Connessione da verificare.',
+            '',
+            'Dati raccolti:',
+            '- Operatore attuale: ' . ($data['operator'] ?? 'non indicato'),
+            '- Tecnologia: ' . ($data['access_type'] ?? 'da verificare'),
+            '- Problema: ' . (!empty($data['usage_context']['gaming']) ? 'velocità/stabilità per giocare' : 'prestazioni connessione'),
+            '- Nota: ' . (($conversation['urgency'] ?? '') === 'alta' ? 'il cliente dice che la situazione lo sta bloccando' : 'richiesta da approfondire'),
+            '',
+            'Vorrei continuare da qui senza ricominciare da zero.',
+        ];
+        $text = mb_substr(implode("\n", $lines), 0, 1800, 'UTF-8');
 
         return ['summary' => $text, 'url' => 'https://wa.me/' . preg_replace('/\D+/', '', $number) . '?text=' . rawurlencode($text)];
     }
@@ -45,6 +71,9 @@ final class WhatsAppHandoffBuilder
         $lines = [
             'Ciao Bisped, arrivo dal sito con riepilogo SarAI.',
             '',
+            'Tipo cliente: ' . ($conversation['customer_type'] ?: 'non indicato'),
+            'Telefono cliente: ' . ($conversation['customer_phone'] ?: 'non indicato'),
+            'Urgenza: ' . ($conversation['urgency'] ?: 'non indicata'),
             'Motivo: ' . ($data['trigger'] ?? 'da approfondire'),
             'Luce/Gas/Pratica: ' . ($data['commodity'] ?? 'da verificare'),
             'Abitazione: ' . ($data['home_type'] ?? 'non indicata') . ' - ' . ($data['family_size'] ?? '?') . ' persone',
@@ -54,21 +83,8 @@ final class WhatsAppHandoffBuilder
             'Obiettivo: ' . ($data['primary_goal'] ?? 'da approfondire'),
             'Rischi da controllare: ' . (!empty($data['risk_flags']) ? implode(', ', $data['risk_flags']) : 'nessuno segnalato'),
             '',
-            '3 strade:',
+            'Vorrei continuare da qui senza ricominciare da zero.',
         ];
-        foreach ($quotes as $index => $quote) {
-            $lines[] = ($index + 1) . '. ' . $quote['title'] . ': ' . $quote['summary'];
-        }
-        $conditions = array_values(array_unique(array_filter(array_map(
-            static fn (array $quote): ?string => $quote['condition'] ?? $quote['special_condition'] ?? null,
-            $quotes
-        ))));
-        if ($conditions) {
-            $lines[] = '';
-            $lines[] = 'Condizione Bisped: ' . $conditions[0];
-        }
-        $lines[] = '';
-        $lines[] = 'Vorrei continuare da qui senza ricominciare da zero.';
         $text = mb_substr(implode("\n", $lines), 0, 1800, 'UTF-8');
 
         return ['summary' => $text, 'url' => 'https://wa.me/' . preg_replace('/\D+/', '', $number) . '?text=' . rawurlencode($text)];

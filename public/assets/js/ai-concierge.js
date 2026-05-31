@@ -4,16 +4,11 @@
     if (!root) return;
     var panel = root.querySelector('[data-ai-panel]');
     var messages = root.querySelector('[data-ai-messages]');
-    var choices = root.querySelector('[data-ai-choices]');
-    var quoteList = root.querySelector('[data-ai-quotes]');
     var form = root.querySelector('[data-ai-form]');
     var input = form.querySelector('input');
     var handoff = root.querySelector('[data-ai-handoff]');
-    var agentName = root.querySelector('[data-ai-agent-name]');
     var agentSubtitle = root.querySelector('[data-ai-agent-subtitle]');
     var agentBadge = root.querySelector('[data-ai-agent-badge]');
-    var agentAvatar = root.querySelector('[data-ai-avatar]');
-    var inputNote = root.querySelector('[data-ai-input-note]');
     var csrf = '';
     var conversationId = '';
     var busy = false;
@@ -28,51 +23,36 @@
     function renderAgent(agent, transition) {
         if (!agent) return;
         if (transition) add('transition', transition);
-        agentName.textContent = agent.name;
-        agentSubtitle.textContent = agent.subtitle;
-        agentBadge.textContent = agent.badge;
-        agentAvatar.textContent = agent.name.slice(0, 2).toUpperCase();
-        inputNote.textContent = agent.key === 'sarai'
-            ? 'Scrivi come parleresti al banco. Al resto ci pensa SarAI.'
-            : 'Scrivi pure i dettagli che hai già. ' + agent.name + ' ti chiederà solo ciò che manca.';
+        agentSubtitle.textContent = 'Ti segue ' + agent.name;
+        agentBadge.textContent = 'Assistente digitale';
     }
-    function renderChoices(items) {
-        choices.replaceChildren();
-        (items || []).forEach(function (item) {
-            var button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = item.label;
-            button.addEventListener('click', function () { send('/ai/concierge/choice', { choice: item.value }, item.label); });
-            choices.appendChild(button);
-        });
+    function showWhatsAppFallback(url) {
+        handoff.href = url;
+        handoff.hidden = false;
     }
-    function renderQuotes(items) {
-        quoteList.replaceChildren();
-        (items || []).forEach(function (quote) {
-            var card = document.createElement('article');
-            var title = document.createElement('strong');
-            var text = document.createElement('span');
-            title.textContent = quote.title;
-            text.textContent = quote.summary;
-            card.append(title, text);
-            quoteList.appendChild(card);
-        });
+    function openWhatsApp(url) {
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            window.location.href = url;
+            return;
+        }
+        var popup = window.open(url, '_blank', 'noopener');
+        if (!popup) showWhatsAppFallback(url);
+        else setTimeout(function () { showWhatsAppFallback(url); }, 800);
     }
     function apply(data) {
         if (data.csrf) csrf = data.csrf;
         if (data.conversation_id) conversationId = data.conversation_id;
         renderAgent(data.agent, data.transition);
         add(data.error ? 'error' : 'bot', data.reply || data.error || 'Riprova tra poco.');
-        renderChoices(data.choices);
-        renderQuotes(data.quotes);
-        handoff.hidden = !data.ready;
+        if (data.action === 'redirect_whatsapp' && data.handoff && data.handoff.url) {
+            openWhatsApp(data.handoff.url);
+        }
     }
-    function send(url, payload, visibleText) {
+    function send(payload, visibleText) {
         if (busy) return;
         busy = true;
         if (visibleText) add('user', visibleText);
-        renderChoices([]);
-        fetch(url, {
+        fetch('/ai/concierge/message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(Object.assign({ csrf: csrf, conversation_id: conversationId }, payload))
@@ -84,7 +64,7 @@
         if (conversationId || busy) return;
         busy = true;
         fetch('/ai/concierge/bootstrap').then(function (response) { return response.json(); }).then(apply).catch(function () {
-            add('error', 'Il concierge non e disponibile in questo momento.');
+            add('error', 'Il servizio non è disponibile in questo momento.');
         }).finally(function () { busy = false; });
     }
     root.querySelector('[data-ai-open]').addEventListener('click', function () { panel.hidden = false; bootstrap(); input.focus(); });
@@ -94,25 +74,7 @@
         var text = input.value.trim();
         if (!text) return;
         input.value = '';
-        send('/ai/concierge/message', { message: text }, text);
-    });
-    handoff.addEventListener('click', function () {
-        if (busy) return;
-        var target = window.open('about:blank', '_blank');
-        busy = true;
-        fetch('/ai/concierge/handoff/whatsapp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf: csrf, conversation_id: conversationId })
-        }).then(function (response) { return response.json(); }).then(function (data) {
-            if (data.csrf) csrf = data.csrf;
-            if (!data.url) throw new Error(data.error || 'handoff unavailable');
-            if (target) target.location.href = data.url;
-            else window.location.href = data.url;
-        }).catch(function () {
-            if (target) target.close();
-            add('error', 'Non riesco ad aprire WhatsApp. Riprova tra poco.');
-        }).finally(function () { busy = false; });
+        send({ message: text }, text);
     });
     document.addEventListener('keydown', function (event) { if (event.key === 'Escape') panel.hidden = true; });
 })();

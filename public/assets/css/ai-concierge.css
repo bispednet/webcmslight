@@ -1,7 +1,7 @@
 .ai-concierge { position: fixed; right: 24px; bottom: 24px; z-index: 210; font-family: 'Barlow', sans-serif; }
-.ai-concierge__launcher { position: relative; display: grid; grid-template-columns: 12px auto; column-gap: 9px; padding: 13px 18px; border: 1px solid rgba(255,75,75,.72); border-radius: 16px; color: #fff; background: linear-gradient(135deg,#111 0%,#29080b 100%); box-shadow: 0 10px 34px rgba(229,9,20,.34); text-align: left; cursor: pointer; }
-.ai-concierge__launcher small { grid-column: 2; color: #fca5a5; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.ai-concierge__pulse { align-self: center; width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 5px rgba(239,68,68,.18),0 0 18px #ef4444; }
+.ai-concierge__launcher { position: relative; display: grid; grid-template-columns: 12px auto; column-gap: 9px; padding: 13px 18px; border: 1px solid rgba(74,222,128,.72); border-radius: 16px; color: #fff; background: linear-gradient(135deg,#075e54 0%,#128c7e 100%); box-shadow: 0 10px 34px rgba(18,140,126,.34); text-align: left; cursor: pointer; }
+.ai-concierge__launcher small { grid-column: 2; color: #d1fae5; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.ai-concierge__pulse { align-self: center; width: 10px; height: 10px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 5px rgba(74,222,128,.18),0 0 18px #4ade80; }
 .ai-concierge__panel { position: absolute; right: 0; bottom: 76px; width: min(410px,calc(100vw - 32px)); overflow: hidden; border: 1px solid rgba(239,68,68,.55); border-radius: 18px; color: var(--c-txt); background: linear-gradient(160deg,var(--c-surface),var(--c-bg)); box-shadow: 0 26px 70px rgba(0,0,0,.5),0 0 30px rgba(229,9,20,.13); }
 .ai-concierge__header { display: flex; align-items: center; gap: 10px; padding: 14px; color: #fff; background: linear-gradient(120deg,#0c0c0d,#35080d); }
 .ai-concierge__header span { display: block; color: #fca5a5; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
@@ -13,13 +13,9 @@
 .ai-concierge__message--user { margin-left: auto; border-color: rgba(229,9,20,.44); color: #fff; background: #4a0b10; }
 .ai-concierge__message--error { border-color: #ef4444; color: #fecaca; }
 .ai-concierge__message--transition { max-width: 100%; border-color: rgba(251,191,36,.5); color: #fde68a; background: rgba(120,53,15,.35); font-size: 12px; text-align: center; }
-.ai-concierge__choices { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 14px 12px; }
-.ai-concierge__choices button { border: 1px solid rgba(229,9,20,.5); border-radius: 999px; padding: 7px 10px; color: var(--c-txt); background: transparent; font-size: 12px; cursor: pointer; }
-.ai-concierge__quotes { display: grid; gap: 7px; padding: 0 14px 12px; }.ai-concierge__quotes article { padding: 9px; border-left: 2px solid #ef4444; background: rgba(229,9,20,.08); }.ai-concierge__quotes strong,.ai-concierge__quotes span { display: block; }.ai-concierge__quotes strong { color: var(--c-txt); font-size: 12px; }.ai-concierge__quotes span { margin-top: 3px; color: var(--c-muted); font-size: 11px; line-height: 1.35; }
-.ai-concierge__input-note { margin: 0; padding: 0 14px 8px; color: var(--c-muted); font-size: 11px; line-height: 1.35; }
 .ai-concierge__form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--c-border); }
 .ai-concierge__form input { min-width: 0; flex: 1; border: 1px solid var(--c-border); border-radius: 12px; padding: 10px; color: var(--c-txt); background: var(--c-bg); }
 .ai-concierge__form button,.ai-concierge__handoff { border: 0; border-radius: 10px; padding: 10px 13px; color: #fff; background: #e50914; font-weight: 800; cursor: pointer; }
-.ai-concierge__actions { padding: 0 14px; }.ai-concierge__handoff { width: 100%; background: #168447; }.ai-concierge__handoff[hidden] { display: none; }
+.ai-concierge__actions { padding: 0 14px; }.ai-concierge__handoff { display: block; width: 100%; text-align: center; text-decoration: none; background: #168447; }.ai-concierge__handoff[hidden] { display: none; }
 .ai-concierge__privacy { margin: 9px 14px 12px; color: var(--c-muted); font-size: 10px; line-height: 1.35; }
 @media (max-width:520px) { .ai-concierge { right: 16px; bottom: 16px; }.ai-concierge__panel { position: fixed; right: 12px; bottom: 84px; width: calc(100vw - 24px); }.ai-concierge__messages { max-height: 42vh; } }

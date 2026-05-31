@@ -5,6 +5,7 @@ BISPED_NET_REWORK_PLAN_v2.md
 /BISPED_HANDOFF.md
 /BISPED_*_PLAN*.md
 /BISPED_*_PATCH*.md
+/BISPED_*_REWORK*.md
 env.php
 *.env
 *.sql
