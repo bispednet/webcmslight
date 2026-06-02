@@ -1,0 +1,307 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Bisped CMS Agent API",
+    "description": "API per gestire prodotti, blog post, lead e appuntamenti di Bisped via agente AI.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "https://bisped.net" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/api/agent/v1/ping": {
+      "get": {
+        "operationId": "ping",
+        "summary": "Verifica che l'API sia raggiungibile",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/agent/v1/stats": {
+      "get": {
+        "operationId": "getStats",
+        "summary": "Statistiche generali: prodotti, lead, messaggi, appuntamenti",
+        "responses": {
+          "200": {
+            "description": "Statistiche",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "products":     { "type": "integer" },
+                    "blog_posts":   { "type": "integer" },
+                    "leads_today":  { "type": "integer" },
+                    "leads_total":  { "type": "integer" },
+                    "new_messages": { "type": "integer" },
+                    "appointments": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/v1/products": {
+      "get": {
+        "operationId": "listProducts",
+        "summary": "Lista prodotti. Usa search per filtrare per nome, categoria o SKU.",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit",  "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista prodotti",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "products": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/ProductSummary" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createProduct",
+        "summary": "Crea un nuovo prodotto nel catalogo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProductInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Prodotto creato" }
+        }
+      }
+    },
+    "/api/agent/v1/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "summary": "Recupera un prodotto per ID con tutti i dettagli e le feature",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Prodotto trovato" },
+          "404": { "description": "Non trovato" }
+        }
+      },
+      "post": {
+        "operationId": "updateProduct",
+        "summary": "Aggiorna campi di un prodotto esistente. Invia solo i campi da modificare.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProductInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Aggiornato" }
+        }
+      }
+    },
+    "/api/agent/v1/products/{id}/delete": {
+      "post": {
+        "operationId": "deleteProduct",
+        "summary": "Elimina un prodotto per ID",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Eliminato" }
+        }
+      }
+    },
+    "/api/agent/v1/blog": {
+      "get": {
+        "operationId": "listBlog",
+        "summary": "Lista articoli del blog ordinati per data",
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Lista post" }
+        }
+      },
+      "post": {
+        "operationId": "createPost",
+        "summary": "Crea un nuovo articolo del blog",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BlogPostInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Post creato" }
+        }
+      }
+    },
+    "/api/agent/v1/blog/{id}": {
+      "get": {
+        "operationId": "getPost",
+        "summary": "Recupera un articolo completo per ID",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Post trovato" }
+        }
+      },
+      "post": {
+        "operationId": "updatePost",
+        "summary": "Aggiorna un articolo del blog. Invia solo i campi da modificare.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BlogPostInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Aggiornato" }
+        }
+      }
+    },
+    "/api/agent/v1/leads": {
+      "get": {
+        "operationId": "listLeads",
+        "summary": "Lista lead AI Concierge. Filtra per sector: tlc, informatica, energia_amministrativo.",
+        "parameters": [
+          { "name": "sector", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit",  "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Lista lead" }
+        }
+      }
+    },
+    "/api/agent/v1/leads/{id}": {
+      "get": {
+        "operationId": "getLead",
+        "summary": "Recupera un lead con report commerciale e analytics",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Lead trovato" }
+        }
+      }
+    },
+    "/api/agent/v1/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "summary": "Lista messaggi di contatto. status: new, read, archived.",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "default": "new" } },
+          { "name": "limit",  "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Lista messaggi" }
+        }
+      }
+    },
+    "/api/agent/v1/appointments": {
+      "get": {
+        "operationId": "listAppointments",
+        "summary": "Lista appuntamenti. status: pending, confirmed, cancelled.",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "default": "pending" } },
+          { "name": "limit",  "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Lista appuntamenti" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "ProductSummary": {
+        "type": "object",
+        "properties": {
+          "id":            { "type": "integer" },
+          "name":          { "type": "string" },
+          "slug":          { "type": "string" },
+          "category":      { "type": "string" },
+          "price":         { "type": "number" },
+          "sale_price":    { "type": "number" },
+          "stock_status":  { "type": "string" },
+          "sku":           { "type": "string" },
+          "featured_order":{ "type": "integer" }
+        }
+      },
+      "ProductInput": {
+        "type": "object",
+        "properties": {
+          "name":           { "type": "string", "description": "Nome prodotto, obbligatorio per create" },
+          "description":    { "type": "string", "description": "Descrizione breve, obbligatoria per create" },
+          "icon_key":       { "type": "string", "description": "Icona CSS es. 'smartphone'" },
+          "category":       { "type": "string", "description": "Categoria es. 'smartphone', 'notebook', 'fibra'" },
+          "tags":           { "type": "string", "description": "Tag separati da virgola" },
+          "sku":            { "type": "string" },
+          "price":          { "type": "number", "description": "Prezzo in euro" },
+          "sale_price":     { "type": "number", "description": "Prezzo scontato in euro" },
+          "campaign_label": { "type": "string", "description": "Badge es. 'Novità', 'Promo'" },
+          "stock_status":   { "type": "string", "description": "es. 'disponibile', 'esaurito', 'su ordinazione'" },
+          "featured_order": { "type": "integer", "description": "0=in evidenza, >0=ordine crescente" },
+          "features":       { "type": "array", "items": { "type": "string" }, "description": "Lista caratteristiche" },
+          "content_html":   { "type": "string", "description": "Contenuto HTML esteso" },
+          "hero_title":     { "type": "string" },
+          "hero_subtitle":  { "type": "string" },
+          "cta_text":       { "type": "string" },
+          "cta_link":       { "type": "string" },
+          "external_link":  { "type": "string" }
+        }
+      },
+      "BlogPostInput": {
+        "type": "object",
+        "properties": {
+          "title":         { "type": "string", "description": "Titolo italiano, obbligatorio per create" },
+          "title_en":      { "type": "string" },
+          "content_html":  { "type": "string", "description": "Corpo articolo HTML, obbligatorio per create" },
+          "snippet":       { "type": "string", "description": "Anteprima breve (max 500 char)" },
+          "image_url":     { "type": "string" },
+          "published_at":  { "type": "string", "format": "date", "description": "YYYY-MM-DD" },
+          "is_published":  { "type": "boolean", "default": true },
+          "related_product_tags": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -79,6 +79,12 @@ return [
         'rate_limit_per_minute' => 12,
         'retention_days' => 180,
     ],
+    // ── Agent API ──────────────────────────────────────────────────────────
+    // Chiave per il Custom GPT / agent AI. Genera con: bin2hex(random_bytes(32))
+    // NON condividere e NON committare il valore reale.
+    'agent' => [
+        'api_key' => '',
+    ],
     'whatsapp' => [
         'mode' => 'click_to_chat',
         'phone_number' => '393346582116',

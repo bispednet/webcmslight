@@ -19,6 +19,12 @@
 # Niente listing
 Options -Indexes
 
+# agent-openapi.json: disponibile per configurare il Custom GPT.
+# In produzione, de-commenta il blocco e metti il tuo IP.
+# <Files "agent-openapi.json">
+#     Require ip 1.2.3.4
+# </Files>
+
 # Blocca dotfiles e file sensibili (incluso .env.php)
 <FilesMatch "(^\.|\.env(\.php)?|composer\.(json|lock)|package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|webpack.*|vite.*|Makefile|README.*|LICENSE|.*\.(sql|sqlite|bak|zip|tar|gz|tgz))$">
     Require all denied

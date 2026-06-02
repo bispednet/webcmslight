@@ -36,12 +36,22 @@ if (str_starts_with($requestPath, '/admin')) {
     exit;
 }
 
+// ── Agent API — CORS preflight ─────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && str_starts_with($requestPath, '/api/agent/')) {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Authorization, Content-Type');
+    http_response_code(204);
+    exit;
+}
+
 use App\Core\Router;
 use App\Controllers\PageController;
 use App\Controllers\AuthController;
 use App\Controllers\ContactController;
 use App\Controllers\AppointmentController;
 use App\Controllers\AiConciergeController;
+use App\Controllers\Api\AgentApiController;
 
 $router = new Router();
 
@@ -129,5 +139,26 @@ $router->get('/en/remote-support', [PageController::class, 'teleassistenza']);
 
 $router->get('/sitemap.xml', [PageController::class, 'sitemap']);
 $router->get('/sitemap', [PageController::class, 'sitemap']);
+
+// ── Agent API v1 ────────────────────────────────────────────────────────────
+$router->get('/api/agent/v1/ping', [AgentApiController::class, 'ping']);
+$router->get('/api/agent/v1/stats', [AgentApiController::class, 'stats']);
+
+$router->get('/api/agent/v1/products', [AgentApiController::class, 'listProducts']);
+$router->get('/api/agent/v1/products/{id}', [AgentApiController::class, 'getProduct']);
+$router->post('/api/agent/v1/products', [AgentApiController::class, 'createProduct']);
+$router->match(['PUT', 'POST'], '/api/agent/v1/products/{id}', [AgentApiController::class, 'updateProduct']);
+$router->match(['DELETE', 'POST'], '/api/agent/v1/products/{id}/delete', [AgentApiController::class, 'deleteProduct']);
+
+$router->get('/api/agent/v1/blog', [AgentApiController::class, 'listBlog']);
+$router->get('/api/agent/v1/blog/{id}', [AgentApiController::class, 'getPost']);
+$router->post('/api/agent/v1/blog', [AgentApiController::class, 'createPost']);
+$router->match(['PUT', 'POST'], '/api/agent/v1/blog/{id}', [AgentApiController::class, 'updatePost']);
+
+$router->get('/api/agent/v1/leads', [AgentApiController::class, 'listLeads']);
+$router->get('/api/agent/v1/leads/{id}', [AgentApiController::class, 'getLead']);
+
+$router->get('/api/agent/v1/messages', [AgentApiController::class, 'listMessages']);
+$router->get('/api/agent/v1/appointments', [AgentApiController::class, 'listAppointments']);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');
