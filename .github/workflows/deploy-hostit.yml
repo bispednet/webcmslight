@@ -25,7 +25,8 @@ jobs:
           username:   ${{ secrets.FTP_USER }}
           password:   ${{ secrets.FTP_PASS }}
           port:       21
-          protocol:   ftp           # usa ftps se HOST.it supporta FTP esplicito TLS
+          protocol:   ftps          # FTP esplicito su TLS — più stabile su HOST.it
+          timeout:    120000        # 2 minuti: HOST.it può essere lento ad accettare
           local-dir:  ./
           server-dir: ${{ secrets.FTP_REMOTE_DIR }}  # es. /public_html/ o /httpdocs/
           dry-run:    false
