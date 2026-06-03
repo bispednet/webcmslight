@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0  # necessario per il diff con il deploy precedente
 
       - name: Deploy su HOST.it via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server:     ${{ secrets.FTP_HOST }}
           username:   ${{ secrets.FTP_USER }}
