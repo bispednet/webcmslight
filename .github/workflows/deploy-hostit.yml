@@ -1,0 +1,49 @@
+name: Deploy to HOST.it via FTP
+
+on:
+  push:
+    branches:
+      - main          # deploy automatico su ogni push a main
+  workflow_dispatch:  # deploy manuale dal tab "Actions" su GitHub
+
+jobs:
+  deploy:
+    name: FTP Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout codice
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # necessario per il diff con il deploy precedente
+
+      - name: Deploy su HOST.it via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server:     ${{ secrets.FTP_HOST }}
+          username:   ${{ secrets.FTP_USER }}
+          password:   ${{ secrets.FTP_PASS }}
+          port:       21
+          protocol:   ftp           # usa ftps se HOST.it supporta FTP esplicito TLS
+          local-dir:  ./
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}  # es. /public_html/ o /httpdocs/
+          dry-run:    false
+
+          # File e cartelle da NON caricare mai
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/runtime/**
+            **/runtime
+            **/.env.php
+            **/storage/gemini-rate-limit.json
+            **/storage/*.log
+            **/storage/*.lock
+            **/node_modules/**
+            **/_migration.local/**
+            **/BISPED_*.md
+            **/README.md
+            **/*.local.*
+            **/playwright_*.py
+            **/runtime/mariadb-data/**

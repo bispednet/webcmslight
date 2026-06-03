@@ -161,4 +161,6 @@ $router->get('/api/agent/v1/leads/{id}', [AgentApiController::class, 'getLead'])
 $router->get('/api/agent/v1/messages', [AgentApiController::class, 'listMessages']);
 $router->get('/api/agent/v1/appointments', [AgentApiController::class, 'listAppointments']);
 
+$router->post('/api/agent/v1/media/fetch', [AgentApiController::class, 'fetchMedia']);
+
 $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/');

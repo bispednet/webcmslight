@@ -233,6 +233,44 @@
         }
       }
     },
+    "/api/agent/v1/media/fetch": {
+      "post": {
+        "operationId": "fetchMedia",
+        "summary": "Scarica un'immagine da URL esterno e la salva sul server. Restituisce l'URL locale da usare in image_url.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string", "description": "URL pubblico dell'immagine (JPG, PNG, WebP, GIF, SVG, max 8 MB)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Immagine salvata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url":      { "type": "string", "description": "URL locale da usare in image_url" },
+                    "filename": { "type": "string" },
+                    "mime":     { "type": "string" },
+                    "size_kb":  { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/agent/v1/appointments": {
       "get": {
         "operationId": "listAppointments",

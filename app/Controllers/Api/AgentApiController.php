@@ -335,6 +335,88 @@ final class AgentApiController
         echo json_encode(['appointments' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
 
+    // ── Media ─────────────────────────────────────────────────────────────────
+    /**
+     * Scarica un'immagine da URL esterno e la salva in public/media/agent/.
+     * Restituisce l'URL locale da usare in image_url del prodotto/post.
+     * Anti-SSRF: blocca localhost e reti private.
+     */
+    public function fetchMedia(): void
+    {
+        $body = $this->body();
+        $url  = (string)($body['url'] ?? '');
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/^https?:\/\//i', $url)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'URL non valido. Deve iniziare con http:// o https://']);
+
+            return;
+        }
+        // Anti-SSRF
+        $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+        if (preg_match('/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1)/i', $host)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'URL non raggiungibile: rete privata.']);
+
+            return;
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT      => 'Bisped-Agent/1.0',
+        ]);
+        $data    = curl_exec($ch);
+        $code    = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $ctHeader = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+
+        if (!$data || $code < 200 || $code >= 300) {
+            http_response_code(422);
+            echo json_encode(['error' => "Download fallito (HTTP {$code})."]);
+
+            return;
+        }
+
+        // Validate MIME from content
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->buffer((string)$data);
+        $exts  = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif', 'image/svg+xml' => 'svg'];
+        if (!isset($exts[$mime])) {
+            http_response_code(422);
+            echo json_encode(['error' => "Tipo non supportato: {$mime}. Usa JPG, PNG, WebP, GIF, SVG."]);
+
+            return;
+        }
+
+        $size = strlen((string)$data);
+        if ($size > 8 * 1024 * 1024) {
+            http_response_code(422);
+            echo json_encode(['error' => 'Immagine troppo grande (max 8 MB).']);
+
+            return;
+        }
+
+        $dir = BASE_PATH . '/public/media/agent/';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $filename   = date('Ymd') . '-' . bin2hex(random_bytes(6)) . '.' . $exts[$mime];
+        file_put_contents($dir . $filename, $data);
+
+        echo json_encode([
+            'url'      => '/media/agent/' . $filename,
+            'filename' => $filename,
+            'mime'     => $mime,
+            'size_kb'  => round($size / 1024, 1),
+            'message'  => 'Immagine salvata. Usa "url" nel campo image_url del prodotto o del post.',
+        ]);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
     private function body(): array
     {
