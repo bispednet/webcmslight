@@ -1,0 +1,38 @@
+# ============================================================
+# Bisped — bootstrap dalla root verso public/
+# Necessario quando il document root di HOST.it punta a /public_html/
+# invece che a /public_html/public/.
+# Inoltra tutte le richieste al front controller in public/,
+# bloccando l'accesso diretto ai file sensibili.
+# ============================================================
+
+# --- Sicurezza: blocca file e cartelle sensibili nella root ---
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+<Files ".env.php">
+    Require all denied
+</Files>
+<Files "composer.json">
+    Require all denied
+</Files>
+
+# Niente directory listing
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Blocca accesso diretto alle cartelle applicative (mai servite dal web)
+    RewriteRule ^(app|database|docs|scripts|storage|runtime|\.git|\.github)(/|$) - [F,L]
+
+    # Asset e file reali presenti dentro public/ (css, js, immagini, ecc.)
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Area amministrativa -> public/admin.php
+    RewriteRule ^admin(?:/.*)?$ public/admin.php [QSA,L]
+
+    # Tutto il resto -> front controller public/index.php
+    RewriteRule ^(.*)$ public/index.php [QSA,L]
+</IfModule>
