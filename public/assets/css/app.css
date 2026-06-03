@@ -464,9 +464,8 @@ html[data-theme="light"] .site-header { --_bg-r:244; --_bg-g:244; --_bg-b:246; }
     transform: translateY(0);
 }
 
-/* ─── Theme toggle label ────────────────────────────────────────────────────── */
-.theme-toggle-label::after { content: "Scuro"; }
-html[data-theme="light"] .theme-toggle-label::after { content: "Chiaro"; }
+/* ─── Theme toggle label (nascosta: basta l'icona SVG) ──────────────────────── */
+.theme-toggle-label { display: none; }
 
 /* ─── Misc helpers ──────────────────────────────────────────────────────────── */
 .text-red   { color: var(--bisped-red); }

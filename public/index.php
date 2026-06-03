@@ -16,13 +16,9 @@ if (PHP_SAPI !== 'cli') {
             'httponly' => false,
             'samesite' => 'Lax',
         ]);
-    } elseif ($requestPath === '/' && !isset($_COOKIE['bisped_locale'])) {
-        $browserLocale = strtolower((string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ''));
-        if (str_starts_with($browserLocale, 'en')) {
-            header('Location: /en/', true, 302);
-            exit;
-        }
     }
+    // Nota: il sito parte sempre in italiano (target Piombino). L'inglese si
+    // raggiunge solo via /en esplicito o dal toggle lingua, mai per auto-redirect.
 }
 if ($requestPath === '/health/db') {
     require __DIR__ . '/health-db.php';

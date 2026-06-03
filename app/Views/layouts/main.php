@@ -133,7 +133,7 @@ if ($isAdmin) {
             }
         };
     </script>
-    <link rel="stylesheet" href="/assets/css/app.css?v=20260530-concierge">
+    <link rel="stylesheet" href="/assets/css/app.css?v=20260603-prod">
     <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260601-swarm-v3">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>
