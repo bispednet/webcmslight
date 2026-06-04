@@ -643,7 +643,7 @@ foreach ($activeCategories as $category) {
                     $postSlug,
                     $article['title_it'],
                     $article['title_en'],
-                    $item['date'],
+                    date('Y-m-d'), // data di pubblicazione su Bisped = oggi, non quella della fonte RSS
                     $imageUrl,
                     clean_text((string)$article['snippet_it'], 260),
                     clean_text((string)$article['snippet_en'], 260),

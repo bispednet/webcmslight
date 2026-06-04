@@ -296,4 +296,10 @@
     max-height: 85vh;
   }
   .ai-concierge__messages { max-height: 50vh; }
+
+  /* Quando la chat è aperta, nascondi il launcher: a tutta larghezza si
+     sovrapporrebbe all'area di input rendendo impossibile inviare messaggi. */
+  .ai-concierge__panel:not([hidden]) ~ .ai-concierge__launcher {
+    display: none;
+  }
 }

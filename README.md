@@ -1,7 +1,9 @@
+![Bisped](public/media/2025/10/readme_header_banner.png)
+
 # Bisped.net — WebCMS Light + AI Concierge
 
 > CMS PHP/MariaDB custom per [bisped.net](https://bisped.net) — negozio informatica, telefonia ed energia a Piombino (LI).
-> Sostituisce WordPress/WooCommerce dopo validazione completa in preview su `https://solclawn.com`.
+> In produzione su `https://bisped.net` (HOST.it). Sostituisce il precedente WordPress/WooCommerce.
 
 ---
 
@@ -139,7 +141,7 @@ runtime/mariadb/bin/mariadbd \
   --pid-file=runtime/mariadb.pid --skip-networking=0 --bind-address=127.0.0.1
 ```
 
-**Server (tunnel solclawn.com → 127.0.0.1:4000):**
+**Server (tunnel bisped.net → 127.0.0.1:4000):**
 ```bash
 runtime/bin/frankenphp php-server --root public --listen 127.0.0.1:4000 --access-log
 ```
@@ -180,7 +182,7 @@ Revisione completa → [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.
 ## Note operative
 
 - Non modificare la produzione WordPress via FTP durante lo sviluppo
-- Preview attiva su `https://solclawn.com` via cloudflared
+- Produzione su `https://bisped.net` (HOST.it, deploy FTP via GitHub Actions)
 - `runtime/` è esclusa da Git (FrankenPHP, MariaDB, Playwright, venv)
 - `BispedBusinessContext.php` contiene stime di prezzo indicative — aggiornare manualmente se cambiano
 - Deploy produzione richiede: rotazione `app.key`, credenziali OAuth/SMTP, `app.url=https://bisped.net`

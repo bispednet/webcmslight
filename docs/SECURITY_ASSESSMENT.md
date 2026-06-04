@@ -2,7 +2,7 @@
 
 Data ultima revisione: 2026-06-01 (aggiornato per rework Professional Agent Swarm Concierge)
 
-Ambiente valutato: preview `https://solclawn.com`, repo `bispednet/webcmslight`, runtime FrankenPHP + MariaDB locale.
+Ambiente valutato: produzione `https://bisped.net` (HOST.it) + sviluppo locale FrankenPHP + MariaDB.
 
 ## Executive Summary
 
@@ -49,7 +49,7 @@ Prima della produzione servono ancora rotazione/validazione dei segreti reali, h
 - Secret scan sui file tracciabili, escludendo `.env.php`, runtime, storage e piani sensibili ignorati.
 - Parser PHP sui file modificati con `token_get_all(..., TOKEN_PARSE)`.
 - Verifica `/install.php`: restituisce `404` senza variabile di abilitazione.
-- Verifica header HTTPS su `solclawn.com`.
+- Verifica header HTTPS su `bisped.net`.
 - Smoke test principali su login, pagine inglesi, appuntamenti e admin nelle iterazioni precedenti.
 - Smoke test API completo concierge: qualifica TLC gaming/FWA, routing SerenAI, slot filling naturale, apertura WhatsApp automatica, fallback browser, lead DB, record `contact_messages` e URL `wa.me`.
 - Verifica rendering articolo Cherokee dopo bonifica: nessun marker mojibake e accenti UTF-8 corretti.

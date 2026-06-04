@@ -33,7 +33,7 @@ Verifica:
 systemctl --user is-active bisped-mariadb.service bisped-frankenphp.service
 curl -s http://127.0.0.1:4000/ping.php
 curl -s http://127.0.0.1:4000/health/db
-curl -I https://solclawn.com/
+curl -I https://bisped.net/
 ```
 
 Restart:

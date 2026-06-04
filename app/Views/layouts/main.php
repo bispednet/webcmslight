@@ -67,7 +67,7 @@ if ($isAdmin) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<?= $isEnglish ? 'en' : 'it' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -134,7 +134,7 @@ if ($isAdmin) {
         };
     </script>
     <link rel="stylesheet" href="/assets/css/app.css?v=20260603-prod">
-    <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260601-swarm-v3">
+    <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260604-mobile-fix">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>
         <meta name="csrf-token" content="<?= htmlspecialchars($adminCsrf, ENT_QUOTES, 'UTF-8'); ?>">
@@ -157,7 +157,7 @@ if ($isAdmin) {
         'navigation' => $headerNavigation,
     ]); ?>
     <main class="container mx-auto max-w-7xl px-4 lg:px-6 pt-20 pb-16 space-y-16">
-        <?php View::renderPartial($contentTemplate, $contentData ?? []); ?>
+        <?php View::renderPartial($contentTemplate, ($contentData ?? []) + ['isEnglish' => $isEnglish]); ?>
     </main>
     <?php View::renderPartial('partials/footer', [
         'siteLogo' => $siteLogoPath,
@@ -165,7 +165,7 @@ if ($isAdmin) {
     ]); ?>
 
     <?php View::renderPartial('partials/ai-concierge-widget'); ?>
-    <script src="/assets/js/ai-concierge.js?v=20260601-swarm-v3" defer></script>
+    <script src="/assets/js/ai-concierge.js?v=20260604-mobile-fix" defer></script>
 
     <!-- Cookie Banner -->
     <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Cookie policy">
