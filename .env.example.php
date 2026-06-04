@@ -85,6 +85,29 @@ return [
     'agent' => [
         'api_key' => '',
     ],
+    // ── Catalogo: import prodotti da fornitori B2B ─────────────────────────
+    'catalog' => [
+        'enabled'         => false,   // metti true quando il fornitore è configurato
+        'markup_default'  => 0.18,    // ricarico di default sul costo B2B (+18%)
+        'vat'             => 0.22,    // IVA applicata al prezzo di vendita
+        'import_unmapped' => false,   // se true importa anche categorie non mappate (in "accessori")
+        'markup' => [                 // ricarico per categoria (override del default)
+            'smartphone'    => 0.12,
+            'notebook'      => 0.15,
+            'componenti-pc' => 0.20,
+            'gaming'        => 0.22,
+            'accessori'     => 0.30,
+        ],
+        'nexths' => [
+            'mode'          => 'csv',  // 'csv' oppure 'api'
+            // Modalità CSV: percorso del listino scaricato dal portale Nexths
+            'csv_path'      => '',     // es. '/home/uu4c5pdm/.../storage/imports/nexths.csv'
+            'csv_delimiter' => ';',
+            // Modalità API (se Nexths la offre): endpoint + chiave
+            'api_url'       => '',
+            'api_key'       => '',
+        ],
+    ],
     'whatsapp' => [
         'mode' => 'click_to_chat',
         'phone_number' => '393346582116',

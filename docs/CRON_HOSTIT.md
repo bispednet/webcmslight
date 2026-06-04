@@ -105,13 +105,72 @@ Se vuoi portare SUBITO su bisped.net gli articoli già generati in locale (senza
 
 ---
 
-## Ricerca automatica nuovi prodotti (catalogo)
+## Import automatico prodotti da fornitore (Nexths)
 
-L'`ingest.php` attuale genera **solo articoli editoriali**, non popola il catalogo prodotti con articoli reali in vendita. La ricerca automatica di nuovi prodotti è una funzionalità separata da progettare, perché richiede una **fonte dati prodotti** concreta. Opzioni possibili:
+È disponibile un modulo che importa i prodotti dal listino **Nexths** nel catalogo Bisped, con pricing automatico e filtro per categoria.
 
-- **Feed/listini fornitori** (Esprinet, Ingram Micro, Nexths…) — richiede credenziali B2B
-- **Amazon PA-API** — richiede account affiliato
-- **Ricerca web + Gemini** — meno affidabile su prezzi/disponibilità reali
-- **Inserimento manuale assistito** dal Custom GPT — già disponibile via Agent API
+### Componenti
 
-Vedi la sezione dedicata quando si definisce la fonte.
+- `app/Services/Catalog/Suppliers/NexthsAdapter.php` — legge il listino Nexths (CSV o API)
+- `app/Services/Catalog/ProductImporter.php` — upsert prodotti (match per SKU), pricing, filtro categorie
+- `scripts/auto-update/import-products.php` — comando CLI per il cron
+
+### Cosa fa
+
+1. Legge il listino Nexths (file CSV scaricato dal portale, oppure API)
+2. **Filtra le categorie**: importa solo smartphone, notebook, desktop, componenti-pc, gaming, tablet, accessori. Scarta il resto (es. casalinghi).
+3. **Calcola il prezzo di vendita** dal costo B2B: `costo × (1 + markup) × (1 + IVA)`, con arrotondamento a `,90`. Markup configurabile per categoria.
+4. **Upsert per SKU**: se il prodotto esiste aggiorna prezzo e disponibilità, altrimenti lo crea.
+
+### Cosa devi verificare/fornire (Nexths)
+
+Il mapping delle colonne e i campi API sono **presunti** e vanno confermati col tracciato reale:
+
+1. Accedi al portale Nexths e verifica **come scaricano il listino**: file CSV/Excel oppure API.
+2. **Se CSV**: scarica un file di esempio e controlla le intestazioni delle colonne. Se non combaciano con quelle in `NexthsAdapter::$columnMap`, aggiungile lì (è già pronto per molte varianti italiane: codice, descrizione, prezzo, categoria, marca, disponibilità).
+3. **Se API**: recupera endpoint e credenziali, poi adatta `NexthsAdapter::parseApiRow()`.
+
+### Configurazione (`.env.php`)
+
+```php
+'catalog' => [
+    'enabled'        => true,
+    'markup_default' => 0.18,
+    'vat'            => 0.22,
+    'markup' => [
+        'smartphone'    => 0.12,
+        'notebook'      => 0.15,
+        'componenti-pc' => 0.20,
+        'gaming'        => 0.22,
+        'accessori'     => 0.30,
+    ],
+    'nexths' => [
+        'mode'     => 'csv',
+        'csv_path' => '/home/uu4c5pdm/domains/bisped.net/public_html/storage/imports/nexths.csv',
+        'csv_delimiter' => ';',
+        // oppure mode='api' con api_url + api_key
+    ],
+],
+```
+
+### Test prima di andare live
+
+```bash
+# Dry-run: non scrive nulla, mostra solo cosa farebbe
+php scripts/auto-update/import-products.php --supplier=nexths --dry-run --verbose
+```
+
+### Cron (DirectAdmin)
+
+```bash
+/usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=nexths >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+```
+
+### Workflow CSV consigliato
+
+Finché Nexths non offre un'API, il flusso più semplice è:
+1. Scarichi periodicamente il listino CSV dal portale Nexths
+2. Lo carichi via FTP in `storage/imports/nexths.csv`
+3. Il cron giornaliero lo importa e aggiorna prezzi/disponibilità
+
+> Le foto prodotto: se il CSV Nexths include URL immagini, si può estendere l'importer per scaricarle via lo stesso meccanismo `media/fetch` dell'Agent API. Da abilitare quando si conferma che il listino contiene gli URL.
