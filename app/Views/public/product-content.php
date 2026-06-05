@@ -34,7 +34,7 @@ $stockQty = (int)($product['stock_qty'] ?? 0);
 if (in_array($rawStock, ['instock', 'in-stock', 'disponibile', '1'], true)) {
     $stockClass = 'badge-stock--in';
     $stockLabel = $stockQty > 0
-        ? 'Disponibile · ' . $stockQty . ' pz in magazzino'
+        ? 'Disponibile · ' . $stockQty . ' pz online'
         : 'Disponibile';
 } elseif ($rawStock === '') {
     $stockClass = 'badge-stock--ask'; $stockLabel = 'Su richiesta';
@@ -145,13 +145,22 @@ $shareUrl = $scheme . '://' . $host . '/products/' . $slug;
             </a>
         </div>
 
-        <?php if ($contentHtml && strip_tags($contentHtml) !== ''): ?>
+        <?php
+        // Mostra content_html curato se presente; altrimenti la descrizione del
+        // fornitore (prodotti Runner). I tag in description sono già sanificati all'import.
+        $descHtml = (string)($product['description'] ?? '');
+        $detailHtml = ($contentHtml && strip_tags($contentHtml) !== '') ? $contentHtml : '';
+        if ($detailHtml === '' && strip_tags($descHtml) !== '' && trim($descHtml) !== trim($name)) {
+            $detailHtml = '<p>' . $descHtml . '</p>';
+        }
+        ?>
+        <?php if ($detailHtml !== ''): ?>
         <!-- Description -->
         <div class="mt-8 border-t pt-6" style="border-color:var(--c-border)"
              <?= AdminMode::dataAttrs('products', 'content_html', $slug, 'html') ?>>
             <h2 class="text-sm font-black uppercase tracking-widest mb-4" style="color:var(--c-muted)">Dettagli prodotto</h2>
             <div class="text-sm leading-6" style="color:var(--c-txt)">
-                <?= $contentHtml ?>
+                <?= $detailHtml ?>
             </div>
         </div>
         <?php endif; ?>
