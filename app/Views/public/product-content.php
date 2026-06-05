@@ -30,8 +30,12 @@ $oldFormatted   = $isSale ? number_format((float)$regularPrice, 2, ',', '.') : n
 
 // Stock
 $rawStock = strtolower(trim((string)($product['stock_status'] ?? '')));
+$stockQty = (int)($product['stock_qty'] ?? 0);
 if (in_array($rawStock, ['instock', 'in-stock', 'disponibile', '1'], true)) {
-    $stockClass = 'badge-stock--in'; $stockLabel = 'Disponibile';
+    $stockClass = 'badge-stock--in';
+    $stockLabel = $stockQty > 0
+        ? 'Disponibile · ' . $stockQty . ' pz in magazzino'
+        : 'Disponibile';
 } elseif ($rawStock === '') {
     $stockClass = 'badge-stock--ask'; $stockLabel = 'Su richiesta';
 } else {
@@ -57,8 +61,8 @@ $shareUrl = $scheme . '://' . $host . '/products/' . $slug;
 
 <div class="grid gap-10 lg:grid-cols-[420px_1fr] lg:items-start" data-animate>
 
-    <!-- Image panel -->
-    <div class="sticky top-24">
+    <!-- Image panel (sticky solo da desktop: su mobile deve scorrere col contenuto) -->
+    <div class="lg:sticky lg:top-24">
         <div class="rounded-lg border overflow-hidden bg-white" style="border-color:var(--c-border);aspect-ratio:1/1">
             <?php if ($imgUrl !== ''): ?>
                 <img src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>"

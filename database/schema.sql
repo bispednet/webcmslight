@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS products (
     sale_price DECIMAL(10,2) NULL,
     campaign_label VARCHAR(120) NULL,
     stock_status VARCHAR(80) NULL,
+    stock_qty INT UNSIGNED DEFAULT 0,
     content_html LONGTEXT NULL,
     featured_order INT UNSIGNED DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

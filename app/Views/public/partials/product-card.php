@@ -16,9 +16,10 @@ $isSale       = $salePrice && $regularPrice && (float)$salePrice < (float)$regul
 
 // Stock
 $rawStock = strtolower(trim((string)($product['stock_status'] ?? '')));
+$stockQty = (int)($product['stock_qty'] ?? 0);
 if (in_array($rawStock, ['instock', 'in-stock', 'disponibile', '1', 'true'], true)) {
     $stockClass = 'badge-stock--in';
-    $stockLabel = 'Disponibile';
+    $stockLabel = $stockQty > 0 ? 'Disponibile · ' . $stockQty . ' pz' : 'Disponibile';
 } elseif ($rawStock === '' || in_array($rawStock, ['onrequest', 'su richiesta'], true)) {
     $stockClass = 'badge-stock--ask';
     $stockLabel = 'Su richiesta';

@@ -29,3 +29,4 @@ airewagcms_mysql_db.sql
 /vendor/
 /node_modules/
 .DS_Store
+/public/media/products/runner/

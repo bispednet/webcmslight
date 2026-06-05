@@ -93,6 +93,7 @@ return [
         'markup_default'  => 0.10,    // +10% sul costo d'acquisto
         'markup_fixed'    => 5.00,    // +5€ fissi (scoraggia la minuteria a basso margine)
         'max_discount'    => 0.05,    // sconto massimo applicabile in trattativa (5%)
+        'require_image'   => true,    // scarta i prodotti senza foto valida
         'import_unmapped' => false,   // se true importa anche famiglie non mappate (in "accessori")
         'family_exclude'  => [],      // famiglie Runner extra da escludere (oltre ai default)
         'markup' => [                 // markup % per categoria (override del default)

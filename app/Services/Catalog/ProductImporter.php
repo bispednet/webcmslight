@@ -87,6 +87,12 @@ final class ProductImporter
     /** Sotto questa soglia di prodotti letti, il prune NON gira (feed sospetto). */
     private const PRUNE_SAFETY_THRESHOLD = 500;
 
+    /** Immagini più piccole di così sono placeholder "no foto" del fornitore. */
+    private const MIN_IMAGE_BYTES = 2500;
+
+    /** Dove salviamo le immagini prodotto scaricate dal fornitore. */
+    private const IMAGE_DIR = '/media/products/runner';
+
     /**
      * @return array{created:int, updated:int, depleted:int, skipped:int, errors:int, pruned:int}
      */
@@ -130,17 +136,27 @@ final class ProductImporter
                     continue;
                 }
 
-                $price       = $this->computeSalePrice((float)$raw['cost'], $mapped['category']);
-                $stockStatus = 'disponibile';
+                // Foto: scarica e valida. Senza foto vera, il prodotto non entra
+                // a catalogo (richiesta: "non voglio prodotti senza foto").
+                $localImage = null;
+                if (!empty($this->config['require_image']) || !$dryRun) {
+                    $localImage = $this->localizeImage((string)($raw['image_url'] ?? ''), $sku, $dryRun);
+                    if ($localImage === null && !empty($this->config['require_image'])) {
+                        $stats['skipped']++;
+                        continue;
+                    }
+                }
+
+                $price = $this->computeSalePrice((float)$raw['cost'], $mapped['category']);
 
                 if ($existingId !== null) {
                     if (!$dryRun) {
-                        $this->updateProduct($existingId, $price, $stockStatus);
+                        $this->updateProduct($existingId, $price, $stock, $localImage, (string)($raw['description'] ?? ''));
                     }
                     $stats['updated']++;
                 } else {
                     if (!$dryRun) {
-                        $this->createProduct($sku, $price, $mapped, $raw, $stockStatus);
+                        $this->createProduct($sku, $price, $stock, $mapped, $raw, $localImage);
                     }
                     $stats['created']++;
                 }
@@ -202,17 +218,16 @@ final class ProductImporter
         $stmt = $this->db->query("SELECT id, sku, stock_status FROM products WHERE sku IS NOT NULL AND sku <> '' AND featured_order >= 100");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $up = $this->db->prepare('UPDATE products SET stock_status = :s, updated_at = NOW() WHERE id = :id');
+        $up = $this->db->prepare('UPDATE products SET stock_status = :s, stock_qty = :q, updated_at = NOW() WHERE id = :id');
         foreach ($rows as $r) {
             $qty = $availability[$r['sku']] ?? 0;
             $new = $qty > 0 ? 'disponibile' : 'esaurito';
-            if ($new === $r['stock_status']) {
-                continue; // nessun cambiamento
-            }
             if (!$dryRun) {
-                $up->execute(['s' => $new, 'id' => $r['id']]);
+                $up->execute(['s' => $new, 'q' => max(0, $qty), 'id' => $r['id']]);
             }
-            $res[$qty > 0 ? 'available' : 'depleted']++;
+            if ($new !== $r['stock_status']) {
+                $res[$qty > 0 ? 'available' : 'depleted']++;
+            }
         }
 
         return $res;
@@ -290,17 +305,26 @@ final class ProductImporter
         return $id === false ? null : (int)$id;
     }
 
-    private function updateProduct(int $id, float $price, string $stockStatus): void
+    private function updateProduct(int $id, float $price, int $stock, ?string $localImage, string $description): void
     {
-        $this->db->prepare(
-            'UPDATE products SET price = :price, stock_status = :stock_status, updated_at = NOW() WHERE id = :id'
-        )->execute(['price' => $price, 'stock_status' => $stockStatus, 'id' => $id]);
+        $sets = ['price = :price', 'stock_status = :ss', 'stock_qty = :qty', 'updated_at = NOW()'];
+        $params = ['price' => $price, 'ss' => 'disponibile', 'qty' => $stock, 'id' => $id];
+        if ($localImage !== null && $localImage !== '') {
+            $sets[] = 'image_url = :img';
+            $params['img'] = $localImage;
+        }
+        $cleanDesc = $this->cleanDescription($description);
+        if ($cleanDesc !== '') {
+            $sets[] = 'description = :descr';
+            $params['descr'] = $cleanDesc;
+        }
+        $this->db->prepare('UPDATE products SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
     }
 
     private function markDepleted(int $id): void
     {
         $this->db->prepare(
-            "UPDATE products SET stock_status = 'esaurito', updated_at = NOW() WHERE id = :id"
+            "UPDATE products SET stock_status = 'esaurito', stock_qty = 0, updated_at = NOW() WHERE id = :id"
         )->execute(['id' => $id]);
     }
 
@@ -308,29 +332,99 @@ final class ProductImporter
      * @param array{category:string, icon:string} $mapped
      * @param array<string,mixed> $raw
      */
-    private function createProduct(string $sku, float $price, array $mapped, array $raw, string $stockStatus): void
+    private function createProduct(string $sku, float $price, int $stock, array $mapped, array $raw, ?string $localImage): void
     {
         $name        = mb_substr((string)$raw['name'], 0, 150, 'UTF-8');
         $slug        = $this->uniqueSlug($name . '-' . $sku);
         $brand       = trim((string)($raw['brand'] ?? ''));
-        $description = trim((string)($raw['description'] ?? '')) ?: $name;
-        $imageUrl    = trim((string)($raw['image_url'] ?? ''));
+        $description = $this->cleanDescription((string)($raw['description'] ?? '')) ?: $name;
 
         $this->db->prepare(
-            'INSERT INTO products (name, slug, description, icon_key, external_link, category, tags, sku, price, stock_status, featured_order)
-             VALUES (:name, :slug, :description, :icon, :image, :category, :tags, :sku, :price, :stock_status, 100)'
+            'INSERT INTO products (name, slug, description, icon_key, image_url, category, tags, sku, price, stock_status, stock_qty, featured_order)
+             VALUES (:name, :slug, :description, :icon, :image, :category, :tags, :sku, :price, :stock_status, :qty, 100)'
         )->execute([
             'name'         => $name,
             'slug'         => $slug,
-            'description'  => mb_substr($description, 0, 2000, 'UTF-8'),
+            'description'  => mb_substr($description, 0, 4000, 'UTF-8'),
             'icon'         => $mapped['icon'],
-            'image'        => $imageUrl ?: null,
+            'image'        => $localImage ?: null,
             'category'     => $mapped['category'],
             'tags'         => mb_substr(trim($brand . ',' . $mapped['category']), 0, 255, 'UTF-8'),
             'sku'          => $sku,
             'price'        => $price,
-            'stock_status' => $stockStatus,
+            'stock_status' => 'disponibile',
+            'qty'          => $stock,
         ]);
+    }
+
+    /**
+     * Scarica l'immagine prodotto dal fornitore, la valida (no placeholder) e la
+     * salva in public/media/products/runner/{sku}.jpg. Cache: se esiste già, la
+     * riusa. Ritorna il path locale (/media/...) o null se non c'è foto valida.
+     */
+    private function localizeImage(string $url, string $sku, bool $dryRun): ?string
+    {
+        if ($url === '' || !preg_match('#^https?://#i', $url)) {
+            return null;
+        }
+        $safeSku  = preg_replace('/[^A-Za-z0-9._-]+/', '_', $sku) ?: 'item';
+        $relPath  = self::IMAGE_DIR . '/' . $safeSku . '.jpg';
+        $absDir   = BASE_PATH . '/public' . self::IMAGE_DIR;
+        $absPath  = BASE_PATH . '/public' . $relPath;
+
+        // Cache: già scaricata e valida
+        if (is_file($absPath) && filesize($absPath) >= self::MIN_IMAGE_BYTES) {
+            return $relPath;
+        }
+        if ($dryRun) {
+            return $relPath; // in dry-run non scarichiamo, assumiamo ok
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_USERAGENT      => 'Bisped-Catalog/1.0',
+        ]);
+        $data = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $type = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+
+        // Scarta: errore HTTP, non immagine, o placeholder troppo piccolo
+        if (!$data || $code < 200 || $code >= 300 || !str_starts_with($type, 'image/')) {
+            return null;
+        }
+        if (strlen((string)$data) < self::MIN_IMAGE_BYTES) {
+            return null; // placeholder "no foto"
+        }
+
+        if (!is_dir($absDir)) {
+            @mkdir($absDir, 0755, true);
+        }
+        if (@file_put_contents($absPath, $data) === false) {
+            return null;
+        }
+
+        return $relPath;
+    }
+
+    /**
+     * Ripulisce la descrizione HTML del fornitore mantenendo formattazione base.
+     */
+    private function cleanDescription(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+        // Tieni solo tag base sicuri
+        $html = strip_tags($html, '<p><br><ul><li><strong><b><em><i>');
+        $html = preg_replace('/\s+/', ' ', $html) ?? $html;
+
+        return trim((string)$html);
     }
 
     private function uniqueSlug(string $base): string
