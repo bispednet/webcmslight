@@ -540,6 +540,20 @@ html[data-theme="light"] .site-header { --_bg-r:244; --_bg-g:244; --_bg-b:246; }
     background: rgba(209,25,32,.06);
 }
 
+/* Sotto-categoria: più piccola e discreta del reparto macro */
+.cat-pill--sub {
+    padding: 5px 12px;
+    font-size: 10.5px;
+    letter-spacing: .04em;
+    border-radius: 999px;
+    text-transform: none;
+}
+.cat-pill--sub.active {
+    background: var(--bisped-red);
+    color: #fff;
+    border-color: var(--bisped-red);
+}
+
 /* ─── Info Card ─────────────────────────────────────────────────────────────── */
 .info-card {
     background: var(--c-surface);

@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS products (
     cta_text VARCHAR(100) NULL,
     cta_link VARCHAR(255) NULL,
     category VARCHAR(120) NULL,
+    subcategory VARCHAR(80) NULL,
+    subcategory_label VARCHAR(120) NULL,
     tags VARCHAR(255) NULL,
     sku VARCHAR(120) NULL,
     price DECIMAL(10,2) NULL,

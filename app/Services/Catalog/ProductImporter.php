@@ -114,11 +114,15 @@ final class ProductImporter
                 continue;
             }
 
-            $mapped = $this->mapCategory($family, (string)($raw['category'] ?? ''), (string)($raw['name'] ?? ''));
+            $descCat = (string)($raw['category'] ?? '');
+            $mapped = $this->mapCategory($family, $descCat, (string)($raw['name'] ?? ''));
             if ($mapped === null) {
                 $stats['skipped']++;
                 continue;
             }
+            // Sotto-categoria = categoria merceologica Runner (DescCatMerc)
+            $mapped['subcategory']       = $this->slugify($descCat);
+            $mapped['subcategory_label'] = $this->prettyLabel($descCat);
 
             $sku        = (string)$raw['sku'];
             $stock      = (int)($raw['stock'] ?? 0);
@@ -151,7 +155,7 @@ final class ProductImporter
 
                 if ($existingId !== null) {
                     if (!$dryRun) {
-                        $this->updateProduct($existingId, $price, $stock, $localImage, (string)($raw['description'] ?? ''));
+                        $this->updateProduct($existingId, $price, $stock, $localImage, (string)($raw['description'] ?? ''), $mapped);
                     }
                     $stats['updated']++;
                 } else {
@@ -269,30 +273,76 @@ final class ProductImporter
         return in_array($family, $exclude, true);
     }
 
+    /** Keyword che qualificano un prodotto come "gaming" (doppia visibilità). */
+    private const GAMING_KEYWORDS = [
+        'gaming', 'rog ', 'tuf gaming', 'predator', 'aorus', 'omen', 'nitro',
+        'geforce rtx', 'radeon rx', 'gamer',
+    ];
+
     /**
      * @return array{category:string, icon:string}|null
      */
     private function mapCategory(string $family, string $descCatMerc, string $name): ?array
     {
-        // 1) keyword fine su DescCatMerc + nome
         $haystack = mb_strtolower($descCatMerc . ' ' . $name, 'UTF-8');
+
+        // Determina la macro base
+        $base = null;
         foreach ($this->categoryMap as $needle => $target) {
             if (str_contains($haystack, $needle)) {
-                return $target;
+                $base = $target;
+                break;
+            }
+        }
+        if ($base === null && isset(self::FAMILY_MAP[$family])) {
+            $base = self::FAMILY_MAP[$family];
+        }
+        if ($base === null) {
+            if (!empty($this->config['import_unmapped'])) {
+                $base = ['category' => 'accessori', 'icon' => 'desktop'];
+            } else {
+                return null;
             }
         }
 
-        // 2) categoria di default della famiglia
-        if (isset(self::FAMILY_MAP[$family])) {
-            return self::FAMILY_MAP[$family];
+        // Refinement gaming: schede video/console sono già gaming dal categoryMap.
+        // Periferiche/componenti con keyword gaming nel nome → macro gaming
+        // (così un mouse gaming appare nel reparto Gaming oltre che in Mouse).
+        if ($base['category'] !== 'gaming' && $this->looksGaming($haystack)) {
+            $base = ['category' => 'gaming', 'icon' => 'gaming'];
         }
 
-        // 3) famiglia sconosciuta: includi solo se import_unmapped
-        if (!empty($this->config['import_unmapped'])) {
-            return ['category' => 'accessori', 'icon' => 'desktop'];
+        return $base;
+    }
+
+    private function looksGaming(string $haystack): bool
+    {
+        foreach (self::GAMING_KEYWORDS as $kw) {
+            if (str_contains($haystack, $kw)) {
+                return true;
+            }
         }
 
-        return null;
+        return false;
+    }
+
+    private function slugify(string $text): string
+    {
+        $text = mb_strtolower(trim($text), 'UTF-8');
+        $text = preg_replace('/[^a-z0-9]+/u', '-', $text) ?? $text;
+
+        return trim($text, '-') ?: 'altro';
+    }
+
+    private function prettyLabel(string $text): string
+    {
+        $text = trim(mb_convert_case(mb_strtolower($text, 'UTF-8'), MB_CASE_TITLE, 'UTF-8'));
+        // Acronimi che vanno in maiuscolo
+        foreach (['Cpu' => 'CPU', 'Ram' => 'RAM', 'Ssd' => 'SSD', 'Hdd' => 'HDD', 'Usb' => 'USB', 'Pc' => 'PC', 'Tv' => 'TV', 'Nas' => 'NAS', 'Poe' => 'PoE', 'Ups' => 'UPS'] as $from => $to) {
+            $text = preg_replace('/\b' . $from . '\b/u', $to, $text) ?? $text;
+        }
+
+        return $text ?: 'Altro';
     }
 
     // ── DB ───────────────────────────────────────────────────────────────────
@@ -305,10 +355,20 @@ final class ProductImporter
         return $id === false ? null : (int)$id;
     }
 
-    private function updateProduct(int $id, float $price, int $stock, ?string $localImage, string $description): void
+    /**
+     * @param array{category:string,icon:string,subcategory:string,subcategory_label:string} $mapped
+     */
+    private function updateProduct(int $id, float $price, int $stock, ?string $localImage, string $description, array $mapped): void
     {
-        $sets = ['price = :price', 'stock_status = :ss', 'stock_qty = :qty', 'updated_at = NOW()'];
-        $params = ['price' => $price, 'ss' => 'disponibile', 'qty' => $stock, 'id' => $id];
+        $sets = [
+            'price = :price', 'stock_status = :ss', 'stock_qty = :qty',
+            'category = :cat', 'subcategory = :sub', 'subcategory_label = :subl', 'updated_at = NOW()',
+        ];
+        $params = [
+            'price' => $price, 'ss' => 'disponibile', 'qty' => $stock,
+            'cat' => $mapped['category'], 'sub' => $mapped['subcategory'], 'subl' => $mapped['subcategory_label'],
+            'id' => $id,
+        ];
         if ($localImage !== null && $localImage !== '') {
             $sets[] = 'image_url = :img';
             $params['img'] = $localImage;
@@ -340,8 +400,8 @@ final class ProductImporter
         $description = $this->cleanDescription((string)($raw['description'] ?? '')) ?: $name;
 
         $this->db->prepare(
-            'INSERT INTO products (name, slug, description, icon_key, image_url, category, tags, sku, price, stock_status, stock_qty, featured_order)
-             VALUES (:name, :slug, :description, :icon, :image, :category, :tags, :sku, :price, :stock_status, :qty, 100)'
+            'INSERT INTO products (name, slug, description, icon_key, image_url, category, subcategory, subcategory_label, tags, sku, price, stock_status, stock_qty, featured_order)
+             VALUES (:name, :slug, :description, :icon, :image, :category, :sub, :subl, :tags, :sku, :price, :stock_status, :qty, 100)'
         )->execute([
             'name'         => $name,
             'slug'         => $slug,
@@ -349,7 +409,9 @@ final class ProductImporter
             'icon'         => $mapped['icon'],
             'image'        => $localImage ?: null,
             'category'     => $mapped['category'],
-            'tags'         => mb_substr(trim($brand . ',' . $mapped['category']), 0, 255, 'UTF-8'),
+            'sub'          => $mapped['subcategory'],
+            'subl'         => $mapped['subcategory_label'],
+            'tags'         => mb_substr(trim($brand . ',' . $mapped['subcategory_label']), 0, 255, 'UTF-8'),
             'sku'          => $sku,
             'price'        => $price,
             'stock_status' => 'disponibile',

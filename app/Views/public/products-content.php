@@ -82,7 +82,7 @@ $topDeal = array_slice(array_values($onSaleProducts), 0, 3);
             <span style="color:var(--bisped-red)">persone a disposizione.</span>
         </h1>
         <p class="mt-5 max-w-2xl text-muted text-lg">
-            Sfoglia per reparto o cerca direttamente. Prezzi ufficiali con sconto vs listino.
+            Sfoglia per reparto, affina per sotto-categoria o cerca direttamente. Disponibilità reale e spedizione rapida.
         </p>
 
         <!-- Live search -->
@@ -114,6 +114,9 @@ $topDeal = array_slice(array_values($onSaleProducts), 0, 3);
                 </button>
             <?php endforeach; ?>
         </div>
+
+        <!-- Sub-category pills (popolati via JS quando selezioni un reparto) -->
+        <div class="mt-3 flex flex-wrap gap-2" id="sub-pills" hidden></div>
 
         <!-- No results message (hidden by default) -->
         <p id="no-results" class="hidden mt-5 text-sm" style="color:var(--c-muted)">
@@ -185,6 +188,8 @@ $topDeal = array_slice(array_values($onSaleProducts), 0, 3);
                        data-name="<?= htmlspecialchars(strtolower($product['name']), ENT_QUOTES, 'UTF-8') ?>"
                        data-tags="<?= htmlspecialchars(strtolower($product['tags'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                        data-category="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"
+                       data-subcategory="<?= htmlspecialchars((string)($product['subcategory'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                       data-sublabel="<?= htmlspecialchars((string)($product['subcategory_label'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                        style="text-decoration:none"
                        data-animate
                        data-animate-delay="<?= min($index * 50, 400) ?>">
@@ -216,32 +221,71 @@ $topDeal = array_slice(array_values($onSaleProducts), 0, 3);
 (function () {
     const search   = document.getElementById('product-search');
     const pills    = document.querySelectorAll('#cat-pills [data-filter]');
+    const subWrap  = document.getElementById('sub-pills');
     const sections = document.querySelectorAll('.product-section');
     const noRes    = document.getElementById('no-results');
+    const allItems = Array.from(document.querySelectorAll('.product-item'));
     let activeCat  = 'all';
+    let activeSub  = 'all';
 
     function update() {
         const q = search.value.toLowerCase().trim();
         let totalVisible = 0;
 
         sections.forEach(sec => {
-            const catKey = sec.dataset.category;
-            const items  = sec.querySelectorAll('.product-item');
+            const items = sec.querySelectorAll('.product-item');
             let secVisible = 0;
-
             items.forEach(item => {
                 const nameMatch = item.dataset.name.includes(q);
                 const tagsMatch = item.dataset.tags.includes(q);
                 const catMatch  = activeCat === 'all' || item.dataset.category === activeCat;
-                const show      = catMatch && (q === '' || nameMatch || tagsMatch);
+                const subMatch  = activeSub === 'all' || item.dataset.subcategory === activeSub;
+                const show      = catMatch && subMatch && (q === '' || nameMatch || tagsMatch);
                 item.style.display = show ? '' : 'none';
                 if (show) { secVisible++; totalVisible++; }
             });
-
             sec.style.display = secVisible > 0 ? '' : 'none';
         });
 
         noRes.classList.toggle('hidden', totalVisible > 0);
+    }
+
+    // Costruisce i chip sotto-categoria per il reparto attivo
+    function buildSubPills() {
+        subWrap.innerHTML = '';
+        if (activeCat === 'all') { subWrap.hidden = true; return; }
+
+        // Raccoglie le sotto-categorie uniche del reparto (slug -> label)
+        const subs = new Map();
+        allItems.forEach(item => {
+            if (item.dataset.category !== activeCat) return;
+            const slug = item.dataset.subcategory;
+            const label = item.dataset.sublabel;
+            if (slug && !subs.has(slug)) subs.set(slug, label || slug);
+        });
+        if (subs.size <= 1) { subWrap.hidden = true; return; }
+
+        // Chip "Tutti"
+        subWrap.appendChild(makeSubPill('all', 'Tutti', true));
+        // Chip ordinati per label
+        [...subs.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+            .forEach(([slug, label]) => subWrap.appendChild(makeSubPill(slug, label, false)));
+        subWrap.hidden = false;
+    }
+
+    function makeSubPill(slug, label, active) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cat-pill cat-pill--sub' + (active ? ' active' : '');
+        b.dataset.sub = slug;
+        b.textContent = label;
+        b.addEventListener('click', () => {
+            subWrap.querySelectorAll('button').forEach(p => p.classList.remove('active'));
+            b.classList.add('active');
+            activeSub = slug;
+            update();
+        });
+        return b;
     }
 
     search.addEventListener('input', update);
@@ -251,6 +295,8 @@ $topDeal = array_slice(array_values($onSaleProducts), 0, 3);
             pills.forEach(p => p.classList.remove('active'));
             pill.classList.add('active');
             activeCat = pill.dataset.filter;
+            activeSub = 'all';
+            buildSubPills();
             update();
             if (activeCat !== 'all') {
                 const sec = document.getElementById(activeCat);
