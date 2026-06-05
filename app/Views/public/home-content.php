@@ -143,24 +143,33 @@ if (empty($featured)) {
     </div>
 </section>
 
-<!-- ─── PROMO BANNERS ────────────────────────────────────────────────────────── -->
+<!-- ─── PROMO BANNERS (3 reparti) ────────────────────────────────────────────── -->
 <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 py-2" data-animate>
-    <!-- Banner principale: Gaming RIG -->
-    <a href="<?= $p ?>/products#gaming" class="promo-banner lg:col-span-2" style="aspect-ratio:16/7">
-        <img src="/media/banners/banner-gaming-rig.jpg" alt="PC Gaming Build Bisped" loading="eager">
+    <!-- Gaming -->
+    <a href="<?= $p ?>/products" class="promo-banner" style="aspect-ratio:16/10">
+        <img src="/media/banners/banner-gaming.jpg" alt="<?= $en ? 'Gaming setup' : 'Postazione gaming' ?>" loading="eager">
         <div class="promo-banner__overlay">
-            <span class="promo-banner__tag"><?= $en ? 'Promo' : 'Promozione' ?></span>
-            <p class="promo-banner__title"><?= $en ? 'Choose our<br>dedicated<br>Gaming builds' : 'Scegli le nostre<br>Build specifiche<br>per il Gaming' ?></p>
-            <span class="promo-banner__cta"><?= $en ? 'Discover →' : 'Scopri →' ?></span>
+            <span class="promo-banner__tag">Gaming</span>
+            <p class="promo-banner__title"><?= $en ? 'Rigs, GPUs<br>and gear' : 'Rig, schede video<br>e periferiche' ?></p>
+            <span class="promo-banner__cta"><?= $en ? 'Explore →' : 'Scopri →' ?></span>
         </div>
     </a>
-    <!-- Banner secondario: Smartphone -->
-    <a href="<?= $p ?>/products#smartphone" class="promo-banner" style="aspect-ratio:16/7">
-        <img src="/media/banners/banner-xiaomi.jpg" alt="Scopri Xiaomi" loading="lazy">
+    <!-- Smartphone -->
+    <a href="<?= $p ?>/products" class="promo-banner" style="aspect-ratio:16/10">
+        <img src="/media/banners/banner-smartphone.jpg" alt="<?= $en ? 'Smartphones and accessories' : 'Smartphone e accessori' ?>" loading="lazy">
         <div class="promo-banner__overlay">
-            <span class="promo-banner__tag"><?= $en ? 'Ultra-fast charging' : 'Ricarica ultra-rapida' ?></span>
-            <p class="promo-banner__title"><?= $en ? 'Discover<br>Xiaomi' : 'Scopri<br>Xiaomi' ?></p>
-            <span class="promo-banner__cta"><?= $en ? 'See smartphones →' : 'Vedi smartphone →' ?></span>
+            <span class="promo-banner__tag">Smartphone</span>
+            <p class="promo-banner__title"><?= $en ? 'Latest phones<br>and accessories' : 'Gli ultimi modelli<br>e accessori' ?></p>
+            <span class="promo-banner__cta"><?= $en ? 'See phones →' : 'Vedi smartphone →' ?></span>
+        </div>
+    </a>
+    <!-- Notebook / Lavoro -->
+    <a href="<?= $p ?>/products" class="promo-banner" style="aspect-ratio:16/10">
+        <img src="/media/banners/banner-notebook.jpg" alt="<?= $en ? 'Notebooks for work' : 'Notebook per il lavoro' ?>" loading="lazy">
+        <div class="promo-banner__overlay">
+            <span class="promo-banner__tag"><?= $en ? 'Work & Study' : 'Lavoro & Studio' ?></span>
+            <p class="promo-banner__title"><?= $en ? 'Notebooks<br>and workstations' : 'Notebook<br>e postazioni' ?></p>
+            <span class="promo-banner__cta"><?= $en ? 'Discover →' : 'Scopri →' ?></span>
         </div>
     </a>
 </section>
