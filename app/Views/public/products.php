@@ -1,10 +1,11 @@
 <?php
 use App\Core\View;
 
-/** @var array $products */
+/** @var array $counts */
+/** @var array $subcats */
 
 View::renderPartial('layouts/main', [
-    'title' => 'Products',
+    'title' => 'Catalogo',
     'contentTemplate' => 'public/products-content',
-    'contentData' => compact('products'),
+    'contentData' => compact('counts', 'subcats'),
 ]);

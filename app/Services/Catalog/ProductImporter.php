@@ -25,59 +25,140 @@ use PDO;
  */
 final class ProductImporter
 {
-    /** Famiglie Runner da NON importare mai (fuori dal target Bisped). */
-    private const FAMILY_EXCLUDE = [
-        'ELETTRODOMESTICI ARTICOLI REGALO',
-        'EDUCATIONAL',
-        'DIGITAL SIGNAGE',
-        'UFFICIO E CONSUMABILI',
-        'SOFTWARE',
-    ];
-
-    /** Famiglia Runner => categoria Bisped di default (se nessuna keyword più specifica combacia). */
-    private const FAMILY_MAP = [
-        'SMARTPHONE E NAVIGATORI'      => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'NOTEBOOK E TABLET'            => ['category' => 'notebook',      'icon' => 'laptop'],
-        'MONITOR'                      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'INFORMATICA E COMPONENTISTICA'=> ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'SERVER E PERSONAL COMPUTER'   => ['category' => 'desktop',       'icon' => 'desktop'],
-        'NETWORKING E SORVEGLIANZA'    => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'STAMPANTI FAX MULTIFUNZIONE'  => ['category' => 'accessori',     'icon' => 'desktop'],
-        'HOME ENTERTAINMENT'           => ['category' => 'gaming',        'icon' => 'gaming'],
-        'AUDIO E VIDEO'                => ['category' => 'accessori',     'icon' => 'desktop'],
-        'VIDEOCONFERENZA'              => ['category' => 'accessori',     'icon' => 'desktop'],
-        'FOTO E OTTICA'                => ['category' => 'accessori',     'icon' => 'desktop'],
-        'CAVI'                         => ['category' => 'accessori',     'icon' => 'desktop'],
-        'PREVENZIONE E SICUREZZA'      => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'RICONDIZIONATI'               => ['category' => 'accessori',     'icon' => 'desktop'],
-    ];
-
     /**
-     * Keyword su DescCatMerc/nome => categoria Bisped (sotto-categoria fine).
-     * Vince sulla mappa famiglia. Le più specifiche vanno prima.
+     * Mappa esplicita: categoria merceologica Runner (DescCatMerc, UPPERCASE)
+     * => macro Bisped. Le DescCatMerc non presenti qui vengono SCARTATE
+     * (catalogo pulito, niente roba fuori target).
+     * La sotto-categoria mostrata è la DescCatMerc stessa (label leggibile).
      */
-    private array $categoryMap = [
-        'scheda video' => ['category' => 'gaming',        'icon' => 'gaming'],
-        'schede video' => ['category' => 'gaming',        'icon' => 'gaming'],
-        'console'      => ['category' => 'gaming',        'icon' => 'gaming'],
-        'gaming'       => ['category' => 'gaming',        'icon' => 'gaming'],
-        'smartphone'   => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'tablet'       => ['category' => 'tablet',        'icon' => 'smartphone'],
-        'notebook'     => ['category' => 'notebook',      'icon' => 'laptop'],
-        'monitor'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'processor'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'mainboard'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'ssd'          => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'hard disk'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'router'       => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'switch'       => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'nas'          => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'mouse'        => ['category' => 'accessori',     'icon' => 'desktop'],
-        'tastier'      => ['category' => 'accessori',     'icon' => 'desktop'],
-        'cuffi'        => ['category' => 'accessori',     'icon' => 'desktop'],
-        'web cam'      => ['category' => 'accessori',     'icon' => 'desktop'],
-        'webcam'       => ['category' => 'accessori',     'icon' => 'desktop'],
-        'stampant'     => ['category' => 'accessori',     'icon' => 'desktop'],
+    private const SUBCAT_MAP = [
+        // ── Smartphone ──
+        'CELLULARI'                          => 'smartphone',
+        'SMARTPHONE'                         => 'smartphone',
+        'SMARTWATCH'                         => 'smartphone',
+        'TELEFONIA FISSA E CORDLESS'         => 'smartphone',
+        // ── Notebook ──
+        'NOTEBOOK'                           => 'notebook',
+        // ── PC assemblati ──
+        'PC'                                 => 'pc-assemblati',
+        'ALL IN ONE'                         => 'pc-assemblati',
+        'MINI PC'                            => 'pc-assemblati',
+        'MINI PC BAREBONE'                   => 'pc-assemblati',
+        // ── Componenti ──
+        'ALIMENTATORI'                       => 'componenti',
+        'CASE'                               => 'componenti',
+        'CASE ACCESSORI'                     => 'componenti',
+        'CASE VENTOLE'                       => 'componenti',
+        'CPU'                                => 'componenti',
+        'CPU DISSIPATORI'                    => 'componenti',
+        'MAINBOARD'                          => 'componenti',
+        'MEMORIE RAM'                        => 'componenti',
+        'HARD DISK INTERNI'                  => 'componenti',
+        'HARD DISK HDD INTERNI ENTRY'        => 'componenti',
+        'SSD INTERNI'                        => 'componenti',
+        'MEMORIE FLASH'                      => 'componenti',
+        'LETTORI E MASTERIZZATORI'           => 'componenti',
+        // ── Monitor ──
+        'MONITOR LED'                        => 'monitor',
+        'MONITOR DESIGNER'                   => 'monitor',
+        'MONITOR TOUCH'                      => 'monitor',
+        'WALL MOUNT'                         => 'monitor',
+        // ── Gaming ──
+        'SCHEDE VIDEO'                       => 'gaming',
+        'ACCESSORI GAMING'                   => 'gaming',
+        'MONITOR GAMING'                     => 'gaming',
+        // ── Connettività ──
+        'ROUTER'                             => 'connettivita',
+        'SWITCH E HUB'                       => 'connettivita',
+        'ACCESS POINT'                       => 'connettivita',
+        'FIREWALL'                           => 'connettivita',
+        'ADATTATORI WIRELESS'                => 'connettivita',
+        'SCHEDE DI RETE INTERNE'             => 'connettivita',
+        'ACCESSORI NETWORKING'               => 'connettivita',
+        'VOIP SOLUTION'                      => 'connettivita',
+        'TELECAMERE IP'                      => 'connettivita',
+        'ACCESSORI VIDEOSORVEGLIANZA'        => 'connettivita',
+        // ── Server ──
+        'SERVER'                             => 'server',
+        'SERVER ACCESSORI'                   => 'server',
+        'HARD DISK SERVER'                   => 'server',
+        'RAM PER SERVER'                     => 'server',
+        'ARMADI RACK ACCESSORI'              => 'server',
+        'CONTROLLER'                         => 'server',
+        'NAS'                                => 'server',
+        // ── Stampa ──
+        'STAMPANTI LASER'                    => 'stampa',
+        'STAMPANTI INKJET'                   => 'stampa',
+        'STAMPANTI MULTIFUNZIONE INKJET'     => 'stampa',
+        'MULTIFUNZIONE LASER'                => 'stampa',
+        'MULTIFUNZIONE LASER A3'             => 'stampa',
+        'MULTIFUNZIONE INKJET A3'            => 'stampa',
+        'STAMPANTI TERMICHE E CARD'          => 'stampa',
+        'SCANNER DOCUMENTALI'                => 'stampa',
+        'SCANNER PIANI'                      => 'stampa',
+        'PLOTTER'                            => 'stampa',
+        'STAMPANTI ACCESSORI'                => 'stampa',
+        // ── Audio & TV ──
+        'CUFFIE E MICROFONI'                 => 'audio-video',
+        'SPEAKER'                            => 'audio-video',
+        'ACCESSORI TV E MONITOR SOUNDBAR'    => 'audio-video',
+        'ACCESSORI TV'                       => 'audio-video',
+        'TELEVISORI LED'                     => 'audio-video',
+        'VIDEOPROIETTORI'                    => 'audio-video',
+        'ACCESSORI VIDEOPROIETTORI'          => 'audio-video',
+        // ── Accessori (tutto il resto utile) ──
+        'TABLET PC'                          => 'accessori',
+        'TABLET ACCESSORI'                   => 'accessori',
+        'MOUSE'                              => 'accessori',
+        'TASTIERE'                           => 'accessori',
+        'TASTIERE E MOUSE ACCESSORI'         => 'accessori',
+        'WEB CAM'                            => 'accessori',
+        'WEB CAM VIDEOCONFERENZA'            => 'accessori',
+        'MICROFONI VIDEOCONFERENZA'          => 'accessori',
+        'ACCESSORI VIDEOCONFERENZA'          => 'accessori',
+        'HUB USB'                            => 'accessori',
+        'CARD READER'                        => 'accessori',
+        'ADATTATORI'                         => 'accessori',
+        'MEMORIE USB'                        => 'accessori',
+        'HARD DISK ESTERNI'                  => 'accessori',
+        'SSD ESTERNI'                        => 'accessori',
+        'HARD DISK ACCESSORI'                => 'accessori',
+        'BORSE PER NOTEBOOK'                 => 'accessori',
+        'DOCKING STATION'                    => 'accessori',
+        'ALIMENTATORI NOTEBOOK'              => 'accessori',
+        'ACCESSORI NET/NOTEBOOK'             => 'accessori',
+        'ACCESSORI PC'                       => 'accessori',
+        'GRUPPI DI CONTINUITA'               => 'accessori',
+        'GRUPPI DI CONTINUITA ACCESSORI UPS' => 'accessori',
+        'BATTERIE UPS'                       => 'accessori',
+        'CUSTODIE E COVER'                   => 'accessori',
+        'FILM PROTETTIVI SMARTPHONE'         => 'accessori',
+        'SMARTPHONE ACCESSORI'               => 'accessori',
+        'CAVI ANTENNA'                       => 'accessori',
+        'CAVI AUDIO'                         => 'accessori',
+        'CAVI DI ALIMENTAZIONE'              => 'accessori',
+        'CAVI DI RETE'                       => 'accessori',
+        'CAVI FIBRA'                         => 'accessori',
+        'CAVI HDMI/VGA/DVI/DP'               => 'accessori',
+        'CAVI USB'                           => 'accessori',
+        'CAVI VARI'                          => 'accessori',
+        'SPLITTER / EXTENDER'                => 'accessori',
+        'TAVOLETTE GRAFICHE'                 => 'accessori',
+    ];
+
+    /** Icona (icon_key fallback) per macro. */
+    private const MACRO_ICON = [
+        'smartphone'    => 'smartphone',
+        'notebook'      => 'laptop',
+        'pc-assemblati' => 'desktop',
+        'componenti'    => 'desktop',
+        'monitor'       => 'desktop',
+        'gaming'        => 'gaming',
+        'connettivita'  => 'wifi',
+        'server'        => 'desktop',
+        'stampa'        => 'desktop',
+        'audio-video'   => 'desktop',
+        'accessori'     => 'desktop',
     ];
 
     public function __construct(private PDO $db, private array $config)
@@ -261,58 +342,47 @@ final class ProductImporter
         return round(max($candidate, 0.90), 2);
     }
 
-    // ── Categorie ────────────────────────────────────────────────────────────
-    private function familyExcluded(string $family): bool
-    {
-        $extra = array_map(
-            static fn ($f) => mb_strtoupper((string)$f, 'UTF-8'),
-            (array)($this->config['family_exclude'] ?? [])
-        );
-        $exclude = array_merge(self::FAMILY_EXCLUDE, $extra);
-
-        return in_array($family, $exclude, true);
-    }
-
     /** Keyword che qualificano un prodotto come "gaming" (doppia visibilità). */
     private const GAMING_KEYWORDS = [
         'gaming', 'rog ', 'tuf gaming', 'predator', 'aorus', 'omen', 'nitro',
         'geforce rtx', 'radeon rx', 'gamer',
     ];
 
+    // ── Categorie ────────────────────────────────────────────────────────────
+    private function familyExcluded(string $family): bool
+    {
+        // Whitelist gestita per DescCatMerc (SUBCAT_MAP). Solo override da config.
+        $extra = array_map(
+            static fn ($f) => mb_strtoupper((string)$f, 'UTF-8'),
+            (array)($this->config['family_exclude'] ?? [])
+        );
+
+        return $extra !== [] && in_array($family, $extra, true);
+    }
+
     /**
+     * Mappa la categoria merceologica Runner (DescCatMerc) sulla macro Bisped.
+     * Le DescCatMerc non in whitelist vengono scartate (return null).
+     *
      * @return array{category:string, icon:string}|null
      */
     private function mapCategory(string $family, string $descCatMerc, string $name): ?array
     {
-        $haystack = mb_strtolower($descCatMerc . ' ' . $name, 'UTF-8');
+        $key = mb_strtoupper(trim($descCatMerc), 'UTF-8');
+        if (!isset(self::SUBCAT_MAP[$key])) {
+            return null; // fuori catalogo
+        }
+        $macro = self::SUBCAT_MAP[$key];
 
-        // Determina la macro base
-        $base = null;
-        foreach ($this->categoryMap as $needle => $target) {
-            if (str_contains($haystack, $needle)) {
-                $base = $target;
-                break;
-            }
-        }
-        if ($base === null && isset(self::FAMILY_MAP[$family])) {
-            $base = self::FAMILY_MAP[$family];
-        }
-        if ($base === null) {
-            if (!empty($this->config['import_unmapped'])) {
-                $base = ['category' => 'accessori', 'icon' => 'desktop'];
-            } else {
-                return null;
-            }
+        // Refinement gaming: periferiche/componenti/monitor/audio con keyword
+        // gaming nel nome vanno nel reparto Gaming (mantenendo la sotto-categoria).
+        if ($macro !== 'gaming'
+            && in_array($macro, ['accessori', 'componenti', 'monitor', 'audio-video'], true)
+            && $this->looksGaming(mb_strtolower($name, 'UTF-8'))) {
+            $macro = 'gaming';
         }
 
-        // Refinement gaming: schede video/console sono già gaming dal categoryMap.
-        // Periferiche/componenti con keyword gaming nel nome → macro gaming
-        // (così un mouse gaming appare nel reparto Gaming oltre che in Mouse).
-        if ($base['category'] !== 'gaming' && $this->looksGaming($haystack)) {
-            $base = ['category' => 'gaming', 'icon' => 'gaming'];
-        }
-
-        return $base;
+        return ['category' => $macro, 'icon' => self::MACRO_ICON[$macro] ?? 'desktop'];
     }
 
     private function looksGaming(string $haystack): bool

@@ -28,8 +28,43 @@ final class PageController extends Controller
 
     public function products(): void
     {
-        $products = $this->content->getProducts();
-        $this->view('public/products', compact('products'));
+        $counts = $this->content->productCategoryCounts();
+        $subcats = $this->content->productSubcategories();
+        $this->view('public/products', compact('counts', 'subcats'));
+    }
+
+    /**
+     * Endpoint AJAX: ritorna un blocco di card prodotto (HTML) per il lazy load.
+     * GET /products/load?cat=&sub=&q=&page=
+     */
+    public function loadProducts(): void
+    {
+        $cat    = trim((string)($_GET['cat'] ?? 'all'));
+        $sub    = trim((string)($_GET['sub'] ?? 'all'));
+        $q      = trim((string)($_GET['q'] ?? ''));
+        $page   = max(1, (int)($_GET['page'] ?? 1));
+        $limit  = 30;
+        $offset = ($page - 1) * $limit;
+
+        $result = $this->content->searchProducts($cat, $sub, $q, $limit, $offset);
+
+        header('Content-Type: text/html; charset=utf-8');
+        ob_start();
+        foreach ($result['items'] as $product) {
+            echo '<a href="/products/' . htmlspecialchars((string)$product['slug'], ENT_QUOTES, 'UTF-8') . '"'
+                . ' class="product-item" style="text-decoration:none">';
+            \App\Core\View::renderPartial('public/partials/product-card', ['product' => $product]);
+            echo '</a>';
+        }
+        $html = ob_get_clean();
+
+        $loaded = $offset + count($result['items']);
+        echo json_encode([
+            'html'    => $html,
+            'total'   => $result['total'],
+            'hasMore' => $loaded < $result['total'],
+            'loaded'  => $loaded,
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     public function azienda(): void

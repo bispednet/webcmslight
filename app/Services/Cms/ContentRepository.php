@@ -35,6 +35,83 @@ final class ContentRepository
         return $products;
     }
 
+    /**
+     * Ricerca prodotti paginata per il caricamento lazy del catalogo.
+     *
+     * @return array{items: array<int,array<string,mixed>>, total: int}
+     */
+    public function searchProducts(string $cat = 'all', string $sub = 'all', string $q = '', int $limit = 30, int $offset = 0): array
+    {
+        $where  = ['1=1'];
+        $params = [];
+        if ($cat !== 'all' && $cat !== '') {
+            $where[]        = 'category = :cat';
+            $params['cat']  = $cat;
+        }
+        if ($sub !== 'all' && $sub !== '') {
+            $where[]        = 'subcategory = :sub';
+            $params['sub']  = $sub;
+        }
+        if ($q !== '') {
+            $where[]      = '(name LIKE :q OR tags LIKE :q OR subcategory_label LIKE :q)';
+            $params['q']  = '%' . $q . '%';
+        }
+        $whereSql = implode(' AND ', $where);
+
+        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM products WHERE {$whereSql}");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+
+        $sql = "SELECT * FROM products WHERE {$whereSql} ORDER BY featured_order ASC, stock_qty DESC, name ASC LIMIT :limit OFFSET :offset";
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue(':' . $k, $v);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return ['items' => $stmt->fetchAll() ?: [], 'total' => $total];
+    }
+
+    /**
+     * Macro presenti a catalogo con conteggio, per costruire i filtri.
+     *
+     * @return array<string,int>
+     */
+    public function productCategoryCounts(): array
+    {
+        $stmt = $this->db->query("SELECT category, COUNT(*) n FROM products WHERE category IS NOT NULL AND category <> '' GROUP BY category");
+
+        return $stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+    }
+
+    /**
+     * Sotto-categorie per macro, con label e conteggio.
+     *
+     * @return array<string, array<int, array{slug:string,label:string,n:int}>>
+     */
+    public function productSubcategories(): array
+    {
+        $stmt = $this->db->query(
+            "SELECT category, subcategory, subcategory_label, COUNT(*) n
+             FROM products
+             WHERE category <> '' AND subcategory IS NOT NULL AND subcategory <> ''
+             GROUP BY category, subcategory, subcategory_label
+             ORDER BY subcategory_label"
+        );
+        $out = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $out[$r['category']][] = [
+                'slug'  => (string)$r['subcategory'],
+                'label' => (string)($r['subcategory_label'] ?: $r['subcategory']),
+                'n'     => (int)$r['n'],
+            ];
+        }
+
+        return $out;
+    }
+
     public function getProductBySlug(string $slug): ?array
     {
         $stmt = $this->db->prepare('SELECT * FROM products WHERE slug = :slug LIMIT 1');

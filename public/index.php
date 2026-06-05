@@ -89,6 +89,7 @@ $router->post('/ai/concierge/message', [AiConciergeController::class, 'message']
 $router->post('/ai/concierge/choice', [AiConciergeController::class, 'choice']);
 $router->post('/ai/concierge/handoff/whatsapp', [AiConciergeController::class, 'whatsappHandoff']);
 $router->get('/products', [PageController::class, 'products']);
+$router->get('/products/load', [PageController::class, 'loadProducts']);
 $router->get('/it/prodotti', [PageController::class, 'products']);
 $router->get('/en/products', [PageController::class, 'products']);
 $router->get('/products/{slug}', [PageController::class, 'product']);
