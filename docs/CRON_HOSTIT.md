@@ -105,30 +105,31 @@ Se vuoi portare SUBITO su bisped.net gli articoli già generati in locale (senza
 
 ---
 
-## Import automatico prodotti da fornitore (Nexths)
+## Import automatico prodotti da fornitore (Runner S.p.A.)
 
-È disponibile un modulo che importa i prodotti dal listino **Nexths** nel catalogo Bisped, con pricing automatico e filtro per categoria.
+Modulo che importa i prodotti dal listino **Runner** nel catalogo Bisped, con pricing automatico e filtro per categoria. Basato sul tracciato ufficiale Runner (file `.txt` pipe-delimited via FTP).
 
 ### Componenti
 
-- `app/Services/Catalog/Suppliers/NexthsAdapter.php` — legge il listino Nexths (CSV o API)
-- `app/Services/Catalog/ProductImporter.php` — upsert prodotti (match per SKU), pricing, filtro categorie
+- `app/Services/Catalog/Suppliers/RunnerAdapter.php` — scarica e joina i tracciati Runner
+- `app/Services/Catalog/ProductImporter.php` — upsert per SKU, pricing, filtro categorie
 - `scripts/auto-update/import-products.php` — comando CLI per il cron
 
-### Cosa fa
+### Come funziona
 
-1. Legge il listino Nexths (file CSV scaricato dal portale, oppure API)
-2. **Filtra le categorie**: importa solo smartphone, notebook, desktop, componenti-pc, gaming, tablet, accessori. Scarta il resto (es. casalinghi).
-3. **Calcola il prezzo di vendita** dal costo B2B: `costo × (1 + markup) × (1 + IVA)`, con arrotondamento a `,90`. Markup configurabile per categoria.
-4. **Upsert per SKU**: se il prodotto esiste aggiorna prezzo e disponibilità, altrimenti lo crea.
+1. **Scarica via FTP** dal server Runner:
+   - `articoli.txt` (anagrafica: codice, descrizione, produttore, categoria, disponibilità)
+   - `{CODICE_CLIENTE}/prezzi.txt` (il TUO prezzo di acquisto personalizzato)
+   - `immagini.txt` (URL foto prodotto)
+   - `descp.txt` (descrizioni estese)
+2. **Joina per Codice** anagrafica + prezzo + immagine + descrizione.
+3. **Filtra le categorie**: importa solo smartphone, notebook, desktop, componenti-pc, gaming, tablet, connettività, accessori. Scarta il resto (es. elettrodomestici).
+4. **Calcola il prezzo di vendita** dal costo B2B (`PrezzoPers`): `costo × (1 + markup) × (1 + IVA)`, arrotondato a `,90`. Markup configurabile per categoria.
+5. **Upsert per SKU**: se il prodotto esiste aggiorna prezzo e disponibilità, altrimenti lo crea.
 
-### Cosa devi verificare/fornire (Nexths)
+### ⚠️ Host FTP Runner
 
-Il mapping delle colonne e i campi API sono **presunti** e vanno confermati col tracciato reale:
-
-1. Accedi al portale Nexths e verifica **come scaricano il listino**: file CSV/Excel oppure API.
-2. **Se CSV**: scarica un file di esempio e controlla le intestazioni delle colonne. Se non combaciano con quelle in `NexthsAdapter::$columnMap`, aggiungile lì (è già pronto per molte varianti italiane: codice, descrizione, prezzo, categoria, marca, disponibilità).
-3. **Se API**: recupera endpoint e credenziali, poi adatta `NexthsAdapter::parseApiRow()`.
+`ftp.runner.it` è dietro **Cloudflare** e NON instrada il traffico FTP. Il vero host FTP è un altro: cercalo nella mail con le credenziali (user `C111445`), oppure aprilo un ticket nell'area assistenza Runner. Inserisci quell'host in `catalog.runner.ftp_host`.
 
 ### Configurazione (`.env.php`)
 
@@ -142,13 +143,17 @@ Il mapping delle colonne e i campi API sono **presunti** e vanno confermati col 
         'notebook'      => 0.15,
         'componenti-pc' => 0.20,
         'gaming'        => 0.22,
+        'connettivita'  => 0.20,
         'accessori'     => 0.30,
     ],
-    'nexths' => [
-        'mode'     => 'csv',
-        'csv_path' => '/home/uu4c5pdm/domains/bisped.net/public_html/storage/imports/nexths.csv',
-        'csv_delimiter' => ';',
-        // oppure mode='api' con api_url + api_key
+    'runner' => [
+        'ftp_host'      => 'HOST_FTP_RUNNER',   // dalla mail Runner (non ftp.runner.it)
+        'ftp_user'      => 'C111445',
+        'ftp_pass'      => '••••••••',
+        'ftp_port'      => 21,
+        'ftp_ssl'       => false,               // true se Runner usa FTPS
+        'customer_code' => 'C111445',           // cartella prezzi personalizzati
+        'work_dir'      => '/home/uu4c5pdm/domains/bisped.net/public_html/storage/imports/runner',
     ],
 ],
 ```
@@ -157,20 +162,20 @@ Il mapping delle colonne e i campi API sono **presunti** e vanno confermati col 
 
 ```bash
 # Dry-run: non scrive nulla, mostra solo cosa farebbe
-php scripts/auto-update/import-products.php --supplier=nexths --dry-run --verbose
+php scripts/auto-update/import-products.php --supplier=runner --dry-run --verbose
 ```
 
 ### Cron (DirectAdmin)
 
+I tracciati Runner si aggiornano ogni ora; un import 1-2 volte al giorno è sufficiente:
+
 ```bash
-/usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=nexths >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+/usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
 ```
 
-### Workflow CSV consigliato
+### Note
 
-Finché Nexths non offre un'API, il flusso più semplice è:
-1. Scarichi periodicamente il listino CSV dal portale Nexths
-2. Lo carichi via FTP in `storage/imports/nexths.csv`
-3. Il cron giornaliero lo importa e aggiorna prezzi/disponibilità
-
-> Le foto prodotto: se il CSV Nexths include URL immagini, si può estendere l'importer per scaricarle via lo stesso meccanismo `media/fetch` dell'Agent API. Da abilitare quando si conferma che il listino contiene gli URL.
+- **Prezzo:** `PrezzoPers` è il TUO prezzo di acquisto netto (cartella `C111445/prezzi.txt`). Il prezzo di vendita lo calcola l'importer con markup + IVA. Solo i prodotti con un prezzo personalizzato vengono importati.
+- **Immagini:** il tracciato fornisce URL (`immagini.txt`). Per ora salviamo l'URL remoto Runner; volendo si possono scaricare in locale con lo stesso meccanismo `media/fetch` dell'Agent API.
+- **Categorie:** il filtro usa `DescCatMerc`. Se Runner usa nomi categoria non ancora mappati, aggiungili in `ProductImporter::$categoryMap`.
+- **Permessi:** assicurati che `storage/imports/runner/` sia scrivibile (chmod 755).

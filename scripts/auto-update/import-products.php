@@ -17,9 +17,10 @@ use App\Core\Container;
 use App\Core\Database;
 use App\Services\Catalog\ProductImporter;
 use App\Services\Catalog\Suppliers\NexthsAdapter;
+use App\Services\Catalog\Suppliers\RunnerAdapter;
 
 $opts     = getopt('', ['supplier:', 'dry-run', 'verbose', 'limit:']);
-$supplier = (string)($opts['supplier'] ?? 'nexths');
+$supplier = (string)($opts['supplier'] ?? 'runner');
 $dryRun   = isset($opts['dry-run']);
 $verbose  = isset($opts['verbose']);
 $limit    = isset($opts['limit']) ? max(0, (int)$opts['limit']) : 0;
@@ -36,6 +37,7 @@ $db = Database::connection();
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $adapter = match ($supplier) {
+    'runner' => new RunnerAdapter((array)($catalog['runner'] ?? [])),
     'nexths' => new NexthsAdapter((array)($catalog['nexths'] ?? [])),
     default  => null,
 };

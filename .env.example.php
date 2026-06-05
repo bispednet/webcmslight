@@ -98,12 +98,21 @@ return [
             'gaming'        => 0.22,
             'accessori'     => 0.30,
         ],
+        // Fornitore Runner S.p.A. — tracciati txt pipe-delimited via FTP
+        'runner' => [
+            'ftp_host'      => '',         // host del server FTP Runner (NON ftp.runner.it: è dietro Cloudflare)
+            'ftp_user'      => '',         // codice cliente, es. C111445
+            'ftp_pass'      => '',
+            'ftp_port'      => 21,
+            'ftp_ssl'       => false,      // true se Runner richiede FTPS
+            'customer_code' => '',         // cartella prezzi personalizzati (= codice cliente)
+            'work_dir'      => '',         // es. '/home/uu4c5pdm/.../storage/imports/runner'
+            'skip_download' => false,      // true per usare solo i file già in work_dir (test)
+        ],
         'nexths' => [
             'mode'          => 'csv',  // 'csv' oppure 'api'
-            // Modalità CSV: percorso del listino scaricato dal portale Nexths
-            'csv_path'      => '',     // es. '/home/uu4c5pdm/.../storage/imports/nexths.csv'
+            'csv_path'      => '',
             'csv_delimiter' => ';',
-            // Modalità API (se Nexths la offre): endpoint + chiave
             'api_url'       => '',
             'api_key'       => '',
         ],

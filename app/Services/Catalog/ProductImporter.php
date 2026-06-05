@@ -16,23 +16,57 @@ use PDO;
  */
 final class ProductImporter
 {
-    /** Mappa categoria grezza fornitore => categoria Bisped + icona. */
+    /**
+     * Mappa categoria grezza fornitore => categoria Bisped + icona.
+     * L'ordine conta: la prima keyword che combacia vince, quindi le più
+     * specifiche (es. "scheda video"→gaming) vanno prima delle generiche.
+     */
     private array $categoryMap = [
-        'smartphone' => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'telefon'    => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'notebook'   => ['category' => 'notebook',      'icon' => 'laptop'],
-        'laptop'     => ['category' => 'notebook',      'icon' => 'laptop'],
-        'desktop'    => ['category' => 'desktop',       'icon' => 'desktop'],
-        'pc '        => ['category' => 'desktop',       'icon' => 'desktop'],
-        'monitor'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'scheda'     => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'video'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'ssd'        => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'ram'        => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'gaming'     => ['category' => 'gaming',        'icon' => 'gaming'],
-        'tablet'     => ['category' => 'tablet',        'icon' => 'smartphone'],
-        'stampant'   => ['category' => 'accessori',     'icon' => 'desktop'],
-        'accessor'   => ['category' => 'accessori',     'icon' => 'desktop'],
+        // Mobile
+        'smartphone'   => ['category' => 'smartphone',    'icon' => 'smartphone'],
+        'telefon'      => ['category' => 'smartphone',    'icon' => 'smartphone'],
+        'cellular'     => ['category' => 'smartphone',    'icon' => 'smartphone'],
+        'tablet'       => ['category' => 'tablet',        'icon' => 'smartphone'],
+        // Gaming (prima dei componenti generici)
+        'scheda video' => ['category' => 'gaming',        'icon' => 'gaming'],
+        'schede video' => ['category' => 'gaming',        'icon' => 'gaming'],
+        'gaming'       => ['category' => 'gaming',        'icon' => 'gaming'],
+        'console'      => ['category' => 'gaming',        'icon' => 'gaming'],
+        // Computer
+        'notebook'     => ['category' => 'notebook',      'icon' => 'laptop'],
+        'laptop'       => ['category' => 'notebook',      'icon' => 'laptop'],
+        'desktop'      => ['category' => 'desktop',       'icon' => 'desktop'],
+        // Componenti PC
+        'processor'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'scheda madre' => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'schede madri' => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'memoria'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'ram'          => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'ssd'          => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'hard disk'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'alimentator'  => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'case'         => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'ventol'       => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'monitor'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'scheda'       => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        // Connettività
+        'router'       => ['category' => 'connettivita',  'icon' => 'wifi'],
+        'switch'       => ['category' => 'connettivita',  'icon' => 'wifi'],
+        'access point' => ['category' => 'connettivita',  'icon' => 'wifi'],
+        'modem'        => ['category' => 'connettivita',  'icon' => 'wifi'],
+        'nas'          => ['category' => 'connettivita',  'icon' => 'wifi'],
+        // Accessori e periferiche
+        'mouse'        => ['category' => 'accessori',     'icon' => 'desktop'],
+        'tastier'      => ['category' => 'accessori',     'icon' => 'desktop'],
+        'cuffi'        => ['category' => 'accessori',     'icon' => 'desktop'],
+        'auricolar'    => ['category' => 'accessori',     'icon' => 'desktop'],
+        'webcam'       => ['category' => 'accessori',     'icon' => 'desktop'],
+        'periferich'   => ['category' => 'accessori',     'icon' => 'desktop'],
+        'stampant'     => ['category' => 'accessori',     'icon' => 'desktop'],
+        'scanner'      => ['category' => 'accessori',     'icon' => 'desktop'],
+        'ups'          => ['category' => 'accessori',     'icon' => 'desktop'],
+        'borse'        => ['category' => 'accessori',     'icon' => 'desktop'],
+        'accessor'     => ['category' => 'accessori',     'icon' => 'desktop'],
     ];
 
     public function __construct(private PDO $db, private array $config)
