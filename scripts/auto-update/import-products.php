@@ -38,6 +38,18 @@ $limit    = isset($opts['limit']) ? max(0, (int)$opts['limit']) : 0;
 $config  = Container::get('config', []);
 $catalog = $config['catalog'] ?? [];
 
+// Override dei parametri di pricing dai settings DB (modificabili da dashboard admin).
+try {
+    $sdb = Database::connection();
+    $rows = $sdb->query("SELECT setting_key, setting_value FROM settings WHERE setting_key LIKE 'catalog_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
+    if (!empty($rows['catalog_markup_default'])) { $catalog['markup_default'] = (float)$rows['catalog_markup_default']; }
+    if (isset($rows['catalog_markup_fixed']))    { $catalog['markup_fixed']   = (float)$rows['catalog_markup_fixed']; }
+    if (!empty($rows['catalog_vat']))            { $catalog['vat']            = (float)$rows['catalog_vat']; }
+    if (isset($rows['catalog_max_discount']))    { $catalog['max_discount']   = (float)$rows['catalog_max_discount']; }
+} catch (\Throwable) {
+    // settings non disponibili: si usano i valori di .env.php
+}
+
 if (empty($catalog['enabled'])) {
     fwrite(STDERR, "Import prodotti disabilitato. Imposta catalog.enabled=true in .env.php\n");
     exit(1);

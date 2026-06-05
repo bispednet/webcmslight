@@ -44,6 +44,7 @@ final class SettingsController extends Controller
                 'general' => $this->handleGeneralUpdate(),
                 'brand' => $this->handleBrandUpdate(),
                 'seo' => $this->handleSeoUpdate(),
+                'pricing' => $this->handlePricingUpdate(),
                 default => throw new \InvalidArgumentException('Unknown settings action.'),
             };
             Flash::set('admin.settings.notice', $message);
@@ -144,6 +145,24 @@ final class SettingsController extends Controller
     /**
      * @param array<string,string> $settings
      */
+    private function handlePricingUpdate(): string
+    {
+        // Percentuali inserite come numeri interi (es. 10 = 10%, 22 = IVA 22%)
+        $markupPct = max(0.0, min(200.0, (float)str_replace(',', '.', (string)($_POST['markup_default'] ?? '10'))));
+        $vatPct    = max(0.0, min(100.0, (float)str_replace(',', '.', (string)($_POST['vat'] ?? '22'))));
+        $discPct   = max(0.0, min(100.0, (float)str_replace(',', '.', (string)($_POST['max_discount'] ?? '5'))));
+        $fixed     = max(0.0, min(1000.0, (float)str_replace(',', '.', (string)($_POST['markup_fixed'] ?? '5'))));
+
+        $this->persistSettings([
+            'catalog_markup_default' => (string)round($markupPct / 100, 4),
+            'catalog_markup_fixed'   => (string)round($fixed, 2),
+            'catalog_vat'            => (string)round($vatPct / 100, 4),
+            'catalog_max_discount'   => (string)round($discPct / 100, 4),
+        ]);
+
+        return 'Parametri pricing catalogo salvati.';
+    }
+
     private function persistSettings(array $settings): void
     {
         $filtered = array_filter(
