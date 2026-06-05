@@ -165,13 +165,45 @@ Modulo che importa i prodotti dal listino **Runner** nel catalogo Bisped, con pr
 php scripts/auto-update/import-products.php --supplier=runner --dry-run --verbose
 ```
 
-### Cron (DirectAdmin)
+### Due cron: disponibilità (6h) + catalogo completo (24h)
 
-I tracciati Runner si aggiornano ogni ora; un import 1-2 volte al giorno è sufficiente:
+La disponibilità è critica: **non vogliamo a catalogo prodotti non disponibili su Runner**. Per questo ci sono due modalità separate.
+
+| Modalità | Cosa fa | Frequenza |
+|---|---|---|
+| `--mode=availability` | Scarica solo `dispo.txt` (leggero), mette `esaurito` ciò che è a 0 e `disponibile` ciò che torna. Non crea/rimuove. | **ogni 6h** |
+| `--mode=full` | Import completo: crea nuovi, aggiorna prezzi, esaurisce stock 0, marca `ritirato` i prodotti non più nel listino. | **ogni 24h** |
+
+**Cron su DirectAdmin** (sostituisci il path PHP se diverso):
 
 ```bash
-/usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+# Disponibilità — ogni 6 ore
+0 */6 * * *  /usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=availability >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+
+# Catalogo completo — ogni giorno alle 4:00
+0 4 * * *    /usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=full >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
 ```
+
+### Sicurezza del prune
+
+Il prune (rimozione prodotti non più nel listino) gira **solo** se l'import legge almeno 500 prodotti, per evitare di svuotare il catalogo se il feed FTP arriva vuoto o corrotto. I prodotti rimossi passano a `ritirato`, non vengono cancellati dal DB.
+
+### Pricing (formula)
+
+```
+prezzo_vendita = ( costo_acquisto × (1 + markup%) + markup_fisso ) × (1 + IVA)
+```
+arrotondato a `,90`. Esempi reali verificati:
+- Cavo USB costo €3,16 → **€11,90** (i 5€ fissi scoraggiano la minuteria)
+- SSD Crucial 500GB costo €84,66 → **€119,90**
+- Notebook Acer i9 costo €700 → **€934,90** (markup 8%)
+- iPhone 17 Pro Max costo €1262 → **€1672,90**
+
+Parametri in `catalog` (`.env.php`): `markup_default`, `markup_fixed`, `vat`, override `markup[categoria]` e `fixed[categoria]`. Modificabili anche dalla dashboard admin (Impostazioni → Catalogo).
+
+### Famiglie escluse
+
+Non vengono importate: Elettrodomestici/Articoli regalo, Educational, Digital Signage, Software, Ufficio e Consumabili. Modificabile in `ProductImporter::FAMILY_EXCLUDE` o via `catalog.family_exclude`.
 
 ### Note
 

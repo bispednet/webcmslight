@@ -86,17 +86,27 @@ return [
         'api_key' => '',
     ],
     // ── Catalogo: import prodotti da fornitori B2B ─────────────────────────
+    // Pricing: (costo × (1 + markup%) + markup_fisso) × (1 + IVA), arrotondato ,90
     'catalog' => [
         'enabled'         => false,   // metti true quando il fornitore è configurato
-        'markup_default'  => 0.18,    // ricarico di default sul costo B2B (+18%)
         'vat'             => 0.22,    // IVA applicata al prezzo di vendita
-        'import_unmapped' => false,   // se true importa anche categorie non mappate (in "accessori")
-        'markup' => [                 // ricarico per categoria (override del default)
-            'smartphone'    => 0.12,
-            'notebook'      => 0.15,
-            'componenti-pc' => 0.20,
-            'gaming'        => 0.22,
-            'accessori'     => 0.30,
+        'markup_default'  => 0.10,    // +10% sul costo d'acquisto
+        'markup_fixed'    => 5.00,    // +5€ fissi (scoraggia la minuteria a basso margine)
+        'max_discount'    => 0.05,    // sconto massimo applicabile in trattativa (5%)
+        'import_unmapped' => false,   // se true importa anche famiglie non mappate (in "accessori")
+        'family_exclude'  => [],      // famiglie Runner extra da escludere (oltre ai default)
+        'markup' => [                 // markup % per categoria (override del default)
+            'smartphone'    => 0.08,
+            'notebook'      => 0.08,
+            'componenti-pc' => 0.10,
+            'gaming'        => 0.10,
+            'connettivita'  => 0.15,
+            'accessori'     => 0.25,
+        ],
+        'fixed' => [                  // €fissi per categoria (override di markup_fixed)
+            'smartphone' => 8.00,
+            'notebook'   => 10.00,
+            'accessori'  => 5.00,
         ],
         // Fornitore Runner S.p.A. — tracciati txt pipe-delimited via FTPS
         'runner' => [

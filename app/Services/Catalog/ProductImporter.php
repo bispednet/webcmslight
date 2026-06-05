@@ -9,106 +9,138 @@ use PDO;
 /**
  * Importa/aggiorna prodotti nel catalogo Bisped a partire da un adapter fornitore.
  *
- * - Match per SKU: se esiste aggiorna prezzo/stock, altrimenti crea.
- * - Pricing: il listino fornitore è il COSTO B2B netto; il prezzo di vendita
- *   viene calcolato applicando un markup e l'IVA, con arrotondamento "psicologico".
- * - Filtro categorie: importa solo le categorie merceologiche vendute da Bisped.
+ * Pricing (configurabile da dashboard):
+ *   prezzo_vendita = ( costo_acquisto × (1 + markup%) + markup_fisso ) × (1 + IVA)
+ *   arrotondato a ,90. markup% e markup_fisso hanno override per categoria.
+ *   Il markup_fisso (default 5€) evita che convenga comprare minuteria da noi.
+ *
+ * Disponibilità:
+ *   - prodotti con stock <= 0 NON vengono creati; se esistono già passano a "esaurito".
+ *   - in modalità full, i prodotti Runner non più presenti nel listino vengono
+ *     marcati "ritirato" (o rimossi, vedi pruneMissing()).
+ *
+ * Categorie:
+ *   filtro per Famiglia merceologica Runner (whitelist), poi sotto-categoria
+ *   per keyword sulla DescCatMerc/nome.
  */
 final class ProductImporter
 {
+    /** Famiglie Runner da NON importare mai (fuori dal target Bisped). */
+    private const FAMILY_EXCLUDE = [
+        'ELETTRODOMESTICI ARTICOLI REGALO',
+        'EDUCATIONAL',
+        'DIGITAL SIGNAGE',
+        'UFFICIO E CONSUMABILI',
+        'SOFTWARE',
+    ];
+
+    /** Famiglia Runner => categoria Bisped di default (se nessuna keyword più specifica combacia). */
+    private const FAMILY_MAP = [
+        'SMARTPHONE E NAVIGATORI'      => ['category' => 'smartphone',    'icon' => 'smartphone'],
+        'NOTEBOOK E TABLET'            => ['category' => 'notebook',      'icon' => 'laptop'],
+        'MONITOR'                      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'INFORMATICA E COMPONENTISTICA'=> ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'SERVER E PERSONAL COMPUTER'   => ['category' => 'desktop',       'icon' => 'desktop'],
+        'NETWORKING E SORVEGLIANZA'    => ['category' => 'connettivita',  'icon' => 'wifi'],
+        'STAMPANTI FAX MULTIFUNZIONE'  => ['category' => 'accessori',     'icon' => 'desktop'],
+        'HOME ENTERTAINMENT'           => ['category' => 'gaming',        'icon' => 'gaming'],
+        'AUDIO E VIDEO'                => ['category' => 'accessori',     'icon' => 'desktop'],
+        'VIDEOCONFERENZA'              => ['category' => 'accessori',     'icon' => 'desktop'],
+        'FOTO E OTTICA'                => ['category' => 'accessori',     'icon' => 'desktop'],
+        'CAVI'                         => ['category' => 'accessori',     'icon' => 'desktop'],
+        'PREVENZIONE E SICUREZZA'      => ['category' => 'connettivita',  'icon' => 'wifi'],
+        'RICONDIZIONATI'               => ['category' => 'accessori',     'icon' => 'desktop'],
+    ];
+
     /**
-     * Mappa categoria grezza fornitore => categoria Bisped + icona.
-     * L'ordine conta: la prima keyword che combacia vince, quindi le più
-     * specifiche (es. "scheda video"→gaming) vanno prima delle generiche.
+     * Keyword su DescCatMerc/nome => categoria Bisped (sotto-categoria fine).
+     * Vince sulla mappa famiglia. Le più specifiche vanno prima.
      */
     private array $categoryMap = [
-        // Mobile
-        'smartphone'   => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'telefon'      => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'cellular'     => ['category' => 'smartphone',    'icon' => 'smartphone'],
-        'tablet'       => ['category' => 'tablet',        'icon' => 'smartphone'],
-        // Gaming (prima dei componenti generici)
         'scheda video' => ['category' => 'gaming',        'icon' => 'gaming'],
         'schede video' => ['category' => 'gaming',        'icon' => 'gaming'],
-        'gaming'       => ['category' => 'gaming',        'icon' => 'gaming'],
         'console'      => ['category' => 'gaming',        'icon' => 'gaming'],
-        // Computer
+        'gaming'       => ['category' => 'gaming',        'icon' => 'gaming'],
+        'smartphone'   => ['category' => 'smartphone',    'icon' => 'smartphone'],
+        'tablet'       => ['category' => 'tablet',        'icon' => 'smartphone'],
         'notebook'     => ['category' => 'notebook',      'icon' => 'laptop'],
-        'laptop'       => ['category' => 'notebook',      'icon' => 'laptop'],
-        'desktop'      => ['category' => 'desktop',       'icon' => 'desktop'],
-        // Componenti PC
+        'monitor'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
         'processor'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'scheda madre' => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'schede madri' => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'memoria'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'ram'          => ['category' => 'componenti-pc', 'icon' => 'desktop'],
+        'mainboard'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
         'ssd'          => ['category' => 'componenti-pc', 'icon' => 'desktop'],
         'hard disk'    => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'alimentator'  => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'case'         => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'ventol'       => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'monitor'      => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        'scheda'       => ['category' => 'componenti-pc', 'icon' => 'desktop'],
-        // Connettività
         'router'       => ['category' => 'connettivita',  'icon' => 'wifi'],
         'switch'       => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'access point' => ['category' => 'connettivita',  'icon' => 'wifi'],
-        'modem'        => ['category' => 'connettivita',  'icon' => 'wifi'],
         'nas'          => ['category' => 'connettivita',  'icon' => 'wifi'],
-        // Accessori e periferiche
         'mouse'        => ['category' => 'accessori',     'icon' => 'desktop'],
         'tastier'      => ['category' => 'accessori',     'icon' => 'desktop'],
         'cuffi'        => ['category' => 'accessori',     'icon' => 'desktop'],
-        'auricolar'    => ['category' => 'accessori',     'icon' => 'desktop'],
+        'web cam'      => ['category' => 'accessori',     'icon' => 'desktop'],
         'webcam'       => ['category' => 'accessori',     'icon' => 'desktop'],
-        'periferich'   => ['category' => 'accessori',     'icon' => 'desktop'],
         'stampant'     => ['category' => 'accessori',     'icon' => 'desktop'],
-        'scanner'      => ['category' => 'accessori',     'icon' => 'desktop'],
-        'ups'          => ['category' => 'accessori',     'icon' => 'desktop'],
-        'borse'        => ['category' => 'accessori',     'icon' => 'desktop'],
-        'accessor'     => ['category' => 'accessori',     'icon' => 'desktop'],
     ];
 
     public function __construct(private PDO $db, private array $config)
     {
     }
 
+    /** Sotto questa soglia di prodotti letti, il prune NON gira (feed sospetto). */
+    private const PRUNE_SAFETY_THRESHOLD = 500;
+
     /**
-     * @return array{created:int, updated:int, skipped:int, errors:int}
+     * @return array{created:int, updated:int, depleted:int, skipped:int, errors:int, pruned:int}
      */
     public function import(SupplierAdapterInterface $adapter, bool $dryRun = false, int $limit = 0): array
     {
         $products = $adapter->fetchProducts();
-        $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => 0];
+        $stats = ['created' => 0, 'updated' => 0, 'depleted' => 0, 'skipped' => 0, 'errors' => 0, 'pruned' => 0];
         $processed = 0;
+        $seenSkus = [];
 
         foreach ($products as $raw) {
             if ($limit > 0 && $processed >= $limit) {
                 break;
             }
 
-            $mapped = $this->mapCategory((string)($raw['category'] ?? ''), (string)($raw['name'] ?? ''));
-            if ($mapped === null) {
-                $stats['skipped']++; // categoria fuori dal catalogo Bisped
+            $family = mb_strtoupper((string)($raw['family'] ?? ''), 'UTF-8');
+            if ($this->familyExcluded($family)) {
+                $stats['skipped']++;
                 continue;
             }
 
-            $sku   = (string)$raw['sku'];
-            $price = $this->computeSalePrice((float)$raw['cost'], $mapped['category']);
-            $stock = (int)($raw['stock'] ?? 0);
-            $stockStatus = $stock > 0 ? 'disponibile' : 'su ordinazione';
-            $name  = mb_substr((string)$raw['name'], 0, 150, 'UTF-8');
+            $mapped = $this->mapCategory($family, (string)($raw['category'] ?? ''), (string)($raw['name'] ?? ''));
+            if ($mapped === null) {
+                $stats['skipped']++;
+                continue;
+            }
+
+            $sku        = (string)$raw['sku'];
+            $stock      = (int)($raw['stock'] ?? 0);
+            $seenSkus[] = $sku;
 
             try {
                 $existingId = $this->findBySku($sku);
+
+                // Disponibilità: stock 0 = non vendibile.
+                if ($stock <= 0) {
+                    if ($existingId !== null && !$dryRun) {
+                        $this->markDepleted($existingId);
+                    }
+                    $stats['depleted']++;
+                    continue;
+                }
+
+                $price       = $this->computeSalePrice((float)$raw['cost'], $mapped['category']);
+                $stockStatus = 'disponibile';
+
                 if ($existingId !== null) {
                     if (!$dryRun) {
-                        $this->updateProduct($existingId, $price, $stockStatus, $stock);
+                        $this->updateProduct($existingId, $price, $stockStatus);
                     }
                     $stats['updated']++;
                 } else {
                     if (!$dryRun) {
-                        $this->createProduct($sku, $name, $price, $mapped, $raw, $stockStatus);
+                        $this->createProduct($sku, $price, $mapped, $raw, $stockStatus);
                     }
                     $stats['created']++;
                 }
@@ -118,39 +150,129 @@ final class ProductImporter
             $processed++;
         }
 
+        // Prune: marca "ritirato" i prodotti non più presenti nel listino fornitore.
+        // Solo in full (limit=0), non dry-run, e con abbastanza prodotti letti
+        // (guardia anti-azzeramento se il feed arriva vuoto o corrotto).
+        $allSkus = array_column($products, 'sku');
+        if ($limit === 0 && !$dryRun && count($allSkus) >= self::PRUNE_SAFETY_THRESHOLD) {
+            $stats['pruned'] = $this->pruneMissing($allSkus);
+        }
+
         return $stats;
     }
 
-    private function computeSalePrice(float $cost, string $category): float
+    /**
+     * Marca "ritirato" i prodotti del fornitore non più presenti nel listino.
+     * Solo modalità full (limit=0) e non dry-run. Identifica i prodotti importati
+     * (sku presente) confrontandoli con quelli visti in questo import.
+     *
+     * @param list<string> $seenSkus
+     */
+    public function pruneMissing(array $seenSkus, string $supplierTag = 'runner'): int
     {
-        $markups = (array)($this->config['markup'] ?? []);
-        $markup  = (float)($markups[$category] ?? $this->config['markup_default'] ?? 0.18); // +18% default
-        $vat     = (float)($this->config['vat'] ?? 0.22); // IVA 22%
+        if (empty($seenSkus)) {
+            return 0;
+        }
+        // Considera solo prodotti che hanno uno sku (creati da import fornitore).
+        $placeholders = implode(',', array_fill(0, count($seenSkus), '?'));
+        $sql = "UPDATE products SET stock_status='ritirato'
+                WHERE sku IS NOT NULL AND sku <> ''
+                  AND sku NOT IN ({$placeholders})
+                  AND stock_status <> 'ritirato'
+                  AND featured_order >= 100"; // 100 = soglia prodotti da import automatico
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($seenSkus);
 
-        $price = $cost * (1 + $markup) * (1 + $vat);
+        return $stmt->rowCount();
+    }
 
-        // Arrotondamento psicologico a ,90
-        $rounded = floor($price) + 0.90;
-        if ($rounded < $price) {
-            $rounded = ceil($price) + 0.90 - 1;
+    /**
+     * Cron disponibilità (ogni 6h): aggiorna SOLO lo stock_status dei prodotti
+     * già a catalogo, in base alla mappa [sku => qty] da dispo.txt.
+     * - qty > 0  → disponibile
+     * - qty <= 0 o sku non in mappa → esaurito
+     * Tocca solo i prodotti da import automatico (featured_order >= 100).
+     *
+     * @param array<string,int> $availability
+     * @return array{available:int, depleted:int}
+     */
+    public function syncAvailability(array $availability, bool $dryRun = false): array
+    {
+        $res = ['available' => 0, 'depleted' => 0];
+        $stmt = $this->db->query("SELECT id, sku, stock_status FROM products WHERE sku IS NOT NULL AND sku <> '' AND featured_order >= 100");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $up = $this->db->prepare('UPDATE products SET stock_status = :s, updated_at = NOW() WHERE id = :id');
+        foreach ($rows as $r) {
+            $qty = $availability[$r['sku']] ?? 0;
+            $new = $qty > 0 ? 'disponibile' : 'esaurito';
+            if ($new === $r['stock_status']) {
+                continue; // nessun cambiamento
+            }
+            if (!$dryRun) {
+                $up->execute(['s' => $new, 'id' => $r['id']]);
+            }
+            $res[$qty > 0 ? 'available' : 'depleted']++;
         }
 
-        return round(max($rounded, 0.90), 2);
+        return $res;
+    }
+
+    // ── Pricing ──────────────────────────────────────────────────────────────
+    public function computeSalePrice(float $cost, string $category): float
+    {
+        $pct   = (float)($this->config['markup'][$category] ?? $this->config['markup_default'] ?? 0.10);
+        $fixed = (float)($this->config['fixed'][$category] ?? $this->config['markup_fixed'] ?? 5.00);
+        $vat   = (float)($this->config['vat'] ?? 0.22);
+
+        // (costo × (1 + markup%) + fisso) × (1 + IVA)
+        $price = ($cost * (1 + $pct) + $fixed) * (1 + $vat);
+
+        return $this->roundPsychological($price);
+    }
+
+    private function roundPsychological(float $price): float
+    {
+        // Arrotonda a ",90" non sotto il prezzo calcolato.
+        $candidate = floor($price) + 0.90;
+        if ($candidate < $price) {
+            $candidate += 1.0;
+        }
+
+        return round(max($candidate, 0.90), 2);
+    }
+
+    // ── Categorie ────────────────────────────────────────────────────────────
+    private function familyExcluded(string $family): bool
+    {
+        $extra = array_map(
+            static fn ($f) => mb_strtoupper((string)$f, 'UTF-8'),
+            (array)($this->config['family_exclude'] ?? [])
+        );
+        $exclude = array_merge(self::FAMILY_EXCLUDE, $extra);
+
+        return in_array($family, $exclude, true);
     }
 
     /**
      * @return array{category:string, icon:string}|null
      */
-    private function mapCategory(string $rawCategory, string $name): ?array
+    private function mapCategory(string $family, string $descCatMerc, string $name): ?array
     {
-        $haystack = mb_strtolower($rawCategory . ' ' . $name, 'UTF-8');
+        // 1) keyword fine su DescCatMerc + nome
+        $haystack = mb_strtolower($descCatMerc . ' ' . $name, 'UTF-8');
         foreach ($this->categoryMap as $needle => $target) {
             if (str_contains($haystack, $needle)) {
                 return $target;
             }
         }
 
-        // Se è impostato import_all=true, le categorie non mappate finiscono in "accessori"
+        // 2) categoria di default della famiglia
+        if (isset(self::FAMILY_MAP[$family])) {
+            return self::FAMILY_MAP[$family];
+        }
+
+        // 3) famiglia sconosciuta: includi solo se import_unmapped
         if (!empty($this->config['import_unmapped'])) {
             return ['category' => 'accessori', 'icon' => 'desktop'];
         }
@@ -158,6 +280,7 @@ final class ProductImporter
         return null;
     }
 
+    // ── DB ───────────────────────────────────────────────────────────────────
     private function findBySku(string $sku): ?int
     {
         $stmt = $this->db->prepare('SELECT id FROM products WHERE sku = :sku LIMIT 1');
@@ -167,31 +290,41 @@ final class ProductImporter
         return $id === false ? null : (int)$id;
     }
 
-    private function updateProduct(int $id, float $price, string $stockStatus, int $stock): void
+    private function updateProduct(int $id, float $price, string $stockStatus): void
     {
         $this->db->prepare(
             'UPDATE products SET price = :price, stock_status = :stock_status, updated_at = NOW() WHERE id = :id'
         )->execute(['price' => $price, 'stock_status' => $stockStatus, 'id' => $id]);
     }
 
+    private function markDepleted(int $id): void
+    {
+        $this->db->prepare(
+            "UPDATE products SET stock_status = 'esaurito', updated_at = NOW() WHERE id = :id"
+        )->execute(['id' => $id]);
+    }
+
     /**
      * @param array{category:string, icon:string} $mapped
      * @param array<string,mixed> $raw
      */
-    private function createProduct(string $sku, string $name, float $price, array $mapped, array $raw, string $stockStatus): void
+    private function createProduct(string $sku, float $price, array $mapped, array $raw, string $stockStatus): void
     {
-        $slug = $this->uniqueSlug($name . '-' . $sku);
-        $brand = trim((string)($raw['brand'] ?? ''));
+        $name        = mb_substr((string)$raw['name'], 0, 150, 'UTF-8');
+        $slug        = $this->uniqueSlug($name . '-' . $sku);
+        $brand       = trim((string)($raw['brand'] ?? ''));
         $description = trim((string)($raw['description'] ?? '')) ?: $name;
+        $imageUrl    = trim((string)($raw['image_url'] ?? ''));
 
         $this->db->prepare(
-            'INSERT INTO products (name, slug, description, icon_key, category, tags, sku, price, stock_status, featured_order)
-             VALUES (:name, :slug, :description, :icon, :category, :tags, :sku, :price, :stock_status, 100)'
+            'INSERT INTO products (name, slug, description, icon_key, external_link, category, tags, sku, price, stock_status, featured_order)
+             VALUES (:name, :slug, :description, :icon, :image, :category, :tags, :sku, :price, :stock_status, 100)'
         )->execute([
             'name'         => $name,
             'slug'         => $slug,
             'description'  => mb_substr($description, 0, 2000, 'UTF-8'),
             'icon'         => $mapped['icon'],
+            'image'        => $imageUrl ?: null,
             'category'     => $mapped['category'],
             'tags'         => mb_substr(trim($brand . ',' . $mapped['category']), 0, 255, 'UTF-8'),
             'sku'          => $sku,

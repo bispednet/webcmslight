@@ -47,19 +47,25 @@ final class RunnerAdapter implements SupplierAdapterInterface
         $immagini = $this->parseImmagini($workDir . '/immagini.txt');
         $descr    = $this->parseDescrizioni($workDir . '/descp.txt');
 
+        // La disponibilità autorevole è in dispo.txt (aggiornato ogni ora);
+        // se presente, sovrascrive il valore di articoli.txt.
+        $dispo = $this->parseDispo($workDir . '/dispo.txt');
+
         $products = [];
         foreach ($articoli as $codice => $a) {
             $cost = $prezzi[$codice] ?? 0.0;
             if ($cost <= 0) {
                 continue; // niente prezzo personalizzato = non vendibile per noi
             }
+            $stock = $dispo[$codice] ?? $a['stock'];
             $products[] = [
                 'sku'         => $codice,
                 'name'        => $a['name'],
                 'cost'        => $cost,
                 'category'    => $a['category'],
+                'family'      => $a['family'],
                 'brand'       => $a['brand'],
-                'stock'       => $a['stock'],
+                'stock'       => $stock,
                 'ean'         => $a['ean'],
                 'image_url'   => $immagini[$codice] ?? '',
                 'description' => $descr[$codice] ?? $a['name'],
@@ -68,6 +74,25 @@ final class RunnerAdapter implements SupplierAdapterInterface
         }
 
         return $products;
+    }
+
+    /**
+     * Modalità leggera: scarica solo dispo.txt e restituisce [sku => quantità].
+     * Usata dal cron disponibilità (ogni 6h) senza scaricare l'intero listino.
+     *
+     * @return array<string,int>
+     */
+    public function fetchAvailability(): array
+    {
+        $workDir = rtrim((string)($this->config['work_dir'] ?? ''), '/') ?: sys_get_temp_dir() . '/runner-feed';
+        if (!is_dir($workDir)) {
+            mkdir($workDir, 0755, true);
+        }
+        if (empty($this->config['skip_download'])) {
+            $this->downloadOne($workDir, 'dispo.txt');
+        }
+
+        return $this->parseDispo($workDir . '/dispo.txt');
     }
 
     // ── FTP download ───────────────────────────────────────────────────────
@@ -98,6 +123,9 @@ final class RunnerAdapter implements SupplierAdapterInterface
         foreach (['articoli.txt', 'immagini.txt', 'descp.txt'] as $file) {
             @ftp_get($conn, $workDir . '/' . $file, $file, FTP_BINARY);
         }
+        // dispo.txt: disponibilità autorevole aggiornata ogni ora
+        @ftp_get($conn, $workDir . '/dispo.txt', 'dispo.txt', FTP_BINARY);
+
         // prezzi.txt nella cartella del codice cliente
         if (!@ftp_get($conn, $workDir . '/prezzi.txt', $code . '/prezzi.txt', FTP_BINARY)) {
             // fallback: alcuni account espongono prezzi.txt in root
@@ -107,9 +135,34 @@ final class RunnerAdapter implements SupplierAdapterInterface
         ftp_close($conn);
     }
 
+    /**
+     * Scarica un singolo file dal server FTP Runner (per il sync disponibilità).
+     */
+    private function downloadOne(string $workDir, string $file): void
+    {
+        $host = (string)($this->config['ftp_host'] ?? '');
+        $user = (string)($this->config['ftp_user'] ?? '');
+        $pass = (string)($this->config['ftp_pass'] ?? '');
+        $port = (int)($this->config['ftp_port'] ?? 21);
+        $ssl  = !empty($this->config['ftp_ssl']);
+        if ($host === '' || $user === '' || $pass === '') {
+            throw new \RuntimeException('FTP Runner non configurato.');
+        }
+        $conn = $ssl ? @ftp_ssl_connect($host, $port, 20) : @ftp_connect($host, $port, 20);
+        if (!$conn || !@ftp_login($conn, $user, $pass)) {
+            if ($conn) {
+                ftp_close($conn);
+            }
+            throw new \RuntimeException('Connessione/login FTP Runner fallita.');
+        }
+        ftp_pasv($conn, true);
+        @ftp_get($conn, $workDir . '/' . $file, $file, FTP_BINARY);
+        ftp_close($conn);
+    }
+
     // ── Parsing ────────────────────────────────────────────────────────────
     /**
-     * @return array<string, array{name:string,brand:string,category:string,stock:int,ean:string,in_promo:bool}>
+     * @return array<string, array{name:string,brand:string,family:string,category:string,stock:int,ean:string,in_promo:bool}>
      */
     private function parseArticoli(string $path): array
     {
@@ -120,17 +173,40 @@ final class RunnerAdapter implements SupplierAdapterInterface
                 continue;
             }
             $codice = trim($f[0]);
-            if ($codice === '') {
+            // Salta l'header (prima riga: "Codice|CodiceProduttore|...")
+            if ($codice === '' || strcasecmp($codice, 'Codice') === 0) {
                 continue;
             }
             $out[$codice] = [
                 'name'     => trim($f[3] ?? ''),
                 'brand'    => trim($f[4] ?? ''),
+                'family'   => trim($f[5] ?? ''),         // Famiglia merceologica
                 'category' => trim($f[7] ?? ''),         // DescCatMerc
                 'stock'    => (int)trim($f[8] ?? '0'),   // Dispo
                 'ean'      => trim($f[2] ?? ''),
                 'in_promo' => trim($f[10] ?? '0') === '1',
             ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function parseDispo(string $path): array
+    {
+        $out = [];
+        foreach ($this->readPipeLines($path) as $f) {
+            // Codice|Dispo
+            if (count($f) < 2) {
+                continue;
+            }
+            $codice = trim($f[0]);
+            if ($codice === '' || strcasecmp($codice, 'Codice') === 0) {
+                continue;
+            }
+            $out[$codice] = (int)preg_replace('/\D+/', '', trim($f[1]));
         }
 
         return $out;
