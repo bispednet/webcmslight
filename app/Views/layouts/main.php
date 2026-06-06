@@ -175,7 +175,7 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
             }
         };
     </script>
-    <link rel="stylesheet" href="/assets/css/app.css?v=20260605-catalog">
+    <link rel="stylesheet" href="/assets/css/app.css?v=20260606-legal">
     <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260604-mobile-fix">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>

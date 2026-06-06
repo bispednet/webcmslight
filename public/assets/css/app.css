@@ -540,6 +540,15 @@ html[data-theme="light"] .site-header { --_bg-r:244; --_bg-g:244; --_bg-b:246; }
     background: rgba(209,25,32,.06);
 }
 
+/* ─── Accordion area legale ─────────────────────────────────────────────────── */
+.legal-acc summary::-webkit-details-marker { display: none; }
+.legal-acc summary { padding: 2px 0; }
+.legal-acc .legal-acc__chevron { transition: transform .25s ease; }
+.legal-acc[open] .legal-acc__chevron { transform: rotate(180deg); }
+.legal-acc .legal-body h3 { font-size: .95rem; }
+.legal-acc .legal-body a { text-decoration: underline; text-underline-offset: 2px; }
+.legal-acc .legal-body table td { vertical-align: top; }
+
 /* Sotto-categoria: più piccola e discreta del reparto macro */
 .cat-pill--sub {
     padding: 5px 12px;
