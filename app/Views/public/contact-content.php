@@ -101,7 +101,7 @@ if (!empty($prefill['prodotto'])) {
         </div>
         <div class="info-card">
             <h3 class="font-display text-base font-black mb-3" style="color:var(--c-acc)">Telefono</h3>
-            <a href="tel:+390565311136" class="text-sm transition-colors hover:text-red-400" style="color:var(--c-muted)">+39 0565 31136</a>
+            <a href="tel:+39056531136" class="text-sm transition-colors hover:text-red-400" style="color:var(--c-muted)">+39 0565 31136</a>
         </div>
         <div class="info-card">
             <h3 class="font-display text-base font-black mb-3" style="color:var(--c-acc)">Cosa succede dopo</h3>

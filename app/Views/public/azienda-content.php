@@ -62,7 +62,7 @@ $storeImage = $_storeRaw . '?v=' . (@filemtime($_storeFile) ?: time());
         </div>
         <div class="flex gap-3 flex-shrink-0">
             <a href="/contatti" class="btn-primary">Contattaci</a>
-            <a href="tel:+390565311136" class="btn-outline">Chiama</a>
+            <a href="tel:+39056531136" class="btn-outline">Chiama</a>
         </div>
     </div>
 

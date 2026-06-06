@@ -153,6 +153,7 @@ return [
     ],
     'company' => [
         'legal_name' => 'bisp&d s.r.l.',
+        'phone' => '0565 31136',
         'address' => 'Piazza della Costituzione, 68 - 57025 Piombino LI Italia',
         'vat_id' => 'IT0156025048',
         'rea' => 'LI-138175',

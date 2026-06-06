@@ -34,7 +34,7 @@ $role  = $role ?? 'customer';
 
     <div class="info-card info-card--accent" data-animate>
         <p class="text-sm font-bold mb-1" style="color:var(--c-acc)">Area in costruzione</p>
-        <p class="text-sm" style="color:var(--c-muted)">Lo storico richieste, i documenti e la gestione ordini sono in arrivo. Per assistenza immediata scrivi a <a href="mailto:negozio@bisped.net" style="color:var(--bisped-red)">negozio@bisped.net</a> o chiama il <a href="tel:+390565311136" style="color:var(--bisped-red)">0565 31136</a>.</p>
+        <p class="text-sm" style="color:var(--c-muted)">Lo storico richieste, i documenti e la gestione ordini sono in arrivo. Per assistenza immediata scrivi a <a href="mailto:negozio@bisped.net" style="color:var(--bisped-red)">negozio@bisped.net</a> o chiama il <a href="tel:+39056531136" style="color:var(--bisped-red)">0565 31136</a>.</p>
     </div>
 
     <div data-animate>

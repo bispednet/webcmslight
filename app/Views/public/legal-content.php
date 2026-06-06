@@ -137,7 +137,7 @@ HTML);
 <p>L'ordine inoltrato dal cliente costituisce proposta d'acquisto. Il contratto si intende concluso con la conferma d'ordine da parte del venditore, inviata via email. Il venditore si riserva di non accettare ordini incompleti, sospetti di frode o per indisponibilità del prodotto, dandone tempestiva comunicazione.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">4. Pagamenti</h3>
-<p>I metodi di pagamento accettati sono indicati in fase di ordine (es. bonifico bancario, carte di credito/debito, pagamento in negozio). I dati di pagamento sono gestiti da istituti e gateway certificati; il venditore non conserva i dati delle carte.</p>
+<p>I metodi di pagamento accettati sono indicati in fase di ordine (bonifico bancario, carte di credito/debito, Satispay, pagamento presso il punto vendita). I dati di pagamento sono gestiti da istituti e gateway certificati; il venditore non conserva i dati delle carte.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">5. Spedizione e consegna</h3>
 <p>La spedizione avviene tramite corriere sul territorio nazionale, salvo diverso accordo. I tempi di consegna sono indicativi e decorrono dalla conferma d'ordine e, ove previsto, dal buon esito del pagamento. È possibile concordare il ritiro presso il punto vendita di Piombino. Le spese di spedizione, se applicabili, sono indicate prima della conferma dell'ordine.</p>
@@ -157,7 +157,7 @@ HTML);
         ?>
 
         <p class="text-xs mt-6" style="color:var(--c-muted)">
-            ⚠️ Da verificare prima della pubblicazione definitiva: numero di telefono (<?= htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') ?>), metodi di pagamento effettivi e tempi di spedizione. Si consiglia revisione da parte di un legale.
+            Per qualsiasi chiarimento scrivi a <a href="mailto:<?= htmlspecialchars($pec, ENT_QUOTES, 'UTF-8') ?>" style="color:var(--bisped-red)"><?= htmlspecialchars($pec, ENT_QUOTES, 'UTF-8') ?></a> o chiama lo <?= htmlspecialchars($phone, ENT_QUOTES, 'UTF-8') ?>. Si consiglia comunque una revisione da parte di un legale prima dell'attivazione delle vendite online.
         </p>
     </section>
 </div>

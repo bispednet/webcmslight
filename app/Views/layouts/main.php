@@ -84,7 +84,7 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
         'name'        => $company['legal_name'] ?? 'Bisped',
         'image'       => $shareImageUrl,
         'url'         => $assetUrl('/'),
-        'telephone'   => '+39 0565 1234567',
+        'telephone'   => '+39 0565 31136',
         'address'     => [
             '@type'           => 'PostalAddress',
             'streetAddress'   => 'Piazza della Costituzione, 68',
