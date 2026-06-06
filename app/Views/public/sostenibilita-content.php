@@ -14,10 +14,10 @@
                 bisp&amp;d porta questa filosofia nel modo in cui consiglia, ripara e accompagna ogni scelta tecnologica.
             </p>
         </div>
-        <div class="rounded-lg border flex items-center justify-center" style="border-color:var(--c-border);background:var(--c-surface);aspect-ratio:4/3">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-32 h-32 opacity-15" style="color:var(--bisped-red)">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12.75 3.03v.568c0 .334.148.65.405.864l1.068.89c.442.369.535 1.01.216 1.49l-.51.766a2.25 2.25 0 0 1-1.161.886l-.143.048a1.107 1.107 0 0 0-.57 1.664c.369.555.169 1.307-.427 1.605L9 13.125l.423 1.059a.956.956 0 0 1-1.652.928l-.679-.906a1.125 1.125 0 0 0-1.906.172L4.5 15.75l-.612.153M12.75 3.031a9 9 0 0 0-8.862 12.872M12.75 3.031a9 9 0 0 1 6.69 14.036m0 0-.177-.529A2.249 2.249 0 0 0 17.5 15.75H17a2.25 2.25 0 0 1-2.25-2.25v-1.5a2.25 2.25 0 0 0-2.25-2.25H9.75"/>
-            </svg>
+        <div class="rounded-lg border overflow-hidden" style="border-color:var(--c-border);aspect-ratio:4/3">
+            <img src="/media/pages/sostenibilita-hero.jpg"
+                 alt="Laboratorio Bisped: diagnosi e riparazione prima della sostituzione"
+                 class="w-full h-full object-cover" loading="eager" width="1000" height="750">
         </div>
     </section>
 

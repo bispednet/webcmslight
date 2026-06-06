@@ -112,6 +112,42 @@ final class ContentRepository
         return $out;
     }
 
+    /**
+     * Prodotti correlati a un insieme di tag/parole chiave (per il blog).
+     * Match su nome, tag, categoria e sotto-categoria; priorità ai disponibili
+     * con foto. Cerca su tutto il catalogo, non solo i primi N.
+     *
+     * @param array<int,string> $tags
+     * @return array<int,array<string,mixed>>
+     */
+    public function relatedProductsByTags(array $tags, int $limit = 4): array
+    {
+        $tags = array_values(array_filter(array_map('trim', $tags), static fn ($t) => mb_strlen($t) >= 3));
+        if ($tags === []) {
+            return [];
+        }
+        $clauses = [];
+        $params  = [];
+        foreach (array_slice($tags, 0, 8) as $i => $t) {
+            $clauses[] = "(name LIKE :t{$i} OR tags LIKE :t{$i} OR category LIKE :t{$i} OR subcategory_label LIKE :t{$i})";
+            $params["t{$i}"] = '%' . $t . '%';
+        }
+        $sql = "SELECT id, name, slug, image_url, sale_price, price, campaign_label, stock_status, stock_qty, subcategory_label
+                FROM products
+                WHERE (" . implode(' OR ', $clauses) . ")
+                  AND image_url IS NOT NULL AND image_url <> ''
+                ORDER BY (stock_status = 'disponibile') DESC, stock_qty DESC, featured_order ASC
+                LIMIT :limit";
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue(':' . $k, $v);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
     public function getProductBySlug(string $slug): ?array
     {
         $stmt = $this->db->prepare('SELECT * FROM products WHERE slug = :slug LIMIT 1');

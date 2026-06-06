@@ -186,6 +186,25 @@ function macroIcon(string $path): string
 
     loadMore.addEventListener('click', () => { page++; fetchPage(false); });
 
+    // Deep-link: ?cat=gaming&sub=schede-video pre-seleziona reparto/sotto-categoria
+    const params  = new URLSearchParams(window.location.search);
+    const initCat = params.get('cat');
+    const initSub = params.get('sub');
+    if (initCat && macroLabels[initCat]) {
+        activeCat = initCat;
+        catPills.forEach(p => p.classList.toggle('active', p.dataset.filter === initCat));
+        buildSubPills();
+        updateHead();
+        if (initSub) {
+            activeSub = initSub;
+            subWrap.querySelectorAll('button').forEach(b => {
+                const match = (b.textContent.trim().toLowerCase().startsWith(
+                    (SUBCATS[initCat] || []).find(s => s.slug === initSub)?.label.toLowerCase() || '\0'));
+                b.classList.toggle('active', match);
+            });
+        }
+    }
+
     // Caricamento iniziale
     fetchPage(true);
 })();

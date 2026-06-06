@@ -25,20 +25,21 @@ $snippet = htmlspecialchars($decodeEntities((string)$rawSnippet), ENT_QUOTES, 'U
 $content = HtmlSanitizer::sanitize($decodeEntities((string)$rawContent));
 $blogUrl = $locale === 'en' ? '/en/blog' : '/blog';
 
-// Dynamic related products via tag overlap
+// Prodotti correlati: tag del post + parole chiave dal titolo, match intelligente
 $relatedProducts = $relatedProducts ?? [];
-if (empty($relatedProducts) && !empty($post['related_product_tags'])) {
-    $postTags = array_map('trim', explode(',', (string)$post['related_product_tags']));
-    $pdo = Database::connection();
-    $rows = $pdo->query("SELECT id, name, slug, sale_price, price, campaign_label, tags FROM products ORDER BY featured_order ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $row) {
-        $productTags = array_map('trim', explode(',', (string)($row['tags'] ?? '')));
-        $overlap = array_intersect($postTags, $productTags);
-        if (count($overlap) >= 1) {
-            $relatedProducts[] = $row;
-            if (count($relatedProducts) >= 3) break;
+if (empty($relatedProducts)) {
+    $terms = [];
+    if (!empty($post['related_product_tags'])) {
+        $terms = array_map('trim', explode(',', (string)$post['related_product_tags']));
+    }
+    // Aggiungi parole significative dal titolo (brand/prodotti)
+    foreach (preg_split('/\s+/', (string)($post['title'] ?? '')) as $w) {
+        $w = trim($w, " \t\n\r.,:;\"'()");
+        if (mb_strlen($w) >= 4 && !in_array(mb_strtolower($w), ['come', 'sono', 'della', 'delle', 'degli', 'with', 'that', 'this', 'from', 'your'], true)) {
+            $terms[] = $w;
         }
     }
+    $relatedProducts = (new \App\Services\Cms\ContentRepository())->relatedProductsByTags(array_unique($terms), 4);
 }
 ?>
 
@@ -89,24 +90,28 @@ if (empty($relatedProducts) && !empty($post['related_product_tags'])) {
         <p class="section-label mb-4">Prodotti correlati</p>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <?php foreach ($relatedProducts as $rp):
-                $rpName     = htmlspecialchars($rp['name'], ENT_QUOTES, 'UTF-8');
-                $rpSlug     = htmlspecialchars($rp['slug'], ENT_QUOTES, 'UTF-8');
-                $rpCampaign = htmlspecialchars($rp['campaign_label'] ?? '', ENT_QUOTES, 'UTF-8');
-                $rpSale     = $rp['sale_price'] ? number_format((float)$rp['sale_price'], 2, ',', '.') . ' €' : null;
-                $rpPrice    = $rp['price']      ? number_format((float)$rp['price'],      2, ',', '.') . ' €' : null;
+                $rpName  = htmlspecialchars($rp['name'], ENT_QUOTES, 'UTF-8');
+                $rpSlug  = htmlspecialchars($rp['slug'], ENT_QUOTES, 'UTF-8');
+                $rpImg   = trim((string)($rp['image_url'] ?? ''));
+                $rpSub   = htmlspecialchars((string)($rp['subcategory_label'] ?? ''), ENT_QUOTES, 'UTF-8');
+                $rpHasSale = !empty($rp['sale_price']) && (float)$rp['sale_price'] < (float)$rp['price'];
+                $rpMain  = $rpHasSale ? (float)$rp['sale_price'] : (float)$rp['price'];
+                $rpMainF = $rpMain ? number_format($rpMain, 2, ',', '.') . ' €' : null;
+                $rpOldF  = $rpHasSale ? number_format((float)$rp['price'], 2, ',', '.') . ' €' : null;
             ?>
-            <a href="/products/<?= $rpSlug ?>" class="service-card group block">
-                <h3 class="font-display font-black text-base mb-2 group-hover:text-red-400 transition-colors" style="color:var(--c-acc)"><?= $rpName ?></h3>
-                <?php if ($rpCampaign): ?>
-                    <span class="campaign-badge mb-2 inline-block"><?= $rpCampaign ?></span>
+            <a href="/products/<?= $rpSlug ?>" class="service-card group block overflow-hidden">
+                <?php if ($rpImg !== ''): ?>
+                    <div class="rounded-md overflow-hidden bg-white mb-3" style="aspect-ratio:4/3">
+                        <img src="<?= htmlspecialchars($rpImg, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $rpName ?>"
+                             class="w-full h-full object-contain p-3" loading="lazy">
+                    </div>
                 <?php endif; ?>
-                <div class="flex items-baseline gap-2 mt-2">
-                    <?php if ($rpSale): ?>
-                        <span class="font-bold" style="color:var(--bisped-red)"><?= $rpSale ?></span>
-                    <?php endif; ?>
-                    <?php if ($rpPrice && $rpSale): ?>
-                        <span class="text-xs line-through" style="color:var(--c-muted)"><?= $rpPrice ?></span>
-                    <?php endif; ?>
+                <?php if ($rpSub): ?><span class="text-[10px] font-black uppercase tracking-widest" style="color:var(--bisped-red)"><?= $rpSub ?></span><?php endif; ?>
+                <h3 class="font-display font-black text-sm mt-1 mb-2 leading-snug group-hover:text-red-400 transition-colors" style="color:var(--c-acc)"><?= $rpName ?></h3>
+                <div class="flex items-baseline gap-2">
+                    <?php if ($rpMainF): ?><span class="font-bold" style="color:var(--bisped-red)"><?= $rpMainF ?></span><?php endif; ?>
+                    <?php if ($rpOldF): ?><span class="text-xs line-through" style="color:var(--c-muted)"><?= $rpOldF ?></span><?php endif; ?>
+                    <span class="text-[10px] text-muted">IVA incl.</span>
                 </div>
             </a>
             <?php endforeach; ?>
