@@ -30,3 +30,6 @@ airewagcms_mysql_db.sql
 /node_modules/
 .DS_Store
 /public/media/products/runner/
+
+# credenziali deploy FTP (mai committare)
+.deploy-ftp.local
