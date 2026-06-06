@@ -28,7 +28,8 @@ $departments = [
         'label' => $en ? 'IT' : 'Informatica',
         'title' => $en ? 'PCs, notebooks, monitors and components' : 'PC, notebook, monitor e componenti',
         'text'  => $en ? 'Curated solutions for work, study and professional workstations.' : 'Soluzioni selezionate per lavoro, studio e postazioni professionali.',
-        'href'  => $p . '/products#informatica',
+        'href'  => $p . '/products',
+        'cta'   => $en ? 'Browse catalog →' : 'Vai al catalogo →',
         'icon'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0H3"/></svg>',
     ],
     [
@@ -36,7 +37,8 @@ $departments = [
         'label' => $en ? 'Smartphone' : 'Smartphone',
         'title' => $en ? 'Phones ready to use' : 'Telefonia pronta all\'uso',
         'text'  => $en ? 'Devices, SIMs, data transfer, accessories and stress-free setup.' : 'Dispositivi, SIM, trasferimento dati, accessori e configurazioni senza stress.',
-        'href'  => $p . '/products#smartphone',
+        'href'  => $p . '/products?cat=smartphone',
+        'cta'   => $en ? 'See smartphones →' : 'Vedi smartphone →',
         'icon'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/></svg>',
     ],
     [
@@ -44,7 +46,8 @@ $departments = [
         'label' => $en ? 'Gaming' : 'Gaming',
         'title' => $en ? 'Setups, rigs and peripherals' : 'Setup, rig e periferiche',
         'text'  => $en ? 'From the assembled PC to the detail that wins the match: performance, looks, reliability.' : 'Dal PC assemblato al dettaglio che cambia la partita: prestazioni, estetica, affidabilità.',
-        'href'  => $p . '/products#gaming',
+        'href'  => $p . '/products?cat=gaming',
+        'cta'   => $en ? 'See gaming →' : 'Vedi gaming →',
         'icon'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z"/></svg>',
     ],
     [
@@ -52,7 +55,8 @@ $departments = [
         'label' => $en ? 'Service' : 'Assistenza',
         'title' => $en ? 'Workshop and remote support' : 'Laboratorio e supporto remoto',
         'text'  => $en ? 'Diagnosis, repair, data recovery, upgrades and scheduled maintenance.' : 'Diagnosi, riparazione, recupero dati, upgrade e manutenzione programmata.',
-        'href'  => $p . '/servizi#assistenza',
+        'href'  => $p . '/contatti?topic=' . rawurlencode($en ? 'Technical support' : 'Assistenza tecnica'),
+        'cta'   => $en ? 'Request support →' : 'Richiedi assistenza →',
         'icon'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z"/></svg>',
     ],
     [
@@ -60,7 +64,8 @@ $departments = [
         'label' => $en ? 'Connectivity' : 'Connettività',
         'title' => $en ? 'Fiber, FWA, networks and Wi-Fi' : 'Fibra, FWA, reti e Wi-Fi',
         'text'  => $en ? 'Coverage checks, activations, routers, home and small-office networks.' : 'Verifica copertura, attivazioni, router, rete domestica e piccoli uffici.',
-        'href'  => $p . '/servizi#connettivita',
+        'href'  => $p . '/contatti?topic=' . rawurlencode($en ? 'Connectivity' : 'Connettività'),
+        'cta'   => $en ? 'Ask us →' : 'Chiedi a noi →',
         'icon'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z"/></svg>',
     ],
     [
@@ -68,7 +73,8 @@ $departments = [
         'label' => $en ? 'Energy' : 'Energia',
         'title' => $en ? 'Power, gas and savings' : 'Luce, gas e risparmio',
         'text'  => $en ? 'Clear commercial advice to pick the right deals for home and business.' : 'Consulenza commerciale chiara per scegliere offerte adatte a casa e impresa.',
-        'href'  => $p . '/servizi#energia',
+        'href'  => $p . '/contatti?topic=' . rawurlencode($en ? 'Energy' : 'Energia'),
+        'cta'   => $en ? 'Ask us →' : 'Chiedi a noi →',
         'icon'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>',
     ],
 ];
@@ -247,7 +253,7 @@ if (empty($featured)) {
                         <p class="mt-2 text-sm text-muted leading-5"><?= htmlspecialchars($department['text'], ENT_QUOTES, 'UTF-8') ?></p>
                     </div>
                 </div>
-                <span class="mt-4 inline-flex text-sm font-black" style="color:var(--bisped-red)"><?= $en ? 'Open department →' : 'Apri reparto →' ?></span>
+                <span class="mt-4 inline-flex text-sm font-black" style="color:var(--bisped-red)"><?= htmlspecialchars($department['cta'] ?? ($en ? 'Open →' : 'Apri →'), ENT_QUOTES, 'UTF-8') ?></span>
             </a>
         <?php endforeach; ?>
     </div>
