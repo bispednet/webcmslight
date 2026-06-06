@@ -138,14 +138,21 @@ final class ContentRepository
                   AND image_url IS NOT NULL AND image_url <> ''
                 ORDER BY (stock_status = 'disponibile') DESC, stock_qty DESC, featured_order ASC
                 LIMIT :limit";
-        $stmt = $this->db->prepare($sql);
-        foreach ($params as $k => $v) {
-            $stmt->bindValue(':' . $k, $v);
-        }
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->execute();
+        // I prodotti correlati sono un di più: se lo schema della tabella products
+        // non è allineato (colonna mancante su un host con migrazioni parziali),
+        // non deve far cadere l'intera pagina dell'articolo. Degrada a vuoto.
+        try {
+            $stmt = $this->db->prepare($sql);
+            foreach ($params as $k => $v) {
+                $stmt->bindValue(':' . $k, $v);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
 
-        return $stmt->fetchAll() ?: [];
+            return $stmt->fetchAll() ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function getProductBySlug(string $slug): ?array
