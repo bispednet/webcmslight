@@ -12,7 +12,7 @@ return [
         ['setting_key' => 'hero_image_home', 'setting_value' => '/media/bisped/fronte_negozio_bisped.png'],
         ['setting_key' => 'hero_badge_home', 'setting_value' => 'Negozio, laboratorio e soluzioni digitali per casa e impresa a Piombino.'],
         ['setting_key' => 'site_logo', 'setting_value' => '/media/bisped/bisped_logo.png'],
-        ['setting_key' => 'favicon_path', 'setting_value' => '/media/bisped/cropped-logobisped.png'],
+        ['setting_key' => 'favicon_path', 'setting_value' => '/media/bisped/bisped_logo_square.png'],
         ['setting_key' => 'og_image', 'setting_value' => '/media/bisped/fronte_negozio_bisped.png'],
         ['setting_key' => 'seo_share_image', 'setting_value' => '/media/bisped/fronte_negozio_bisped.png'],
         ['setting_key' => 'seo_meta_title', 'setting_value' => 'Bisped | Informatica, telefonia e assistenza tecnica'],
