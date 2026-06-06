@@ -26,6 +26,13 @@ final class HtmlSanitizer
             'span' => ['class'],
         ];
 
+        // Fallback se l'estensione DOM/XML non è disponibile sull'host (es. PHP
+        // selector senza ext-dom): evita il fatal e degrada a una sanitizzazione
+        // basilare invece di rompere l'intera pagina.
+        if (!class_exists(\DOMDocument::class)) {
+            return self::sanitizeWithoutDom($value, $allowedTags);
+        }
+
         $doc = new \DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
         // libxml otherwise assumes a legacy encoding for HTML fragments and
@@ -48,6 +55,24 @@ final class HtmlSanitizer
         }
 
         return trim($sanitized);
+    }
+
+    /**
+     * Sanitizzazione di ripiego senza ext-dom: mantiene solo i tag consentiti e
+     * rimuove handler inline (on*) e href javascript:. Pensata per host privi
+     * dell'estensione DOM, così il contenuto editoriale resta visibile e sicuro.
+     *
+     * @param array<string> $allowedTags
+     */
+    private static function sanitizeWithoutDom(string $value, array $allowedTags): string
+    {
+        $allowed = '<' . implode('><', $allowedTags) . '>';
+        $clean = strip_tags($value, $allowed);
+        // rimuove attributi handler inline: on...="..." / on...='...'
+        $clean = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
+        // neutralizza href/src con schema javascript:
+        $clean = preg_replace('/(href|src)\s*=\s*("|\')\s*javascript:[^"\']*(\2)/i', '$1=$2#$2', $clean) ?? $clean;
+        return trim($clean);
     }
 
     /**

@@ -492,8 +492,14 @@ return [
     ],
     'faq_items' => [
         ['question' => 'Fate spedizioni o solo ritiro in negozio?', 'answer' => 'Entrambi. Spediamo in tutta Italia tramite corriere oppure puoi ritirare comodamente presso il nostro punto vendita a Piombino.'],
-        ['question' => 'Posso chiedere un preventivo online?', 'answer' => 'Si. Il form contatti raccoglie richieste strutturate e permette al team di ricontattarti con una proposta mirata.'],
-        ['question' => 'Il catalogo prodotti e aggiornato?', 'answer' => 'Si. Il catalogo e collegato al nostro distributore e aggiornato piu volte al giorno con prezzi e disponibilita reali. Se cerchi un prodotto che non trovi, contattaci: possiamo ordinarlo.'],
+        ['question' => 'Quali metodi di pagamento accettate?', 'answer' => 'Bonifico bancario, carte di credito e debito, Satispay e pagamento direttamente presso il punto vendita.'],
+        ['question' => 'Riparate anche dispositivi non acquistati da voi?', 'answer' => 'Sì. In laboratorio valutiamo PC, notebook, smartphone e periferiche di qualsiasi provenienza: facciamo prima una diagnosi, poi ti diciamo con chiarezza se conviene riparare o sostituire.'],
+        ['question' => 'Il preventivo e la diagnosi sono a pagamento?', 'answer' => 'Il preventivo è gratuito e senza impegno. Ti spieghiamo il problema e i costi prima di procedere: decidi tu con tutte le informazioni in mano.'],
+        ['question' => 'I prodotti hanno garanzia?', 'answer' => 'Sì. Tutti i prodotti sono coperti dalla garanzia legale di conformità di 24 mesi prevista per i consumatori, oltre alle eventuali garanzie del produttore.'],
+        ['question' => 'Il catalogo prodotti è aggiornato?', 'answer' => 'Sì. Il catalogo è collegato al nostro distributore e aggiornato più volte al giorno con prezzi e disponibilità reali. Se cerchi un prodotto che non trovi, contattaci: possiamo ordinarlo.'],
+        ['question' => 'Vi occupate anche di connettività ed energia?', 'answer' => 'Sì. Ti aiutiamo a confrontare e scegliere offerte di fibra, FWA e mobile per la connettività, e di luce e gas per l\'energia, con un approccio pratico e senza promesse generiche.'],
+        ['question' => 'Lavorate anche con le aziende?', 'answer' => 'Sì. Seguiamo professionisti e imprese con fornitura, configurazione, reti, sicurezza, backup e assistenza continuativa, oltre a soluzioni digitali su misura.'],
+        ['question' => 'Sviluppate davvero soluzioni di intelligenza artificiale?', 'answer' => 'Sì. Realizziamo applicativi su misura, chatbot e AI Agent per automatizzare attività, rispondere ai clienti e presidiare i canali online. Raccontaci l\'esigenza e troviamo la soluzione giusta.'],
     ],
     'blog_posts' => [
         [

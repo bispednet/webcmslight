@@ -15,8 +15,8 @@
             </p>
         </div>
         <div class="rounded-lg border overflow-hidden" style="border-color:var(--c-border);aspect-ratio:4/3">
-            <img src="/media/pages/sostenibilita-hero.jpg"
-                 alt="Laboratorio Bisped: diagnosi e riparazione prima della sostituzione"
+            <img src="/media/pages/sostenibilita-tecnico-microscopio.jpg"
+                 alt="Tecnico Bisped ripara una scheda al microscopio: diagnosi e riparazione prima della sostituzione"
                  class="w-full h-full object-cover" loading="eager" width="1000" height="750">
         </div>
     </section>

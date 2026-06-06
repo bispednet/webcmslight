@@ -101,11 +101,7 @@ $services = [
                 <h2 class="max-w-3xl font-display text-3xl font-black md:text-4xl" style="color:var(--c-acc)">
                     Non solo tecnologia da scaffale:<br class="hidden md:block"> software e AI che lavorano per la tua azienda.
                 </h2>
-                <p class="mt-5 max-w-2xl text-base leading-7" style="color:var(--c-muted)">
-                    Progettiamo applicativi su misura e soluzioni di intelligenza artificiale pensate per i processi reali
-                    delle imprese: automatizzare attività ripetitive, rispondere ai clienti, presidiare i canali online
-                    e liberare tempo alle persone. Dall'idea al rilascio, seguiamo tutto noi.
-                </p>
+                <p class="mt-5 max-w-2xl text-base leading-7" style="color:var(--c-muted)">Progettiamo applicativi su misura e soluzioni di intelligenza artificiale pensate per i processi reali delle imprese: automatizzare attività ripetitive, rispondere ai clienti, presidiare i canali online e liberare tempo alle persone. Dall'idea al rilascio, seguiamo tutto noi.</p>
             </div>
         </div>
 

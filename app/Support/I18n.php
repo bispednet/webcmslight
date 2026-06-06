@@ -382,6 +382,57 @@ final class I18n
             'AnyDesk o Quick Assist (ti guidiamo a scaricarlo)' => 'AnyDesk or Quick Assist (we will guide you through the download)',
             'Codice a 9 cifre da comunicarci' => 'The 9-digit code to share with us',
             'Nessun altro uso del PC durante la sessione' => 'No other PC use during the session',
+
+            // ── Servizi: label e sezione AI ─────────────────────────────────
+            'Connettività e fonia' => 'Connectivity &amp; voice',
+            'Applicativi su misura e intelligenza artificiale per le aziende.' => 'Custom apps and artificial intelligence for businesses.',
+            'Sviluppiamo software gestionale, chatbot, AI Agent e automazioni che lavorano per te: dalla gestione clienti alla presenza online, fino agli assistenti virtuali che rispondono al posto tuo.' => 'We build management software, chatbots, AI Agents and automations that work for you: from customer management to online presence, all the way to virtual assistants that reply on your behalf.',
+            'Intelligenza artificiale' => 'Artificial intelligence',
+            'Non solo tecnologia da scaffale:' => 'Not just off-the-shelf technology:',
+            'software e AI che lavorano per la tua azienda.' => 'software and AI that work for your business.',
+            'Progettiamo applicativi su misura e soluzioni di intelligenza artificiale pensate per i processi reali delle imprese: automatizzare attività ripetitive, rispondere ai clienti, presidiare i canali online e liberare tempo alle persone. Dall\'idea al rilascio, seguiamo tutto noi.' => 'We design custom apps and artificial intelligence solutions built around real business processes: automating repetitive tasks, answering customers, covering online channels and freeing up people\'s time. From idea to release, we handle it all.',
+            'Software costruito intorno al tuo lavoro.' => 'Software built around the way you work.',
+            'Gestionali, portali, integrazioni e automazioni progettati sulle tue procedure, non il contrario. Veloci, sicuri e amministrabili da te.' => 'Management systems, portals, integrations and automations designed around your procedures, not the other way round. Fast, secure and manageable by you.',
+            'Risposte ai clienti, giorno e notte.' => 'Answers for customers, day and night.',
+            'Assistenti conversazionali addestrati sui tuoi prodotti e servizi, integrati su sito, WhatsApp e social. Qualificano le richieste e passano al team i contatti pronti.' => 'Conversational assistants trained on your products and services, integrated on your website, WhatsApp and social media. They qualify requests and hand ready leads to your team.',
+            'Agenti che eseguono, non solo rispondono.' => 'Agents that act, not just answer.',
+            'Agenti autonomi che svolgono attività concrete: smistano richieste, aggiornano dati, generano documenti e coordinano più passaggi al posto tuo.' => 'Autonomous agents that carry out concrete tasks: they route requests, update data, generate documents and coordinate multiple steps on your behalf.',
+            'Una presenza sui social sempre attiva.' => 'An always-on presence on social media.',
+            'Personaggi digitali coerenti col tuo brand che producono contenuti e animano i canali con continuità, mantenendo tono e identità sotto il tuo controllo.' => 'Digital characters consistent with your brand that create content and keep your channels active over time, with tone and identity always under your control.',
+            'Un volto digitale per la tua azienda.' => 'A digital face for your business.',
+            'Avatar tridimensionali realistici per accoglienza, formazione, video e assistenza: parlano, presentano e interagiscono con i tuoi clienti.' => 'Realistic three-dimensional avatars for welcome, training, video and support: they speak, present and interact with your customers.',
+            'Consulenza e integrazione, passo dopo passo.' => 'Consulting and integration, step by step.',
+            'Ti aiutiamo a capire dove l\'AI conviene davvero e a integrarla nei tuoi strumenti, con un percorso concreto e misurabile, senza inseguire le mode.' => 'We help you understand where AI truly pays off and integrate it into your tools, with a concrete, measurable path and without chasing hype.',
+            'Parliamo del tuo progetto AI' => 'Let\'s talk about your AI project',
+            'Una prima call gratuita per capire cosa ha senso fare, e cosa no.' => 'A free first call to understand what makes sense to do, and what does not.',
+            'Applicativi su misura' => 'Custom apps',
+            'AI per le aziende' => 'AI for businesses',
+
+            // ── Contatti: opzione AI ────────────────────────────────────────
+            'AI Agent, chatbot e applicativi su misura' => 'AI Agent, chatbots and custom apps',
+
+            // ── FAQ definitive ──────────────────────────────────────────────
+            'Fate spedizioni o solo ritiro in negozio?' => 'Do you ship or only offer in-store pickup?',
+            'Entrambi. Spediamo in tutta Italia tramite corriere oppure puoi ritirare comodamente presso il nostro punto vendita a Piombino.' => 'Both. We ship throughout Italy by courier, or you can conveniently pick up at our store in Piombino.',
+            'Quali metodi di pagamento accettate?' => 'Which payment methods do you accept?',
+            'Bonifico bancario, carte di credito e debito, Satispay e pagamento direttamente presso il punto vendita.' => 'Bank transfer, credit and debit cards, Satispay and payment directly at the store.',
+            'Riparate anche dispositivi non acquistati da voi?' => 'Do you also repair devices not purchased from you?',
+            'Sì. In laboratorio valutiamo PC, notebook, smartphone e periferiche di qualsiasi provenienza: facciamo prima una diagnosi, poi ti diciamo con chiarezza se conviene riparare o sostituire.' => 'Yes. In our workshop we assess PCs, notebooks, smartphones and peripherals of any origin: we run a diagnosis first, then clearly tell you whether repairing or replacing is the better choice.',
+            'Il preventivo e la diagnosi sono a pagamento?' => 'Are the quote and the diagnosis chargeable?',
+            'Il preventivo è gratuito e senza impegno. Ti spieghiamo il problema e i costi prima di procedere: decidi tu con tutte le informazioni in mano.' => 'The quote is free and without obligation. We explain the problem and the costs before proceeding: you decide with all the information in hand.',
+            'I prodotti hanno garanzia?' => 'Do products come with a warranty?',
+            'Sì. Tutti i prodotti sono coperti dalla garanzia legale di conformità di 24 mesi prevista per i consumatori, oltre alle eventuali garanzie del produttore.' => 'Yes. All products are covered by the 24-month legal guarantee of conformity for consumers, in addition to any manufacturer warranties.',
+            'Il catalogo prodotti è aggiornato?' => 'Is the product catalog up to date?',
+            'Sì. Il catalogo è collegato al nostro distributore e aggiornato più volte al giorno con prezzi e disponibilità reali. Se cerchi un prodotto che non trovi, contattaci: possiamo ordinarlo.' => 'Yes. The catalog is connected to our distributor and updated several times a day with real prices and availability. If you cannot find the product you are looking for, contact us: we can order it.',
+            'Vi occupate anche di connettività ed energia?' => 'Do you also handle connectivity and energy?',
+            'Sì. Ti aiutiamo a confrontare e scegliere offerte di fibra, FWA e mobile per la connettività, e di luce e gas per l&#039;energia, con un approccio pratico e senza promesse generiche.' => 'Yes. We help you compare and choose fiber, FWA and mobile offers for connectivity, and electricity and gas for energy, with a practical approach and no generic promises.',
+            'Lavorate anche con le aziende?' => 'Do you also work with businesses?',
+            'Sì. Seguiamo professionisti e imprese con fornitura, configurazione, reti, sicurezza, backup e assistenza continuativa, oltre a soluzioni digitali su misura.' => 'Yes. We support professionals and businesses with supply, setup, networking, security, backups and ongoing assistance, plus custom digital solutions.',
+            'Sviluppate davvero soluzioni di intelligenza artificiale?' => 'Do you really develop artificial intelligence solutions?',
+            'Sì. Realizziamo applicativi su misura, chatbot e AI Agent per automatizzare attività, rispondere ai clienti e presidiare i canali online. Raccontaci l&#039;esigenza e troviamo la soluzione giusta.' => 'Yes. We build custom apps, chatbots and AI Agents to automate tasks, answer customers and cover online channels. Tell us your need and we will find the right solution.',
+
+            // ── Sostenibilità: alt immagine ─────────────────────────────────
+            'Tecnico Bisped ripara una scheda al microscopio: diagnosi e riparazione prima della sostituzione' => 'Bisped technician repairing a board under a microscope: diagnosis and repair before replacement',
         ];
     }
 }
