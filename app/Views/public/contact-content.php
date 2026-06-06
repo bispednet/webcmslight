@@ -63,14 +63,25 @@ if (!empty($prefill['prodotto'])) {
                 </div>
                 <div>
                     <label class="form-label" for="topic">Tipo richiesta</label>
+                    <?php
+                        $topicOptions = [
+                            'Preventivo prodotto'  => 'Preventivo prodotto',
+                            'Assistenza tecnica'   => 'Assistenza tecnica',
+                            'Telefonia'            => 'Telefonia',
+                            'Connettività'         => 'Connettività',
+                            'Energia'              => 'Energia',
+                            'Soluzioni aziendali'  => 'Soluzioni aziendali',
+                            'AI Agent'             => 'AI Agent, chatbot e applicativi su misura',
+                            'Altro'                => 'Altro',
+                        ];
+                        $selectedTopic = !empty($prefill['prodotto'])
+                            ? 'Preventivo prodotto'
+                            : (isset($_GET['topic']) ? trim((string)$_GET['topic']) : '');
+                    ?>
                     <select class="form-select" name="topic" id="topic" style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)">
-                        <option value="Preventivo prodotto"<?= !empty($prefill['prodotto']) ? ' selected' : '' ?>>Preventivo prodotto</option>
-                        <option value="Assistenza tecnica">Assistenza tecnica</option>
-                        <option value="Telefonia">Telefonia</option>
-                        <option value="Connettività">Connettività</option>
-                        <option value="Energia">Energia</option>
-                        <option value="Soluzioni aziendali">Soluzioni aziendali</option>
-                        <option value="Altro">Altro</option>
+                        <?php foreach ($topicOptions as $optValue => $optLabel): ?>
+                            <option value="<?= htmlspecialchars($optValue, ENT_QUOTES, 'UTF-8') ?>"<?= $selectedTopic === $optValue ? ' selected' : '' ?>><?= htmlspecialchars($optLabel, ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>

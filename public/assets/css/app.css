@@ -334,6 +334,27 @@ html[data-theme="light"] .tech-grid {
     flex-shrink: 0;
 }
 
+/* Eyebrow con freccia "indietro": il trattino diventa un link cliccabile */
+.section-label--back::before {
+    display: none;
+}
+.section-label__back {
+    display: inline-flex;
+    align-items: center;
+    color: var(--bisped-red);
+    flex-shrink: 0;
+    margin-right: 2px;
+    transition: transform .15s ease, opacity .15s ease;
+}
+.section-label__back svg {
+    width: 26px;
+    height: 18px;
+}
+.section-label__back:hover {
+    transform: translateX(-3px);
+    opacity: .75;
+}
+
 /* ─── Buttons ───────────────────────────────────────────────────────────────── */
 .btn-primary {
     display: inline-flex;

@@ -175,7 +175,7 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
             }
         };
     </script>
-    <link rel="stylesheet" href="/assets/css/app.css?v=20260606-legal">
+    <link rel="stylesheet" href="/assets/css/app.css?v=20260606-backnav">
     <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260604-mobile-fix">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>
@@ -208,6 +208,30 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
 
     <?php View::renderPartial('partials/ai-concierge-widget'); ?>
     <script src="/assets/js/ai-concierge.js?v=20260604-mobile-fix" defer></script>
+
+    <!-- Back nav: trasforma il primo eyebrow di pagina in una freccia "indietro" cliccabile -->
+    <script>
+    (function(){
+        var p = location.pathname;
+        if (p === '/' || p === '/en' || p === '/en/') return;
+        document.addEventListener('DOMContentLoaded', function(){
+            var label = document.querySelector('main .section-label');
+            if (!label || label.querySelector('.section-label__back')) return;
+            label.classList.add('section-label--back');
+            var ref = document.referrer;
+            var sameOrigin = ref && ref.indexOf(location.origin) === 0 && ref !== location.href;
+            var a = document.createElement('a');
+            a.className = 'section-label__back';
+            a.href = sameOrigin ? ref : '/';
+            a.setAttribute('aria-label', 'Torna alla pagina precedente');
+            a.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 15.75 3 12m0 0 3.75-3.75M3 12h18"/></svg>';
+            a.addEventListener('click', function(e){
+                if (window.history.length > 1) { e.preventDefault(); window.history.back(); }
+            });
+            label.insertBefore(a, label.firstChild);
+        });
+    })();
+    </script>
 
     <!-- Cookie Banner -->
     <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Cookie policy">
