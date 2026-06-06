@@ -116,6 +116,7 @@ bisped.net/
 - **Admin** — prodotti, blog, media, impostazioni, messaggi, appuntamenti, conversazioni AI con report commerciale, temperatura lead, cross-sell suggeriti
 - **Auth** — password locale, Google OAuth, wallet EVM/Solana; ruoli `admin`, `commesso`, `cliente`
 - **Agenda** — richieste appuntamento pubbliche + accettazione admin; sync Google Calendar opzionale
+- **Catalogo automatico** — import dal fornitore B2B Runner (FTP) con foto locali, descrizioni, disponibilità reale; 11 reparti macro + sotto-categorie; pricing configurabile da dashboard; lazy-load AJAX; cron disponibilità 6h + catalogo 24h
 - **Ingest editoriale** — job giornaliero news/offerte con immagini e deduplica (Gemini Flash)
 - **AI Concierge** — swarm 3 agenti, memoria persistente, slot extraction continua, handoff WhatsApp automatico, report commerciale admin
 

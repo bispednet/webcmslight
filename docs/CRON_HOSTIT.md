@@ -32,7 +32,7 @@ Prima `published_at` prendeva la data della **fonte RSS** (es. un comunicato Sam
 Su DirectAdmin il binario PHP è di solito uno di questi:
 
 ```
-/usr/local/bin/php
+/usr/local/php81/bin/php
 /usr/local/php82/bin/php
 /usr/local/php83/bin/php
 ```
@@ -45,7 +45,7 @@ Per scoprire quello esatto, crea un file temporaneo `public/_phppath.php` con:
 
 Aprilo: `https://bisped.net/_phppath.php` → ti dice il path. Poi **cancellalo**.
 
-> Nota: il path mostrato dal web (php-fpm) può differire dal CLI. In genere su DirectAdmin il CLI è `/usr/local/bin/php`. Se il cron non parte, prova le varianti sopra.
+> Nota: il path mostrato dal web (php-fpm) può differire dal CLI. In genere su DirectAdmin il CLI è `/usr/local/php81/bin/php`. Se il cron non parte, prova le varianti sopra.
 
 ### 2. Crea il cron job
 
@@ -65,7 +65,7 @@ Imposta:
 **Command** (sostituisci il path PHP se diverso):
 
 ```bash
-/usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/ingest.php --all --limit=3 >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/ingest-cron.log 2>&1
+/usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/ingest.php --all --limit=3 >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/ingest-cron.log 2>&1
 ```
 
 Questo genera fino a 3 nuovi articoli al giorno alle 6:00, scrivendoli sul DB di produzione.
@@ -178,10 +178,10 @@ La disponibilità è critica: **non vogliamo a catalogo prodotti non disponibili
 
 ```bash
 # Disponibilità — ogni 6 ore
-0 */6 * * *  /usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=availability >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+0 */6 * * *  /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=availability >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
 
 # Catalogo completo — ogni giorno alle 4:00
-0 4 * * *    /usr/local/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=full >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+0 4 * * *    /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=full >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
 ```
 
 ### Sicurezza del prune
