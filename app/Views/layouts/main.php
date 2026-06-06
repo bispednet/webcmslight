@@ -65,6 +65,39 @@ $bodyClass = 'min-h-screen bg-bg text-txt font-sans relative';
 if ($isAdmin) {
     $bodyClass .= ' admin-toolbar-present';
 }
+
+// ── SEO: canonical + hreflang (bilingue) ────────────────────────────────────
+$reqPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$canonicalUrl = $assetUrl($reqPath); // senza query string
+$pathIt = preg_replace('#^/en(/|$)#', '/', $reqPath) ?: '/';
+$pathEn = str_starts_with($reqPath, '/en') ? $reqPath : ('/en' . ($reqPath === '/' ? '' : $reqPath));
+$hrefIt = $assetUrl($pathIt);
+$hrefEn = $assetUrl($pathEn);
+
+// ── JSON-LD: negozio locale (solo home, SEO locale) ─────────────────────────
+$company = $config['company'] ?? [];
+$jsonLd = null;
+if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
+    $jsonLd = json_encode([
+        '@context'    => 'https://schema.org',
+        '@type'       => 'ElectronicsStore',
+        'name'        => $company['legal_name'] ?? 'Bisped',
+        'image'       => $shareImageUrl,
+        'url'         => $assetUrl('/'),
+        'telephone'   => '+39 0565 1234567',
+        'address'     => [
+            '@type'           => 'PostalAddress',
+            'streetAddress'   => 'Piazza della Costituzione, 68',
+            'addressLocality' => 'Piombino',
+            'addressRegion'   => 'LI',
+            'postalCode'      => '57025',
+            'addressCountry'  => 'IT',
+        ],
+        'vatID'       => $company['vat_id'] ?? null,
+        'priceRange'  => '€€',
+        'areaServed'  => 'Piombino e Val di Cornia',
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= $isEnglish ? 'en' : 'it' ?>">
@@ -104,6 +137,15 @@ if ($isAdmin) {
     <?php endif; ?>
     <?php if ($seoDiscordDescription !== ''): ?>
         <meta name="discord:description" content="<?= htmlspecialchars($seoDiscordDescription, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php endif; ?>
+    <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="alternate" hreflang="it" href="<?= htmlspecialchars($hrefIt, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="alternate" hreflang="en" href="<?= htmlspecialchars($hrefEn, ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="alternate" hreflang="x-default" href="<?= htmlspecialchars($hrefIt, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:locale" content="<?= $isEnglish ? 'en_US' : 'it_IT'; ?>">
+    <meta property="og:site_name" content="<?= htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php if ($jsonLd): ?>
+        <script type="application/ld+json"><?= $jsonLd ?></script>
     <?php endif; ?>
     <link rel="icon" href="<?= htmlspecialchars($faviconPath, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars($faviconPath, ENT_QUOTES, 'UTF-8'); ?>">
