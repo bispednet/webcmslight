@@ -53,11 +53,15 @@ final class AgentApiController
         $search = $_GET['search'] ?? '';
         $limit  = min((int)($_GET['limit'] ?? 20), 100);
         if ($search !== '') {
+            // Placeholder unici: native prepares non ammettono :s ripetuto (HY093).
             $stmt = $this->db->prepare(
                 'SELECT id,name,slug,category,price,sale_price,stock_status,sku,featured_order,updated_at
-                 FROM products WHERE name LIKE :s OR category LIKE :s OR sku LIKE :s ORDER BY featured_order,name LIMIT :l'
+                 FROM products WHERE name LIKE :sn OR category LIKE :sc OR sku LIKE :sk ORDER BY featured_order,name LIMIT :l'
             );
-            $stmt->bindValue(':s', '%' . $search . '%');
+            $like = '%' . $search . '%';
+            $stmt->bindValue(':sn', $like);
+            $stmt->bindValue(':sc', $like);
+            $stmt->bindValue(':sk', $like);
             $stmt->bindValue(':l', $limit, PDO::PARAM_INT);
         } else {
             $stmt = $this->db->prepare(

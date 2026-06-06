@@ -53,8 +53,12 @@ final class ContentRepository
             $params['sub']  = $sub;
         }
         if ($q !== '') {
-            $where[]      = '(name LIKE :q OR tags LIKE :q OR subcategory_label LIKE :q)';
-            $params['q']  = '%' . $q . '%';
+            // Placeholder unici: native prepares non ammettono :q ripetuto (HY093).
+            $like         = '%' . $q . '%';
+            $where[]      = '(name LIKE :qn OR tags LIKE :qg OR subcategory_label LIKE :qs)';
+            $params['qn'] = $like;
+            $params['qg'] = $like;
+            $params['qs'] = $like;
         }
         $whereSql = implode(' AND ', $where);
 
@@ -129,8 +133,14 @@ final class ContentRepository
         $clauses = [];
         $params  = [];
         foreach (array_slice($tags, 0, 8) as $i => $t) {
-            $clauses[] = "(name LIKE :t{$i} OR tags LIKE :t{$i} OR category LIKE :t{$i} OR subcategory_label LIKE :t{$i})";
-            $params["t{$i}"] = '%' . $t . '%';
+            // Placeholder UNICI per ogni colonna: con i native prepares (PDO
+            // EMULATE_PREPARES = false) un placeholder ripetuto lancia HY093.
+            $like = '%' . $t . '%';
+            $clauses[] = "(name LIKE :n{$i} OR tags LIKE :g{$i} OR category LIKE :c{$i} OR subcategory_label LIKE :s{$i})";
+            $params["n{$i}"] = $like;
+            $params["g{$i}"] = $like;
+            $params["c{$i}"] = $like;
+            $params["s{$i}"] = $like;
         }
         $sql = "SELECT id, name, slug, image_url, sale_price, price, campaign_label, stock_status, stock_qty, subcategory_label
                 FROM products
