@@ -36,6 +36,105 @@ final class ContentRepository
     }
 
     /**
+     * Vetrina prodotti per la pagina servizi: pochi prodotti forti, non un
+     * semplice slice del catalogo. Privilegia categorie diverse e articoli
+     * disponibili, fotografati e commercialmente presentabili.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function getServiceShowcaseProducts(int $limit = 8): array
+    {
+        $sql = "SELECT *,
+                       COALESCE(sale_price, price, 0) AS effective_price,
+                       CASE category
+                           WHEN 'pc-custom' THEN 0
+                           WHEN 'pc-assemblati' THEN 1
+                           WHEN 'notebook' THEN 2
+                           WHEN 'smartphone' THEN 3
+                           WHEN 'gaming' THEN 4
+                           WHEN 'monitor' THEN 5
+                           WHEN 'connettivita' THEN 6
+                           WHEN 'stampa' THEN 7
+                           WHEN 'audio-video' THEN 8
+                           WHEN 'server' THEN 9
+                           WHEN 'componenti' THEN 10
+                           WHEN 'accessori' THEN 11
+                           ELSE 50
+                       END AS service_category_rank,
+                       (
+                           CASE WHEN stock_status IN ('disponibile','instock','in-stock','1','true') THEN 10000 ELSE 0 END
+                           + CASE WHEN image_url IS NOT NULL AND image_url <> '' THEN 3000 ELSE 0 END
+                           + CASE WHEN campaign_label IS NOT NULL AND campaign_label <> '' THEN 900 ELSE 0 END
+                           + CASE
+                               WHEN COALESCE(sale_price, price, 0) >= 1000 THEN 900
+                               WHEN COALESCE(sale_price, price, 0) >= 300 THEN 700
+                               WHEN COALESCE(sale_price, price, 0) >= 100 THEN 500
+                               ELSE 0
+                             END
+                           + CASE
+                               WHEN UPPER(name) LIKE '%RTX 50%' OR UPPER(name) LIKE '%GEFORCE RTX%' OR UPPER(name) LIKE '%RADEON RX%' THEN 1300
+                               WHEN UPPER(name) LIKE '%I9%' OR UPPER(name) LIKE '%I7%' OR UPPER(name) LIKE '%RYZEN 9%' OR UPPER(name) LIKE '%RYZEN 7%' THEN 900
+                               WHEN UPPER(name) LIKE '%PRO MAX%' OR UPPER(name) LIKE '%ULTRA%' THEN 850
+                               WHEN UPPER(name) LIKE '%OLED%' OR UPPER(name) LIKE '%4K%' OR UPPER(name) LIKE '%WQHD%' THEN 750
+                               WHEN UPPER(name) LIKE '%144HZ%' OR UPPER(name) LIKE '%165HZ%' OR UPPER(name) LIKE '%240HZ%' THEN 550
+                               WHEN UPPER(name) LIKE '%FIREWALL%' OR UPPER(name) LIKE '%FORTIGATE%' OR UPPER(name) LIKE '%LASER%' THEN 500
+                               ELSE 0
+                             END
+                           + LEAST(COALESCE(sale_price, price, 0), 3000) / 2
+                           - CASE
+                               WHEN UPPER(name) LIKE '%MICROSD%' OR UPPER(name) LIKE '%MEMORY CARD%' OR UPPER(name) LIKE '%CAVO %' THEN 1200
+                               ELSE 0
+                             END
+                           + LEAST(COALESCE(stock_qty, 0), 50) * 12
+                           + GREATEST(0, 300 - COALESCE(featured_order, 0))
+                       ) AS showcase_score
+                FROM products
+                WHERE category IS NOT NULL
+                  AND category <> ''
+                  AND COALESCE(sale_price, price, 0) >= 60
+                  AND stock_status IN ('disponibile','instock','in-stock','1','true')
+                  AND image_url IS NOT NULL
+                  AND image_url <> ''
+                ORDER BY service_category_rank ASC, showcase_score DESC, featured_order ASC, name ASC
+                LIMIT 5000";
+
+        $stmt = $this->db->query($sql);
+        $candidates = $stmt->fetchAll() ?: [];
+
+        $selected = [];
+        $seenCategories = [];
+        foreach ($candidates as $product) {
+            $category = (string)($product['category'] ?? '');
+            if ($category === '' || isset($seenCategories[$category])) {
+                continue;
+            }
+
+            $seenCategories[$category] = true;
+            $selected[] = $product;
+            if (count($selected) >= $limit) {
+                break;
+            }
+        }
+
+        if (count($selected) < $limit) {
+            $seenIds = array_fill_keys(array_map(static fn ($p) => (int)$p['id'], $selected), true);
+            foreach ($candidates as $product) {
+                $id = (int)($product['id'] ?? 0);
+                if ($id <= 0 || isset($seenIds[$id])) {
+                    continue;
+                }
+                $selected[] = $product;
+                $seenIds[$id] = true;
+                if (count($selected) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return array_slice($selected, 0, $limit);
+    }
+
+    /**
      * Ricerca prodotti paginata per il caricamento lazy del catalogo.
      *
      * @return array{items: array<int,array<string,mixed>>, total: int}

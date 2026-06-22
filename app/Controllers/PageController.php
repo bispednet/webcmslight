@@ -85,7 +85,7 @@ final class PageController extends Controller
     public function servizi(): void
     {
         $settings = $this->content->getSettings();
-        $products = $this->content->getProducts();
+        $products = $this->content->getServiceShowcaseProducts(8);
         $this->view('public/servizi', compact('settings', 'products'));
     }
 

@@ -204,8 +204,8 @@ $services = [
             </div>
             <a href="/products" class="btn-outline btn-sm flex-shrink-0">Vai allo shop →</a>
         </div>
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            <?php foreach (array_slice(array_values($products), 0, 6) as $product): ?>
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <?php foreach (array_slice(array_values($products), 0, 8) as $product): ?>
                 <?php View::renderPartial('public/partials/product-card', ['product' => $product]); ?>
             <?php endforeach; ?>
         </div>
