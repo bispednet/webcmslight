@@ -197,6 +197,19 @@ Su DirectAdmin/HOST.it aggiungere questo cron giornaliero dopo il cron di import
 30 4 * * * /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/generate-pc-catalog.php >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/pc-configurator-cron.log 2>&1
 ```
 
+## Analytics e SEO locale
+
+- GA4 e Meta Pixel sono configurabili in `.env.php` dentro `analytics.ga4_measurement_id` e `analytics.meta_pixel_id`; se vuoti non viene caricato nessun tag esterno.
+- I tag partono solo dopo consenso cookie `Accetta`, con consenso Google inizializzato a `denied` e Pixel Meta non caricato prima dell'ok.
+- Le visite alle schede prodotto alimentano una metrica interna aggregata usata anche dalla vetrina prodotti della pagina servizi.
+- I vecchi URL SEO tipo `/negozio/samsung-galaxy` sono serviti come landing dinamiche con prodotti e articoli collegati.
+
+Migrazione produzione per le metriche interne:
+
+```bash
+/usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/migrate-analytics-seo.php
+```
+
 ---
 
 ## Documentazione

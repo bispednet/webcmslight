@@ -131,7 +131,7 @@ HTML, 'privacy-policy');
 <p>Il sito carica risorse da <strong>Google Fonts</strong> e CDN per font e librerie di stile: ciò comporta la comunicazione dell'indirizzo IP ai relativi provider, che agiscono come titolari autonomi. Eventuali funzioni di <strong>Google OAuth</strong> (accesso) e <strong>Google Calendar</strong> (appuntamenti) sono attivate solo su azione dell'utente.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">6. Gestione del consenso</h3>
-<p>Al primo accesso un banner consente di <em>accettare</em>, <em>rifiutare</em> o <em>personalizzare</em> i cookie non necessari. I cookie analitici e di marketing sono installati solo dopo consenso. È possibile modificare o revocare le scelte in qualsiasi momento dalle impostazioni del banner o cancellando i cookie dal browser. La revoca non pregiudica la liceità del trattamento basato sul consenso prestato prima della revoca.</p>
+<p>Al primo accesso un banner consente di <em>accettare</em> o <em>rifiutare</em> i cookie non necessari. I cookie analitici e di marketing sono installati solo dopo consenso. È possibile modificare o revocare le scelte cancellando la preferenza salvata nel browser o cancellando i cookie. La revoca non pregiudica la liceità del trattamento basato sul consenso prestato prima della revoca.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">7. Disattivazione dal browser</h3>
 <p>È possibile gestire o disabilitare i cookie dalle impostazioni del proprio browser (Chrome, Firefox, Safari, Edge). La disattivazione dei cookie tecnici può compromettere il funzionamento del sito.</p>

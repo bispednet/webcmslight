@@ -44,6 +44,8 @@ final class ContentRepository
      */
     public function getServiceShowcaseProducts(int $limit = 8): array
     {
+        $metricsJoin = $this->tableExists('product_metrics') ? 'LEFT JOIN product_metrics pm ON pm.product_id = products.id' : '';
+        $metricsScore = $metricsJoin !== '' ? '+ LEAST(COALESCE(pm.views_30d, 0), 500) * 20' : '';
         $sql = "SELECT *,
                        COALESCE(sale_price, price, 0) AS effective_price,
                        CASE category
@@ -85,10 +87,12 @@ final class ContentRepository
                                WHEN UPPER(name) LIKE '%MICROSD%' OR UPPER(name) LIKE '%MEMORY CARD%' OR UPPER(name) LIKE '%CAVO %' THEN 1200
                                ELSE 0
                              END
+                           {$metricsScore}
                            + LEAST(COALESCE(stock_qty, 0), 50) * 12
                            + GREATEST(0, 300 - COALESCE(featured_order, 0))
                        ) AS showcase_score
                 FROM products
+                {$metricsJoin}
                 WHERE category IS NOT NULL
                   AND category <> ''
                   AND COALESCE(sale_price, price, 0) >= 60
@@ -132,6 +136,198 @@ final class ContentRepository
         }
 
         return array_slice($selected, 0, $limit);
+    }
+
+    /**
+     * Landing SEO per vecchi URL WordPress tipo /negozio/samsung-galaxy.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getBrandLanding(string $slug): ?array
+    {
+        $definition = $this->brandDefinition($slug);
+        if ($definition === null) {
+            return null;
+        }
+
+        $products = $this->searchBrandProducts($definition['terms'], 24);
+        $posts = $this->searchBrandPosts($definition['terms'], 6);
+
+        if ($products === [] && $posts === []) {
+            return null;
+        }
+
+        return $definition + [
+            'products' => $products,
+            'posts' => $posts,
+            'meta_description' => sprintf(
+                '%s a Piombino: prodotti disponibili, assistenza, configurazione e consulenza in negozio da bisp&d.',
+                $definition['label']
+            ),
+        ];
+    }
+
+    /**
+     * @return array<int,array{slug:string,label:string}>
+     */
+    public function getBrandLandingIndex(): array
+    {
+        $out = [];
+        foreach ($this->brandDefinitions() as $slug => $definition) {
+            if ($this->searchBrandProducts($definition['terms'], 1) !== [] || $this->searchBrandPosts($definition['terms'], 1) !== []) {
+                $out[] = ['slug' => $slug, 'label' => $definition['label']];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int,string> $terms
+     * @return array<int,array<string,mixed>>
+     */
+    private function searchBrandProducts(array $terms, int $limit): array
+    {
+        $where = [];
+        $params = [];
+        foreach ($terms as $i => $term) {
+            $like = '%' . $term . '%';
+            $where[] = "(name LIKE :pn{$i} OR tags LIKE :pt{$i} OR subcategory_label LIKE :ps{$i})";
+            $params["pn{$i}"] = $like;
+            $params["pt{$i}"] = $like;
+            $params["ps{$i}"] = $like;
+        }
+
+        $logic = count($terms) > 1 ? implode(' AND ', $where) : implode(' OR ', $where);
+        $sql = "SELECT *
+                FROM products
+                WHERE ({$logic})
+                  AND image_url IS NOT NULL AND image_url <> ''
+                ORDER BY (stock_status IN ('disponibile','instock','in-stock','1','true')) DESC,
+                         stock_qty DESC,
+                         COALESCE(sale_price, price, 999999) DESC,
+                         featured_order ASC,
+                         name ASC
+                LIMIT :limit";
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $products = $stmt->fetchAll() ?: [];
+
+        if ($products === [] && count($terms) > 1) {
+            return $this->searchBrandProducts([$terms[0]], $limit);
+        }
+
+        return $products;
+    }
+
+    /**
+     * @param array<int,string> $terms
+     * @return array<int,array<string,mixed>>
+     */
+    private function searchBrandPosts(array $terms, int $limit): array
+    {
+        $clauses = [];
+        $params = [];
+        foreach ($terms as $i => $term) {
+            $like = '%' . $term . '%';
+            $clauses[] = "(title LIKE :bt{$i} OR snippet LIKE :bs{$i} OR related_product_tags LIKE :br{$i})";
+            $params["bt{$i}"] = $like;
+            $params["bs{$i}"] = $like;
+            $params["br{$i}"] = $like;
+        }
+
+        $sql = "SELECT *
+                FROM blog_posts
+                WHERE is_published = 1 AND (" . implode(' OR ', $clauses) . ")
+                ORDER BY published_at DESC
+                LIMIT :limit";
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll() ?: [];
+    }
+
+    /**
+     * @return array{slug:string,label:string,terms:array<int,string>,intro:string}|null
+     */
+    private function brandDefinition(string $slug): ?array
+    {
+        $slug = trim(strtolower($slug), " /\t\n\r\0\x0B");
+        $definitions = $this->brandDefinitions();
+        if (isset($definitions[$slug])) {
+            return $definitions[$slug] + ['slug' => $slug];
+        }
+
+        if (!preg_match('/^[a-z0-9-]{2,80}$/', $slug)) {
+            return null;
+        }
+
+        $label = ucwords(str_replace('-', ' ', $slug));
+        return [
+            'slug' => $slug,
+            'label' => $label,
+            'terms' => [str_replace('-', ' ', $slug)],
+            'intro' => "Prodotti {$label}, disponibilita e assistenza locale a Piombino.",
+        ];
+    }
+
+    /**
+     * @return array<string,array{label:string,terms:array<int,string>,intro:string}>
+     */
+    private function brandDefinitions(): array
+    {
+        return [
+            'samsung-galaxy' => ['label' => 'Samsung Galaxy', 'terms' => ['Samsung', 'Galaxy'], 'intro' => 'Smartphone Samsung Galaxy, accessori e assistenza con consulenza in negozio a Piombino.'],
+            'samsung' => ['label' => 'Samsung', 'terms' => ['Samsung'], 'intro' => 'Prodotti Samsung, smartphone Galaxy, monitor e storage selezionati da bisp&d.'],
+            'apple-iphone' => ['label' => 'Apple iPhone', 'terms' => ['iPhone'], 'intro' => 'iPhone disponibili, accessori e supporto per scegliere il modello giusto.'],
+            'apple' => ['label' => 'Apple', 'terms' => ['Apple', 'iPhone'], 'intro' => 'Prodotti Apple e accessori con assistenza locale a Piombino.'],
+            'xiaomi' => ['label' => 'Xiaomi', 'terms' => ['Xiaomi'], 'intro' => 'Smartphone e accessori Xiaomi per chi cerca rapporto qualita prezzo.'],
+            'oppo' => ['label' => 'OPPO', 'terms' => ['OPPO'], 'intro' => 'Smartphone OPPO e soluzioni mobile disponibili o ordinabili.'],
+            'motorola' => ['label' => 'Motorola', 'terms' => ['Motorola'], 'intro' => 'Smartphone Motorola e accessori con consulenza in negozio.'],
+            'huawei' => ['label' => 'Huawei', 'terms' => ['Huawei'], 'intro' => 'Prodotti Huawei, connettivita e dispositivi mobile.'],
+            'honor' => ['label' => 'Honor', 'terms' => ['Honor'], 'intro' => 'Smartphone Honor e accessori disponibili da bisp&d.'],
+            'asus' => ['label' => 'ASUS', 'terms' => ['ASUS'], 'intro' => 'Notebook, monitor, componenti e gaming ASUS selezionati per lavoro e prestazioni.'],
+            'msi' => ['label' => 'MSI', 'terms' => ['MSI'], 'intro' => 'Notebook gaming, schede video, monitor e PC MSI per postazioni ad alte prestazioni.'],
+            'hp' => ['label' => 'HP', 'terms' => ['HP'], 'intro' => 'Notebook, PC, stampanti e monitor HP per casa e ufficio.'],
+            'lenovo' => ['label' => 'Lenovo', 'terms' => ['Lenovo'], 'intro' => 'Notebook, workstation e desktop Lenovo per lavoro e produttivita.'],
+            'dell' => ['label' => 'Dell', 'terms' => ['Dell'], 'intro' => 'Monitor, notebook e PC Dell per ufficio, grafica e produttivita.'],
+            'acer' => ['label' => 'Acer', 'terms' => ['Acer'], 'intro' => 'Notebook, monitor e postazioni Acer per studio, lavoro e gaming.'],
+            'intel' => ['label' => 'Intel', 'terms' => ['Intel'], 'intro' => 'CPU, notebook e PC con piattaforma Intel disponibili da bisp&d.'],
+            'amd' => ['label' => 'AMD Ryzen', 'terms' => ['AMD', 'Ryzen'], 'intro' => 'CPU, schede video e PC con piattaforma AMD Ryzen.'],
+            'nvidia' => ['label' => 'NVIDIA GeForce', 'terms' => ['RTX'], 'intro' => 'Schede video NVIDIA GeForce RTX e PC gaming configurati con criterio.'],
+            'canon' => ['label' => 'Canon', 'terms' => ['Canon'], 'intro' => 'Stampanti, multifunzione e soluzioni Canon per casa e ufficio.'],
+            'brother' => ['label' => 'Brother', 'terms' => ['Brother'], 'intro' => 'Stampanti e multifunzione Brother per ufficio e attivita.'],
+            'epson' => ['label' => 'Epson', 'terms' => ['Epson'], 'intro' => 'Stampanti, multifunzione e consumabili Epson.'],
+            'fortinet' => ['label' => 'Fortinet Fortigate', 'terms' => ['Fortigate'], 'intro' => 'Firewall Fortigate e sicurezza di rete per aziende e professionisti.'],
+            'cisco' => ['label' => 'Cisco', 'terms' => ['Cisco'], 'intro' => 'Networking Cisco, switch, access point e soluzioni per reti aziendali.'],
+            'tp-link' => ['label' => 'TP-Link', 'terms' => ['TP-Link', 'TPLINK'], 'intro' => 'Router, switch, access point e networking TP-Link.'],
+            'fritzbox' => ['label' => 'FRITZ!Box', 'terms' => ['FRITZ', 'AVM'], 'intro' => 'Router FRITZ!Box e soluzioni Wi-Fi per casa e ufficio.'],
+            'ubiquiti' => ['label' => 'Ubiquiti UniFi', 'terms' => ['Ubiquiti', 'UniFi'], 'intro' => 'Reti UniFi, access point e infrastrutture Wi-Fi gestite.'],
+        ];
+    }
+
+    private function tableExists(string $table): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/', $table)) {
+            return false;
+        }
+
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE " . $this->db->quote($table));
+            return (bool)$stmt->fetchColumn();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

@@ -17,13 +17,21 @@ $footerNavigation = $contentRepository->getNavigation('footer');
 
 $config = Container::get('config', []);
 $baseUrl = rtrim((string)($config['app']['url'] ?? ''), '/');
+$ga4MeasurementId = trim((string)($config['analytics']['ga4_measurement_id'] ?? ''));
+$metaPixelId = trim((string)($config['analytics']['meta_pixel_id'] ?? ''));
 
 $siteName = $layoutSettings['site_name'] ?? 'Bisped';
 $seoBaseTitle = $layoutSettings['seo_meta_title'] ?? $siteName;
 $pageTitle = isset($title) && $title !== '' ? $title . ' | ' . $seoBaseTitle : $seoBaseTitle;
-$metaDescription = $layoutSettings['seo_meta_description'] ?? ($layoutSettings['site_tagline'] ?? '');
-$seoSocialTitle = $layoutSettings['seo_social_title'] ?? $seoBaseTitle;
-$seoSocialDescription = $layoutSettings['seo_social_description'] ?? $metaDescription;
+$metaDescription = isset($metaDescription) && $metaDescription !== ''
+    ? (string)$metaDescription
+    : ($layoutSettings['seo_meta_description'] ?? ($layoutSettings['site_tagline'] ?? ''));
+$seoSocialTitle = isset($seoSocialTitle) && $seoSocialTitle !== ''
+    ? (string)$seoSocialTitle
+    : ($layoutSettings['seo_social_title'] ?? $seoBaseTitle);
+$seoSocialDescription = isset($seoSocialDescription) && $seoSocialDescription !== ''
+    ? (string)$seoSocialDescription
+    : ($layoutSettings['seo_social_description'] ?? $metaDescription);
 $seoTwitterDescription = $layoutSettings['seo_twitter_description'] ?? $seoSocialDescription;
 $seoTelegramDescription = $layoutSettings['seo_telegram_description'] ?? $seoSocialDescription;
 $seoDiscordDescription = $layoutSettings['seo_discord_description'] ?? $seoSocialDescription;
@@ -147,6 +155,24 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
     <?php if ($jsonLd): ?>
         <script type="application/ld+json"><?= $jsonLd ?></script>
     <?php endif; ?>
+    <?php if ($ga4MeasurementId !== '' || $metaPixelId !== ''): ?>
+        <script>
+        window.BISPED_ANALYTICS = {
+            ga4: <?= json_encode($ga4MeasurementId, JSON_UNESCAPED_SLASHES) ?>,
+            metaPixel: <?= json_encode($metaPixelId, JSON_UNESCAPED_SLASHES) ?>
+        };
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('consent', 'default', {
+            ad_storage: 'denied',
+            ad_user_data: 'denied',
+            ad_personalization: 'denied',
+            analytics_storage: 'denied',
+            functionality_storage: 'granted',
+            security_storage: 'granted'
+        });
+        </script>
+    <?php endif; ?>
     <link rel="icon" href="<?= htmlspecialchars($faviconPath, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars($faviconPath, ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -175,7 +201,7 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
             }
         };
     </script>
-    <link rel="stylesheet" href="/assets/css/app.css?v=20260622-pc-config-map">
+    <link rel="stylesheet" href="/assets/css/app.css?v=20260622-seo-analytics">
     <link rel="stylesheet" href="/assets/css/ai-concierge.css?v=20260604-mobile-fix">
     <script type="module" src="/assets/js/animate.js" defer></script>
     <?php if ($isAdmin && $adminCsrf): ?>
@@ -242,8 +268,71 @@ if ($reqPath === '/' || $reqPath === '/en' || $reqPath === '/en/') {
         </div>
     </div>
     <script>
-    (function(){if(localStorage.getItem('bisped-cookie-consent')){document.getElementById('cookie-banner').style.display='none';}})();
-    function bisped_cookieAccept(){localStorage.setItem('bisped-cookie-consent','all');document.getElementById('cookie-banner').style.display='none';}
+    (function(){
+        var consent = localStorage.getItem('bisped-cookie-consent');
+        if(consent){document.getElementById('cookie-banner').style.display='none';}
+
+        window.bispedLoadAnalytics = function(){
+            var cfg = window.BISPED_ANALYTICS || {};
+            if (window.__bispedAnalyticsLoaded || !cfg) return;
+            window.__bispedAnalyticsLoaded = true;
+
+            if (cfg.ga4) {
+                gtag('consent', 'update', {
+                    ad_storage: 'granted',
+                    ad_user_data: 'granted',
+                    ad_personalization: 'granted',
+                    analytics_storage: 'granted'
+                });
+                var ga = document.createElement('script');
+                ga.async = true;
+                ga.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(cfg.ga4);
+                document.head.appendChild(ga);
+                gtag('js', new Date());
+                gtag('config', cfg.ga4, { anonymize_ip: true });
+            }
+
+            if (cfg.metaPixel) {
+                !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+                n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+                t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
+                (window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
+                fbq('consent', 'grant');
+                fbq('init', cfg.metaPixel);
+                fbq('track', 'PageView');
+            }
+
+            if (window.BISPED_TRACKING_CONTEXT && window.BISPED_TRACKING_CONTEXT.product) {
+                var p = window.BISPED_TRACKING_CONTEXT.product;
+                if (cfg.ga4 && window.gtag) {
+                    gtag('event', 'view_item', {
+                        currency: 'EUR',
+                        value: p.price || 0,
+                        items: [{
+                            item_id: p.sku || p.slug,
+                            item_name: p.name,
+                            item_category: p.category,
+                            price: p.price || 0
+                        }]
+                    });
+                }
+                if (cfg.metaPixel && window.fbq) {
+                    fbq('track', 'ViewContent', {
+                        content_ids: [p.sku || p.slug],
+                        content_name: p.name,
+                        content_category: p.category,
+                        content_type: 'product',
+                        value: p.price || 0,
+                        currency: 'EUR'
+                    });
+                }
+            }
+        };
+
+        if(consent === 'all'){ window.bispedLoadAnalytics(); }
+    })();
+    function bisped_cookieAccept(){localStorage.setItem('bisped-cookie-consent','all');document.getElementById('cookie-banner').style.display='none';window.bispedLoadAnalytics&&window.bispedLoadAnalytics();}
     function bisped_cookieReject(){localStorage.setItem('bisped-cookie-consent','essential');document.getElementById('cookie-banner').style.display='none';}
     </script>
 

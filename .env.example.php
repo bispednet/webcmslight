@@ -41,6 +41,12 @@ return [
             'bisped@gmail.com',
         ],
     ],
+    'analytics' => [
+        // GA4 Measurement ID, es. G-XXXXXXXXXX. Lascia vuoto per disattivare.
+        'ga4_measurement_id' => '',
+        // Meta/Facebook Pixel ID. Lascia vuoto per disattivare.
+        'meta_pixel_id' => '',
+    ],
     'gemini' => [
         'api_key' => '',
         'editorial' => [

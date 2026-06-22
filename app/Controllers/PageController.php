@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Response;
 use App\Services\Cms\ContentRepository;
+use App\Services\Analytics\ProductMetricsService;
 use App\Services\Catalog\PcCompatibilityService;
 use App\Services\Security\Csrf;
 use App\Support\Flash;
@@ -105,6 +106,8 @@ final class PageController extends Controller
             return;
         }
 
+        (new ProductMetricsService(\App\Core\Database::connection()))->recordView((int)$product['id']);
+
         $pcConfigurator = null;
         try {
             $pcConfigurator = (new PcCompatibilityService(\App\Core\Database::connection()))
@@ -114,6 +117,18 @@ final class PageController extends Controller
         }
 
         $this->view('public/product', compact('product', 'pcConfigurator'));
+    }
+
+    public function brandLanding(string $slug): void
+    {
+        $landing = $this->content->getBrandLanding($slug);
+        if ($landing === null) {
+            http_response_code(404);
+            $this->view('public/not-found');
+            return;
+        }
+
+        $this->view('public/brand-landing', compact('landing'));
     }
 
     public function productConfiguratorOptions(string $slug): void
@@ -313,6 +328,7 @@ final class PageController extends Controller
 
         $products = $pdo->query("SELECT slug, updated_at FROM products ORDER BY featured_order ASC")->fetchAll(\PDO::FETCH_ASSOC);
         $posts    = $pdo->query("SELECT slug, updated_at FROM blog_posts WHERE is_published = 1 ORDER BY published_at DESC")->fetchAll(\PDO::FETCH_ASSOC);
+        $brandLandings = $this->content->getBrandLandingIndex();
 
         $baseUrl = 'https://bisped.net';
 
@@ -348,6 +364,11 @@ final class PageController extends Controller
             $loc     = $baseUrl . '/products/' . htmlspecialchars($p['slug'], ENT_XML1);
             $lastmod = substr((string)($p['updated_at'] ?? date('Y-m-d')), 0, 10);
             echo "  <url><loc>{$loc}</loc><lastmod>{$lastmod}</lastmod><priority>0.7</priority></url>\n";
+        }
+
+        foreach ($brandLandings as $landing) {
+            $loc = $baseUrl . '/negozio/' . htmlspecialchars((string)$landing['slug'], ENT_XML1);
+            echo "  <url><loc>{$loc}</loc><changefreq>weekly</changefreq><priority>0.72</priority></url>\n";
         }
 
         foreach ($posts as $p) {

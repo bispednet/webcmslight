@@ -157,6 +157,23 @@ CREATE TABLE IF NOT EXISTS product_features (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS product_metrics (
+    product_id INT UNSIGNED PRIMARY KEY,
+    views_total BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    views_30d BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    last_viewed_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS product_metric_daily (
+    product_id INT UNSIGNED NOT NULL,
+    metric_date DATE NOT NULL,
+    views INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (product_id, metric_date),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS pc_component_specs (
     product_id INT UNSIGNED PRIMARY KEY,
     component_type VARCHAR(40) NOT NULL,

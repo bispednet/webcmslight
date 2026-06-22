@@ -806,6 +806,13 @@ html[data-theme="light"] .site-header { --_bg-r:244; --_bg-g:244; --_bg-b:246; }
     color: var(--c-muted);
     opacity: .55;
     white-space: nowrap;
+    text-decoration: none;
+    transition: color .2s, opacity .2s;
+}
+
+.brand-label:hover {
+    color: var(--bisped-red);
+    opacity: .9;
 }
 
 /* ─── Review Card ───────────────────────────────────────────────────────────── */

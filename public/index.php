@@ -92,6 +92,8 @@ $router->get('/products', [PageController::class, 'products']);
 $router->get('/products/load', [PageController::class, 'loadProducts']);
 $router->get('/it/prodotti', [PageController::class, 'products']);
 $router->get('/en/products', [PageController::class, 'products']);
+$router->get('/negozio/{slug}', [PageController::class, 'brandLanding']);
+$router->get('/negozio/{slug}/', [PageController::class, 'brandLanding']);
 $router->get('/products/{slug}/configurator-options', [PageController::class, 'productConfiguratorOptions']);
 $router->get('/products/{slug}', [PageController::class, 'product']);
 $router->get('/it/prodotti/{slug}', [PageController::class, 'product']);

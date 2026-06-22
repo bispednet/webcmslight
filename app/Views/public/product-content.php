@@ -71,6 +71,17 @@ $host     = $_SERVER['HTTP_HOST'] ?? 'bisped.net';
 $shareUrl = $scheme . '://' . $host . '/products/' . $slug;
 ?>
 
+<script>
+window.BISPED_TRACKING_CONTEXT = window.BISPED_TRACKING_CONTEXT || {};
+window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
+    'slug' => $slug,
+    'sku' => $sku,
+    'name' => $name,
+    'category' => $category,
+    'price' => $displayPrice ? (float)$displayPrice : 0.0,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
+
 <!-- Breadcrumb -->
 <nav class="flex items-center gap-2 text-sm text-muted mb-8" aria-label="Breadcrumb">
     <a href="/" class="hover:text-pri transition-colors">Home</a>

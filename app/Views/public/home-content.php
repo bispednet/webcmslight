@@ -213,19 +213,19 @@ if (empty($featured)) {
     <div class="container mx-auto max-w-7xl px-4 lg:px-6">
         <div class="brand-bar__track">
             <span class="text-xs font-black uppercase tracking-widest text-muted opacity-50 flex-shrink-0"><?= $en ? 'Official partners' : 'Partner ufficiali' ?></span>
-            <img class="brand-logo" src="/media/brands/tim.png"      alt="TIM"      loading="lazy">
-            <img class="brand-logo" src="/media/brands/vodafone.png" alt="Vodafone" loading="lazy">
-            <img class="brand-logo" src="/media/brands/wind.png"     alt="WindTre"  loading="lazy">
-            <img class="brand-logo" src="/media/brands/tre.png"      alt="Tre"      loading="lazy">
-            <img class="brand-logo" src="/media/brands/enel.png"     alt="Enel"     loading="lazy">
-            <img class="brand-logo" src="/media/brands/eni.png"      alt="Eni"      loading="lazy">
-            <img class="brand-logo" src="/media/brands/msi.png"      alt="MSI"      loading="lazy">
-            <span class="brand-label">ASUS</span>
-            <span class="brand-label">Intel</span>
-            <span class="brand-label">AMD</span>
-            <span class="brand-label">Samsung</span>
-            <span class="brand-label">Huawei</span>
-            <img class="brand-logo" src="/media/brands/cisco.png"    alt="Cisco"    loading="lazy">
+            <a href="/servizi#connettivita" aria-label="TIM"><img class="brand-logo" src="/media/brands/tim.png" alt="TIM" loading="lazy"></a>
+            <a href="/servizi#connettivita" aria-label="Vodafone"><img class="brand-logo" src="/media/brands/vodafone.png" alt="Vodafone" loading="lazy"></a>
+            <a href="/servizi#connettivita" aria-label="WindTre"><img class="brand-logo" src="/media/brands/wind.png" alt="WindTre" loading="lazy"></a>
+            <a href="/servizi#connettivita" aria-label="Tre"><img class="brand-logo" src="/media/brands/tre.png" alt="Tre" loading="lazy"></a>
+            <a href="/servizi#energia" aria-label="Enel"><img class="brand-logo" src="/media/brands/enel.png" alt="Enel" loading="lazy"></a>
+            <a href="/servizi#energia" aria-label="Eni"><img class="brand-logo" src="/media/brands/eni.png" alt="Eni" loading="lazy"></a>
+            <a href="/negozio/msi" aria-label="MSI"><img class="brand-logo" src="/media/brands/msi.png" alt="MSI" loading="lazy"></a>
+            <a href="/negozio/asus" class="brand-label">ASUS</a>
+            <a href="/negozio/intel" class="brand-label">Intel</a>
+            <a href="/negozio/amd" class="brand-label">AMD</a>
+            <a href="/negozio/samsung-galaxy" class="brand-label">Samsung</a>
+            <a href="/negozio/huawei" class="brand-label">Huawei</a>
+            <a href="/negozio/fortinet" class="brand-label">Fortinet</a>
         </div>
     </div>
 </section>
