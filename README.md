@@ -189,6 +189,14 @@ Revisione completa → [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.
 - `BispedBusinessContext.php` contiene stime di prezzo indicative — aggiornare manualmente se cambiano
 - Deploy produzione richiede: rotazione `app.key`, credenziali OAuth/SMTP, `app.url=https://bisped.net`
 
+## Cron produzione PC Custom
+
+Su DirectAdmin/HOST.it aggiungere questo cron giornaliero dopo il cron di import prodotti/prezzi Runner. Genera e aggiorna i prodotti `PC-Custom` dal catalogo componenti, usando Gemini per validare le configurazioni commercialmente sensate.
+
+```bash
+30 4 * * * /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/generate-pc-catalog.php >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/pc-configurator-cron.log 2>&1
+```
+
 ---
 
 ## Documentazione
