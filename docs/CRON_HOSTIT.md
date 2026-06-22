@@ -182,6 +182,9 @@ La disponibilità è critica: **non vogliamo a catalogo prodotti non disponibili
 
 # Catalogo completo — ogni giorno alle 4:00
 0 4 * * *    /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=full >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+
+# PC configurabili — dopo il catalogo completo
+30 4 * * *  /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/generate-pc-catalog.php >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/pc-configurator-cron.log 2>&1
 ```
 
 ### Sicurezza del prune

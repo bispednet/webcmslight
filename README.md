@@ -117,6 +117,7 @@ bisped.net/
 - **Auth** — password locale, Google OAuth, wallet EVM/Solana; ruoli `admin`, `commesso`, `cliente`
 - **Agenda** — richieste appuntamento pubbliche + accettazione admin; sync Google Calendar opzionale
 - **Catalogo automatico** — import dal fornitore B2B Runner (FTP) con foto locali, descrizioni, disponibilità reale; 11 reparti macro + sotto-categorie; pricing configurabile da dashboard; lazy-load AJAX; cron disponibilità 6h + catalogo 24h
+- **PC configurabili** — build ufficio/gaming generate dal catalogo componenti, con selettori pubblici filtrati per socket, DDR, form factor e alimentazione
 - **Ingest editoriale** — job giornaliero news/offerte con immagini e deduplica (Gemini Flash)
 - **AI Concierge** — swarm 3 agenti, memoria persistente, slot extraction continua, handoff WhatsApp automatico, report commerciale admin
 
@@ -193,6 +194,7 @@ Revisione completa → [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.
 ## Documentazione
 
 - [`docs/AI_CONCIERGE.md`](docs/AI_CONCIERGE.md) — architettura e API del concierge
+- [`docs/PC_CONFIGURATOR.md`](docs/PC_CONFIGURATOR.md) — configuratore PC, vincoli e cron build gaming
 - [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.md) — security audit completo
 - [`docs/BISPED_MIGRATION_AUDIT.md`](docs/BISPED_MIGRATION_AUDIT.md) — audit migrazione da WordPress
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — procedura deploy produzione

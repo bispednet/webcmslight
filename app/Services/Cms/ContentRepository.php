@@ -40,7 +40,7 @@ final class ContentRepository
      *
      * @return array{items: array<int,array<string,mixed>>, total: int}
      */
-    public function searchProducts(string $cat = 'all', string $sub = 'all', string $q = '', int $limit = 30, int $offset = 0): array
+    public function searchProducts(string $cat = 'all', string $sub = 'all', string $q = '', int $limit = 30, int $offset = 0, string $sort = 'featured'): array
     {
         $where  = ['1=1'];
         $params = [];
@@ -66,7 +66,15 @@ final class ContentRepository
         $countStmt->execute($params);
         $total = (int)$countStmt->fetchColumn();
 
-        $sql = "SELECT * FROM products WHERE {$whereSql} ORDER BY featured_order ASC, stock_qty DESC, name ASC LIMIT :limit OFFSET :offset";
+        $orderBy = match ($sort) {
+            'price_asc' => 'COALESCE(sale_price, price, 999999) ASC, name ASC',
+            'price_desc' => 'COALESCE(sale_price, price, 0) DESC, name ASC',
+            'name_asc' => 'name ASC',
+            'newest' => 'id DESC',
+            default => 'featured_order ASC, stock_qty DESC, name ASC',
+        };
+
+        $sql = "SELECT * FROM products WHERE {$whereSql} ORDER BY {$orderBy} LIMIT :limit OFFSET :offset";
         $stmt = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
             $stmt->bindValue(':' . $k, $v);

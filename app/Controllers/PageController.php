@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Controller;
+use App\Core\Response;
 use App\Services\Cms\ContentRepository;
+use App\Services\Catalog\PcCompatibilityService;
 use App\Services\Security\Csrf;
 use App\Support\Flash;
 use App\Support\Session;
@@ -42,11 +44,12 @@ final class PageController extends Controller
         $cat    = trim((string)($_GET['cat'] ?? 'all'));
         $sub    = trim((string)($_GET['sub'] ?? 'all'));
         $q      = trim((string)($_GET['q'] ?? ''));
+        $sort   = trim((string)($_GET['sort'] ?? 'featured'));
         $page   = max(1, (int)($_GET['page'] ?? 1));
         $limit  = 30;
         $offset = ($page - 1) * $limit;
 
-        $result = $this->content->searchProducts($cat, $sub, $q, $limit, $offset);
+        $result = $this->content->searchProducts($cat, $sub, $q, $limit, $offset, $sort);
 
         header('Content-Type: text/html; charset=utf-8');
         ob_start();
@@ -102,7 +105,50 @@ final class PageController extends Controller
             return;
         }
 
-        $this->view('public/product', compact('product'));
+        $pcConfigurator = null;
+        try {
+            $pcConfigurator = (new PcCompatibilityService(\App\Core\Database::connection()))
+                ->configuratorForProduct((int)$product['id']);
+        } catch (\Throwable) {
+            $pcConfigurator = null;
+        }
+
+        $this->view('public/product', compact('product', 'pcConfigurator'));
+    }
+
+    public function productConfiguratorOptions(string $slug): void
+    {
+        $product = $this->content->getProductBySlug($slug);
+        if (!$product) {
+            Response::json(['ok' => false, 'error' => 'not_found'], 404);
+            return;
+        }
+
+        try {
+            $service = new PcCompatibilityService(\App\Core\Database::connection());
+            $configurator = $service->configuratorForProduct((int)$product['id']);
+            if ($configurator === null) {
+                Response::json(['ok' => false, 'error' => 'not_configurable'], 404);
+                return;
+            }
+
+            $selected = (array)($configurator['selected'] ?? []);
+            foreach (PcCompatibilityService::SLOT_LABELS as $slot => $_label) {
+                if (!array_key_exists($slot, $_GET)) {
+                    continue;
+                }
+                $value = (int)($_GET[$slot] ?? 0);
+                if ($value > 0) {
+                    $selected[$slot] = $value;
+                } else {
+                    unset($selected[$slot]);
+                }
+            }
+
+            Response::json(['ok' => true] + $service->selectionSummary($selected));
+        } catch (\Throwable) {
+            Response::json(['ok' => false, 'error' => 'configurator_unavailable'], 503);
+        }
     }
 
     public function blog(): void
@@ -213,6 +259,16 @@ final class PageController extends Controller
         ]);
     }
 
+    public function withdrawal(): void
+    {
+        $settings = $this->content->getSettings();
+        $csrfToken = Csrf::token();
+        $success = Flash::pull('withdrawal_success');
+        $error = Flash::pull('withdrawal_error');
+
+        $this->view('public/recesso', compact('settings', 'csrfToken', 'success', 'error'));
+    }
+
     public function faq(): void
     {
         $faqs = $this->content->getFaqItems();
@@ -277,6 +333,7 @@ final class PageController extends Controller
             ['loc' => '/contatti',      'priority' => '0.7',  'freq' => 'monthly'],
             ['loc' => '/faq',           'priority' => '0.6',  'freq' => 'monthly'],
             ['loc' => '/legal',         'priority' => '0.3',  'freq' => 'yearly'],
+            ['loc' => '/recesso',       'priority' => '0.3',  'freq' => 'yearly'],
         ];
 
         foreach ($staticPages as $p) {

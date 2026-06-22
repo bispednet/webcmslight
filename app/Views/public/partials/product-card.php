@@ -2,9 +2,21 @@
 /** @var array $product */
 use App\Support\AdminMode;
 
+if (!function_exists('bisped_product_category_label')) {
+    function bisped_product_category_label(string $category): string
+    {
+        return match ($category) {
+            'pc-assemblati', 'pc-assmblati' => 'PC',
+            'pc-custom' => 'PC-Custom',
+            default => $category,
+        };
+    }
+}
+
 $slug     = (string)($product['slug'] ?? '');
 $name     = (string)($product['name'] ?? '');
 $category = trim((string)($product['category'] ?? '')) ?: 'Catalogo';
+$categoryLabel = bisped_product_category_label($category);
 $imgUrl   = trim((string)($product['image_url'] ?? ''));
 $sku      = trim((string)($product['sku'] ?? ''));
 
@@ -33,6 +45,7 @@ $oldFormatted   = $isSale ? '€ ' . number_format((float)$regularPrice, 2, ',',
 
 // Category slug for link
 $catSlugs = [
+    'PC-Custom'   => 'pc-custom',
     'Gaming'      => 'gaming',
     'Smartphone'  => 'smartphone',
     'Informatica' => 'informatica',
@@ -70,7 +83,7 @@ foreach ($catSlugs as $k => $v) {
     </div>
 
     <div class="product-card__body">
-        <div class="product-card__cat"><?= htmlspecialchars($category, ENT_QUOTES, 'UTF-8') ?></div>
+        <div class="product-card__cat"><?= htmlspecialchars($categoryLabel, ENT_QUOTES, 'UTF-8') ?></div>
 
         <h3 class="product-card__name"
             <?= AdminMode::dataAttrs('products', 'name', $slug) ?>>

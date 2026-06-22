@@ -13,12 +13,12 @@ $rea       = $company['rea']        ?? 'LI-138175';
 $pec       = $company['pec']        ?? 'bisped@pec.it';
 $email     = $settings['contact_email'] ?? 'negozio@bisped.net';
 $phone     = $company['phone']      ?? '[NUMERO DA INSERIRE]';
-$updated   = '6 giugno 2026';
+$updated   = '22 giugno 2026';
 
-function legalSection(string $title, string $body): void
+function legalSection(string $title, string $body, string $id = ''): void
 {
     ?>
-    <details class="info-card legal-acc">
+    <details class="info-card legal-acc"<?= $id !== '' ? ' id="' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
         <summary class="cursor-pointer list-none flex items-center justify-between gap-4">
             <h2 class="font-display text-xl font-black" style="color:var(--c-acc)"><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h2>
             <svg class="legal-acc__chevron w-5 h-5 flex-shrink-0" style="color:var(--bisped-red)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
@@ -43,8 +43,21 @@ $titolare = '<strong style="color:var(--c-txt)">' . htmlspecialchars($legalName,
         <p class="mt-4 max-w-2xl text-lg" style="color:var(--c-muted)">
             Privacy Policy, Cookie Policy e Condizioni di vendita di <?= htmlspecialchars($legalName, ENT_QUOTES, 'UTF-8') ?>.
             Documenti redatti ai sensi del Regolamento UE 2016/679 (GDPR), del D.Lgs. 196/2003 e 101/2018,
-            del Codice del Consumo (D.Lgs. 206/2005) e della normativa vigente. Ultimo aggiornamento: <?= $updated ?>.
+            del Codice del Consumo (D.Lgs. 206/2005), come modificato anche dal D.Lgs. 31 dicembre 2025, n. 209,
+            e della normativa vigente. Ultimo aggiornamento: <?= $updated ?>.
         </p>
+    </div>
+
+    <div class="info-card max-w-4xl" id="recesso-online" data-animate>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="font-display text-xl font-black" style="color:var(--c-acc)">Diritto di recesso online</h2>
+                <p class="mt-2 text-sm leading-6" style="color:var(--c-muted)">
+                    Per i contratti conclusi a distanza puoi usare la funzione online dedicata. La ricevuta viene inviata via email con contenuto, data e ora della trasmissione.
+                </p>
+            </div>
+            <a href="/recesso" class="btn-primary flex-shrink-0">Recedere dal contratto qui</a>
+        </div>
     </div>
 
     <section class="space-y-4 max-w-4xl">
@@ -58,12 +71,13 @@ $titolare = '<strong style="color:var(--c-txt)">' . htmlspecialchars($legalName,
 <p>{$titolare}. Per qualsiasi richiesta in materia di protezione dei dati è possibile scrivere a <a href="mailto:{$pec}" style="color:var(--bisped-red)">{$pec}</a> oppure a <a href="mailto:{$email}" style="color:var(--bisped-red)">{$email}</a>. Il Titolare non ha nominato un Responsabile della Protezione dei Dati (DPO), non sussistendone l'obbligo ai sensi dell'art. 37 GDPR.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">2. Tipologie di dati trattati</h3>
-<p>A seconda dell'interazione, il Titolare può trattare: <em>dati anagrafici e di contatto</em> (nome, cognome, email, telefono, indirizzo) forniti tramite moduli, registrazione, ordini o assistenza; <em>dati di navigazione</em> (indirizzo IP, tipo di browser/dispositivo, pagine visitate, orari di accesso) raccolti automaticamente; <em>dati di acquisto e fatturazione</em>; <em>contenuti delle comunicazioni</em> inviate tramite moduli di contatto, chat o WhatsApp; <em>cookie e identificatori</em> (v. Cookie Policy).</p>
+<p>A seconda dell'interazione, il Titolare può trattare: <em>dati anagrafici e di contatto</em> (nome, cognome, email, telefono, indirizzo) forniti tramite moduli, registrazione, ordini, recesso o assistenza; <em>dati di navigazione</em> (indirizzo IP, tipo di browser/dispositivo, pagine visitate, orari di accesso) raccolti automaticamente; <em>dati di acquisto, fatturazione, garanzia e recesso</em>; <em>contenuti delle comunicazioni</em> inviate tramite moduli, chat, WhatsApp o funzione di recesso online; <em>cookie e identificatori</em> (v. Cookie Policy).</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">3. Finalità e basi giuridiche</h3>
 <ul style="list-style:disc;padding-left:1.25rem">
   <li><strong>Evasione di ordini, vendita e assistenza</strong> — base giuridica: esecuzione di un contratto o di misure precontrattuali (art. 6.1.b GDPR).</li>
   <li><strong>Adempimenti fiscali, contabili e di legge</strong> — obbligo legale (art. 6.1.c GDPR).</li>
+  <li><strong>Gestione del diritto di recesso, garanzie e reclami</strong> — obbligo legale / esecuzione del contratto (art. 6.1.c/b GDPR).</li>
   <li><strong>Risposta a richieste tramite moduli, chat o telefono</strong> — esecuzione di misure precontrattuali / legittimo interesse (art. 6.1.b/f GDPR).</li>
   <li><strong>Marketing diretto e newsletter</strong> — consenso dell'interessato (art. 6.1.a GDPR), revocabile in ogni momento.</li>
   <li><strong>Statistiche e profilazione tramite cookie analitici/di marketing</strong> — consenso (art. 6.1.a GDPR), prestato tramite il banner cookie.</li>
@@ -80,7 +94,7 @@ $titolare = '<strong style="color:var(--c-txt)">' . htmlspecialchars($legalName,
 <p>Alcuni fornitori (es. Google LLC, Meta Platforms Inc.) possono trattare dati in Paesi extra-SEE. Il trasferimento avviene nel rispetto degli artt. 44 e ss. GDPR, mediante <em>Clausole Contrattuali Standard</em> approvate dalla Commissione UE e/o adesione al <em>EU-US Data Privacy Framework</em>.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">7. Periodo di conservazione</h3>
-<p>I dati sono conservati per il tempo strettamente necessario alle finalità: dati contrattuali e di fatturazione per 10 anni (obblighi civilistici/fiscali); dati per assistenza e richieste fino a evasione e per il periodo di garanzia; dati di marketing fino a revoca del consenso e comunque non oltre 24 mesi dall'ultimo contatto; dati di navigazione e cookie secondo le durate indicate nella Cookie Policy.</p>
+<p>I dati sono conservati per il tempo strettamente necessario alle finalità: dati contrattuali e di fatturazione per 10 anni (obblighi civilistici/fiscali); dati per assistenza, garanzie, reclami e recesso per il tempo necessario alla gestione della pratica e alla tutela dei diritti delle parti; dati di marketing fino a revoca del consenso e comunque non oltre 24 mesi dall'ultimo contatto; dati di navigazione e cookie secondo le durate indicate nella Cookie Policy.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">8. Diritti dell'interessato</h3>
 <p>L'interessato può esercitare in ogni momento i diritti di cui agli artt. 15-22 GDPR: <em>accesso, rettifica, cancellazione ("diritto all'oblio"), limitazione, portabilità, opposizione</em> al trattamento, nonché <em>revoca del consenso</em> senza pregiudizio per la liceità del trattamento precedente. Le richieste vanno inviate a <a href="mailto:{$pec}" style="color:var(--bisped-red)">{$pec}</a> e sono evase entro 30 giorni.</p>
@@ -90,7 +104,7 @@ $titolare = '<strong style="color:var(--c-txt)">' . htmlspecialchars($legalName,
 
 <h3 style="color:var(--c-txt);font-weight:800">10. Modifiche</h3>
 <p>Il Titolare si riserva di aggiornare la presente informativa. Le modifiche sono pubblicate su questa pagina con indicazione della data di ultimo aggiornamento.</p>
-HTML);
+HTML, 'privacy-policy');
 
         // ── COOKIE POLICY ───────────────────────────────────────────────────
         legalSection('Cookie Policy', <<<HTML
@@ -121,7 +135,7 @@ HTML);
 
 <h3 style="color:var(--c-txt);font-weight:800">7. Disattivazione dal browser</h3>
 <p>È possibile gestire o disabilitare i cookie dalle impostazioni del proprio browser (Chrome, Firefox, Safari, Edge). La disattivazione dei cookie tecnici può compromettere il funzionamento del sito.</p>
-HTML);
+HTML, 'cookie-policy');
 
         // ── CONDIZIONI DI VENDITA ───────────────────────────────────────────
         legalSection('Condizioni generali di vendita', <<<HTML
@@ -142,8 +156,11 @@ HTML);
 <h3 style="color:var(--c-txt);font-weight:800">5. Spedizione e consegna</h3>
 <p>La spedizione avviene tramite corriere sul territorio nazionale, salvo diverso accordo. I tempi di consegna sono indicativi e decorrono dalla conferma d'ordine e, ove previsto, dal buon esito del pagamento. È possibile concordare il ritiro presso il punto vendita di Piombino. Le spese di spedizione, se applicabili, sono indicate prima della conferma dell'ordine.</p>
 
-<h3 style="color:var(--c-txt);font-weight:800">6. Diritto di recesso (consumatori)</h3>
-<p>Il cliente che agisce come <strong>consumatore</strong> ha diritto di recedere dal contratto entro <strong>14 giorni</strong> dalla ricezione del bene, senza obbligo di motivazione (artt. 52 e ss. Codice del Consumo). Per esercitarlo è sufficiente inviare comunicazione a <a href="mailto:{$pec}" style="color:var(--bisped-red)">{$pec}</a> o <a href="mailto:{$email}" style="color:var(--bisped-red)">{$email}</a>. Il bene va restituito integro, nella confezione originale, entro 14 giorni; le spese di restituzione sono a carico del cliente salvo diversa indicazione. Il rimborso è effettuato entro 14 giorni dal ricevimento del reso o della prova di spedizione. Il recesso è escluso nei casi previsti dall'art. 59 Codice del Consumo (es. beni sigillati non più restituibili per motivi igienici, software/licenze attivati, beni personalizzati).</p>
+<h3 style="color:var(--c-txt);font-weight:800" id="diritto-recesso">6. Diritto di recesso (consumatori)</h3>
+<p>Il cliente che agisce come <strong>consumatore</strong> ha diritto di recedere dal contratto entro <strong>14 giorni</strong> dalla ricezione del bene, senza obbligo di motivazione (artt. 52 e ss. Codice del Consumo). Per esercitarlo può utilizzare la funzione online <a href="/recesso" style="color:var(--bisped-red)">Recedere dal contratto qui</a>, oppure inviare comunicazione a <a href="mailto:{$pec}" style="color:var(--bisped-red)">{$pec}</a> o <a href="mailto:{$email}" style="color:var(--bisped-red)">{$email}</a>. La funzione online richiede nome, identificativo del contratto/ordine/prodotto ed email per la conferma; dopo l'invio viene trasmessa una ricevuta con contenuto, data e ora. Il bene va restituito integro, nella confezione originale, entro 14 giorni; le spese di restituzione sono a carico del cliente salvo diversa indicazione. Il rimborso è effettuato entro 14 giorni dal ricevimento del reso o della prova di spedizione. Il recesso è escluso nei casi previsti dall'art. 59 Codice del Consumo (es. beni sigillati non più restituibili per motivi igienici, software/licenze attivati, beni personalizzati).</p>
+
+<h3 style="color:var(--c-txt);font-weight:800">6-bis. Recesso online e servizi finanziari a distanza</h3>
+<p>Il D.Lgs. 31 dicembre 2025, n. 209 introduce nel Codice del Consumo specifiche disposizioni sui contratti di servizi finanziari conclusi a distanza e sulla funzione online di recesso. Tali modifiche si applicano ai contratti conclusi successivamente al 19 giugno 2026. bisp&amp;d non opera come banca, assicurazione o intermediario finanziario: eventuali servizi di telefonia, energia, pagamento, credito, assicurazione o finanziamento sono regolati dalle condizioni del relativo fornitore o intermediario, che resta responsabile della propria informativa precontrattuale e delle modalità di recesso di settore.</p>
 
 <h3 style="color:var(--c-txt);font-weight:800">7. Garanzia legale di conformità</h3>
 <p>Tutti i prodotti godono della <strong>garanzia legale di conformità di 24 mesi</strong> per i consumatori (artt. 128 e ss. Codice del Consumo). In caso di difetto di conformità il cliente ha diritto al ripristino della conformità (riparazione o sostituzione) o, nei casi previsti, alla riduzione del prezzo o alla risoluzione del contratto. Per i clienti professionali si applica la garanzia di legge ex art. 1490 c.c. (12 mesi).</p>
@@ -153,7 +170,7 @@ HTML);
 
 <h3 style="color:var(--c-txt);font-weight:800">9. Legge applicabile e foro</h3>
 <p>Le presenti Condizioni sono regolate dalla legge italiana. Per il consumatore è competente il foro del luogo di residenza o domicilio. Per i rapporti con clienti professionali è competente in via esclusiva il Foro di Livorno.</p>
-HTML);
+HTML, 'condizioni-vendita');
         ?>
 
         <p class="text-xs mt-6" style="color:var(--c-muted)">

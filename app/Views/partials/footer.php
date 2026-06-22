@@ -78,9 +78,10 @@ if ($siteLogoUrl === '') {
                 <div>
                     <h3 class="text-xs font-black uppercase tracking-widest mb-4" style="color:var(--c-acc)">Legal</h3>
                     <ul class="space-y-2.5">
-                        <li><a href="/legal" class="text-sm text-muted hover:text-pri transition-colors">Privacy Policy</a></li>
-                        <li><a href="/legal" class="text-sm text-muted hover:text-pri transition-colors">Cookie Policy</a></li>
-                        <li><a href="/legal" class="text-sm text-muted hover:text-pri transition-colors">Condizioni di vendita</a></li>
+                        <li><a href="/legal#privacy-policy" class="text-sm text-muted hover:text-pri transition-colors">Privacy Policy</a></li>
+                        <li><a href="/legal#cookie-policy" class="text-sm text-muted hover:text-pri transition-colors">Cookie Policy</a></li>
+                        <li><a href="/legal#condizioni-vendita" class="text-sm text-muted hover:text-pri transition-colors">Condizioni di vendita</a></li>
+                        <li><a href="/recesso" class="text-sm font-bold text-muted hover:text-pri transition-colors">Recedere dal contratto qui</a></li>
                         <li><a href="/login" class="text-sm text-muted hover:text-pri transition-colors">Area riservata</a></li>
                     </ul>
                 </div>
