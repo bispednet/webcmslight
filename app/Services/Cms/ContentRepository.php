@@ -168,6 +168,85 @@ final class ContentRepository
     }
 
     /**
+     * Rimapppa vecchie schede WooCommerce /negozio/{slug} su prodotti moderni.
+     *
+     * @return array{id:int,slug:string,name:string}|null
+     */
+    public function findLegacyShopProduct(string $slug): ?array
+    {
+        $slug = trim(strtolower($slug), " /\t\n\r\0\x0B");
+        if ($slug === '' || isset($this->brandDefinitions()[$slug])) {
+            return null;
+        }
+
+        $exact = $this->db->prepare('SELECT id, slug, name FROM products WHERE slug = :slug LIMIT 1');
+        $exact->execute(['slug' => $slug]);
+        $product = $exact->fetch(PDO::FETCH_ASSOC);
+        if ($product) {
+            return $product;
+        }
+
+        $tokens = $this->legacyShopTokens($slug);
+        if (count($tokens) < 2) {
+            return null;
+        }
+
+        $scoreParts = [];
+        $whereParts = [];
+        $params = [];
+        foreach (array_slice($tokens, 0, 8) as $i => $token) {
+            $like = '%' . $token . '%';
+            $scoreParts[] = "(CASE WHEN LOWER(name) LIKE :sn{$i} THEN 3 ELSE 0 END)";
+            $scoreParts[] = "(CASE WHEN LOWER(slug) LIKE :ss{$i} THEN 3 ELSE 0 END)";
+            $scoreParts[] = "(CASE WHEN LOWER(COALESCE(sku,'')) LIKE :sk{$i} THEN 4 ELSE 0 END)";
+            $scoreParts[] = "(CASE WHEN LOWER(COALESCE(tags,'')) LIKE :st{$i} THEN 1 ELSE 0 END)";
+            $whereParts[] = "(LOWER(name) LIKE :wn{$i} OR LOWER(slug) LIKE :ws{$i} OR LOWER(COALESCE(sku,'')) LIKE :wk{$i} OR LOWER(COALESCE(tags,'')) LIKE :wt{$i})";
+            foreach (['sn', 'ss', 'sk', 'st', 'wn', 'ws', 'wk', 'wt'] as $prefix) {
+                $params[$prefix . $i] = $like;
+            }
+        }
+
+        $scoreSql = implode(' + ', $scoreParts);
+        $sql = "SELECT id, slug, name, ({$scoreSql}) AS legacy_score
+                FROM products
+                WHERE " . implode(' OR ', $whereParts) . "
+                ORDER BY legacy_score DESC,
+                         (stock_status IN ('disponibile','instock','in-stock','1','true')) DESC,
+                         stock_qty DESC,
+                         COALESCE(sale_price, price, 0) DESC
+                LIMIT 1";
+
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+        $match = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$match || (int)($match['legacy_score'] ?? 0) < max(8, count($tokens) * 3)) {
+            return null;
+        }
+
+        $matchText = strtolower((string)$match['name'] . ' ' . (string)$match['slug']);
+        $matchedTokens = 0;
+        foreach ($tokens as $token) {
+            if (str_contains($matchText, $token)) {
+                $matchedTokens++;
+            }
+        }
+        if (count($tokens) >= 3 && ($matchedTokens / count($tokens)) < 0.70) {
+            return null;
+        }
+        foreach ($this->legacyMustMatchTokens($tokens) as $token) {
+            if (!str_contains($matchText, $token)) {
+                return null;
+            }
+        }
+
+        return $match;
+    }
+
+    /**
      * @return array<int,array{slug:string,label:string}>
      */
     public function getBrandLandingIndex(): array
@@ -272,6 +351,12 @@ final class ContentRepository
             return null;
         }
 
+        foreach ($this->legacyDefinitionAliases() as $needle => $definitionSlug) {
+            if (str_contains($slug, $needle) && isset($definitions[$definitionSlug])) {
+                return $definitions[$definitionSlug] + ['slug' => $slug];
+            }
+        }
+
         $label = ucwords(str_replace('-', ' ', $slug));
         return [
             'slug' => $slug,
@@ -291,8 +376,11 @@ final class ContentRepository
             'samsung' => ['label' => 'Samsung', 'terms' => ['Samsung'], 'intro' => 'Prodotti Samsung, smartphone Galaxy, monitor e storage selezionati da bisp&d.'],
             'apple-iphone' => ['label' => 'Apple iPhone', 'terms' => ['iPhone'], 'intro' => 'iPhone disponibili, accessori e supporto per scegliere il modello giusto.'],
             'apple' => ['label' => 'Apple', 'terms' => ['Apple', 'iPhone'], 'intro' => 'Prodotti Apple e accessori con assistenza locale a Piombino.'],
+            'xiaomi-redmi' => ['label' => 'Xiaomi Redmi', 'terms' => ['Xiaomi', 'Redmi'], 'intro' => 'Smartphone Xiaomi Redmi e accessori con consulenza a Piombino.'],
+            'redmi' => ['label' => 'Xiaomi Redmi', 'terms' => ['Redmi'], 'intro' => 'Smartphone Redmi, accessori e disponibilita in negozio.'],
             'xiaomi' => ['label' => 'Xiaomi', 'terms' => ['Xiaomi'], 'intro' => 'Smartphone e accessori Xiaomi per chi cerca rapporto qualita prezzo.'],
             'oppo' => ['label' => 'OPPO', 'terms' => ['OPPO'], 'intro' => 'Smartphone OPPO e soluzioni mobile disponibili o ordinabili.'],
+            'realme' => ['label' => 'Realme', 'terms' => ['Realme'], 'intro' => 'Smartphone Realme, accessori e alternative disponibili da bisp&d.'],
             'motorola' => ['label' => 'Motorola', 'terms' => ['Motorola'], 'intro' => 'Smartphone Motorola e accessori con consulenza in negozio.'],
             'huawei' => ['label' => 'Huawei', 'terms' => ['Huawei'], 'intro' => 'Prodotti Huawei, connettivita e dispositivi mobile.'],
             'honor' => ['label' => 'Honor', 'terms' => ['Honor'], 'intro' => 'Smartphone Honor e accessori disponibili da bisp&d.'],
@@ -305,6 +393,7 @@ final class ContentRepository
             'intel' => ['label' => 'Intel', 'terms' => ['Intel'], 'intro' => 'CPU, notebook e PC con piattaforma Intel disponibili da bisp&d.'],
             'amd' => ['label' => 'AMD Ryzen', 'terms' => ['AMD', 'Ryzen'], 'intro' => 'CPU, schede video e PC con piattaforma AMD Ryzen.'],
             'nvidia' => ['label' => 'NVIDIA GeForce', 'terms' => ['RTX'], 'intro' => 'Schede video NVIDIA GeForce RTX e PC gaming configurati con criterio.'],
+            'pc-gaming' => ['label' => 'PC Gaming', 'terms' => ['PC', 'Gaming'], 'intro' => 'PC gaming configurabili, componenti e periferiche selezionate da bisp&d.'],
             'canon' => ['label' => 'Canon', 'terms' => ['Canon'], 'intro' => 'Stampanti, multifunzione e soluzioni Canon per casa e ufficio.'],
             'brother' => ['label' => 'Brother', 'terms' => ['Brother'], 'intro' => 'Stampanti e multifunzione Brother per ufficio e attivita.'],
             'epson' => ['label' => 'Epson', 'terms' => ['Epson'], 'intro' => 'Stampanti, multifunzione e consumabili Epson.'],
@@ -313,6 +402,100 @@ final class ContentRepository
             'tp-link' => ['label' => 'TP-Link', 'terms' => ['TP-Link', 'TPLINK'], 'intro' => 'Router, switch, access point e networking TP-Link.'],
             'fritzbox' => ['label' => 'FRITZ!Box', 'terms' => ['FRITZ', 'AVM'], 'intro' => 'Router FRITZ!Box e soluzioni Wi-Fi per casa e ufficio.'],
             'ubiquiti' => ['label' => 'Ubiquiti UniFi', 'terms' => ['Ubiquiti', 'UniFi'], 'intro' => 'Reti UniFi, access point e infrastrutture Wi-Fi gestite.'],
+        ];
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function legacyShopTokens(string $slug): array
+    {
+        $raw = preg_split('/[^a-z0-9]+/', strtolower($slug)) ?: [];
+        $stop = array_flip([
+            'black', 'blue', 'white', 'grey', 'gray', 'red', 'green', 'silver', 'gold',
+            'dual', 'sim', 'italia', 'ita', 'eu', 'eue', 'plus', 'pro', 'max',
+            'the', 'and', 'con', 'per', 'del', 'della', 'nuovo', 'new',
+        ]);
+
+        $tokens = [];
+        foreach ($raw as $token) {
+            if ($token === '' || isset($stop[$token])) {
+                continue;
+            }
+            if (strlen($token) < 3 && !in_array($token, ['pc', 'hp'], true) && !ctype_digit($token)) {
+                continue;
+            }
+            $tokens[] = $token;
+        }
+
+        return array_values(array_unique($tokens));
+    }
+
+    /**
+     * @param array<int,string> $tokens
+     * @return array<int,string>
+     */
+    private function legacyMustMatchTokens(array $tokens): array
+    {
+        $broad = array_flip([
+            'pc', 'gaming', 'monitor', 'led', 'ips', 'fhd', 'qhd', 'wqhd', 'uhd',
+            'smartphone', 'tablet', 'notebook', 'stampante', 'multifunzione',
+            'laser', 'mouse', 'tastiera', 'cuffie', 'audio', 'video',
+            'samsung', 'galaxy', 'xiaomi', 'redmi', 'oppo', 'realme', 'msi',
+            'asus', 'hp', 'lenovo', 'dell', 'acer', 'intel', 'amd', 'nvidia',
+            'canon', 'brother', 'epson', 'fortigate', 'fortinet', 'tplink',
+            'tp', 'link', 'sharkoon',
+        ]);
+
+        $must = [];
+        foreach ($tokens as $token) {
+            if (preg_match('/^\d+(?:gb|tb)$/', $token) || preg_match('/^[45]g$/', $token)) {
+                continue;
+            }
+            if (preg_match('/[a-z]/', $token) && preg_match('/\d/', $token)) {
+                $must[] = $token;
+                continue;
+            }
+            if (!isset($broad[$token]) && strlen($token) >= 4) {
+                $must[] = $token;
+            }
+        }
+
+        return array_values(array_unique($must));
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function legacyDefinitionAliases(): array
+    {
+        return [
+            'samsung-galaxy' => 'samsung-galaxy',
+            'iphone' => 'apple-iphone',
+            'xiaomi-redmi' => 'xiaomi-redmi',
+            'redmi' => 'redmi',
+            'xiaomi' => 'xiaomi',
+            'oppo' => 'oppo',
+            'realme' => 'realme',
+            'motorola' => 'motorola',
+            'huawei' => 'huawei',
+            'honor' => 'honor',
+            'pc-gaming' => 'pc-gaming',
+            'gaming-shark' => 'pc-gaming',
+            'msi' => 'msi',
+            'asus' => 'asus',
+            'lenovo' => 'lenovo',
+            'dell' => 'dell',
+            'acer' => 'acer',
+            'canon' => 'canon',
+            'brother' => 'brother',
+            'epson' => 'epson',
+            'fortigate' => 'fortinet',
+            'tp-link' => 'tp-link',
+            'tplink' => 'tp-link',
+            'fritz' => 'fritzbox',
+            'ubiquiti' => 'ubiquiti',
+            'unifi' => 'ubiquiti',
         ];
     }
 

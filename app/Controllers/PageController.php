@@ -121,11 +121,18 @@ final class PageController extends Controller
 
     public function brandLanding(string $slug): void
     {
+        $legacyProduct = $this->content->findLegacyShopProduct($slug);
+        if ($legacyProduct !== null) {
+            http_response_code(301);
+            header('Location: /products/' . rawurlencode((string)$legacyProduct['slug']));
+            exit;
+        }
+
         $landing = $this->content->getBrandLanding($slug);
         if ($landing === null) {
-            http_response_code(404);
-            $this->view('public/not-found');
-            return;
+            http_response_code(301);
+            header('Location: /negozio');
+            exit;
         }
 
         $this->view('public/brand-landing', compact('landing'));
@@ -341,6 +348,7 @@ final class PageController extends Controller
         $staticPages = [
             ['loc' => '/',              'priority' => '1.0',  'freq' => 'weekly'],
             ['loc' => '/products',      'priority' => '0.9',  'freq' => 'weekly'],
+            ['loc' => '/negozio',       'priority' => '0.9',  'freq' => 'weekly'],
             ['loc' => '/blog',          'priority' => '0.8',  'freq' => 'weekly'],
             ['loc' => '/servizi',       'priority' => '0.8',  'freq' => 'monthly'],
             ['loc' => '/teleassistenza','priority' => '0.8',  'freq' => 'monthly'],

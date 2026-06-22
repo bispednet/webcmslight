@@ -203,6 +203,7 @@ Su DirectAdmin/HOST.it aggiungere questo cron giornaliero dopo il cron di import
 - I tag partono solo dopo consenso cookie `Accetta`, con consenso Google inizializzato a `denied` e Pixel Meta non caricato prima dell'ok.
 - Le visite alle schede prodotto alimentano una metrica interna aggregata usata anche dalla vetrina prodotti della pagina servizi.
 - I vecchi URL SEO tipo `/negozio/samsung-galaxy` sono serviti come landing dinamiche con prodotti e articoli collegati.
+- Gli URL legacy dello shop sotto `/negozio/*` sono rimappati per pattern: prodotto equivalente, landing marca/famiglia o catalogo. Vedi [`docs/LEGACY_SEO_URLS.md`](docs/LEGACY_SEO_URLS.md).
 
 Migrazione produzione per le metriche interne:
 
