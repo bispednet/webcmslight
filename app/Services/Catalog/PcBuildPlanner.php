@@ -424,6 +424,7 @@ final class PcBuildPlanner
             $stmt = $this->db->prepare(
                 "UPDATE products
                  SET name = :name, description = :description, price = :price, stock_status = :stock_status, stock_qty = :stock_qty,
+                     sale_price = NULL,
                      image_url = :image,
                      category = :category, subcategory = 'pc-configurabili', subcategory_label = 'PC configurabili',
                      tags = :tags, content_html = :content_html, updated_at = NOW()

@@ -23,8 +23,9 @@ $sku      = trim((string)($product['sku'] ?? ''));
 // Price logic
 $regularPrice = $product['price'] ?? null;
 $salePrice    = $product['sale_price'] ?? null;
-$displayPrice = $salePrice ?: $regularPrice;
-$isSale       = $salePrice && $regularPrice && (float)$salePrice < (float)$regularPrice;
+$isConfigurablePc = $category === 'pc-custom';
+$displayPrice = $isConfigurablePc ? $regularPrice : ($salePrice ?: $regularPrice);
+$isSale       = !$isConfigurablePc && $salePrice && $regularPrice && (float)$salePrice < (float)$regularPrice;
 
 // Stock
 $rawStock = strtolower(trim((string)($product['stock_status'] ?? '')));

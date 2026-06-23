@@ -35,8 +35,9 @@ $contentHtml = str_replace(
 // Price
 $regularPrice = $product['price']      ?? null;
 $salePrice    = $product['sale_price'] ?? null;
-$displayPrice = $salePrice ?: $regularPrice;
-$isSale = $salePrice && $regularPrice && (float)$salePrice < (float)$regularPrice;
+$isConfigurablePc = !empty($pcConfigurator);
+$displayPrice = $isConfigurablePc ? $regularPrice : ($salePrice ?: $regularPrice);
+$isSale = !$isConfigurablePc && $salePrice && $regularPrice && (float)$salePrice < (float)$regularPrice;
 
 $priceFormatted = $displayPrice ? number_format((float)$displayPrice, 2, ',', '.') : null;
 $oldFormatted   = $isSale ? number_format((float)$regularPrice, 2, ',', '.') : null;
@@ -395,8 +396,8 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     return bits.join(' · ');
                 }
 
-                function syncSelect(select, options) {
-                    const previous = select.value;
+                function syncSelect(select, options, serverSelected) {
+                    const previous = serverSelected === undefined ? select.value : String(serverSelected || '');
                     const isOptional = select.dataset.optional === '1';
                     select.innerHTML = '';
 
@@ -589,7 +590,10 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         const select = root.querySelector('[data-slot="' + slot + '"]');
                         if (!select) return;
                         latestOptions[slot] = options || [];
-                        syncSelect(select, options || []);
+                        const serverSelected = data.selected && Object.prototype.hasOwnProperty.call(data.selected, slot)
+                            ? data.selected[slot]
+                            : undefined;
+                        syncSelect(select, options || [], serverSelected);
                         if (!baseOptions[slot]) {
                             baseOptions[slot] = selectedOption(select, options || []);
                         }

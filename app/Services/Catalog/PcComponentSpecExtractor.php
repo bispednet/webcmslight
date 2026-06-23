@@ -7,6 +7,40 @@ use PDO;
 
 final class PcComponentSpecExtractor
 {
+    /**
+     * These keys are the normalized DescCatMerc values supplied by Runner.
+     * They are more reliable than product-name keywords for the component role.
+     */
+    private const RUNNER_COMPONENT_TYPES = [
+        'cpu' => 'cpu',
+        'mainboard' => 'motherboard',
+        'memorie-ram' => 'ram',
+        'ssd-interni' => 'storage',
+        'hard-disk-interni' => 'storage',
+        'hard-disk-hdd-interni-entry' => 'storage',
+        'schede-video' => 'gpu',
+        'alimentatori' => 'psu',
+        'case' => 'case',
+        'cpu-dissipatori' => 'cooler',
+        'case-ventole' => 'fan',
+        'monitor-led' => 'monitor',
+        'monitor-designer' => 'monitor',
+        'monitor-touch' => 'monitor',
+        'monitor-gaming' => 'monitor',
+        'tastiere' => 'keyboard',
+        'mouse' => 'mouse',
+        'cuffie-e-microfoni' => 'headset',
+    ];
+
+    private const EXCLUDED_RUNNER_CATEGORIES = [
+        'case-accessori',
+        'hard-disk-accessori',
+        'tastiere-e-mouse-accessori',
+        'ram-per-server',
+        'hard-disk-server',
+        'nas',
+    ];
+
     public function __construct(private PDO $db)
     {
     }
@@ -17,7 +51,7 @@ final class PcComponentSpecExtractor
     public function syncCatalog(bool $dryRun = false): array
     {
         $stmt = $this->db->query(
-            "SELECT id, name, category, subcategory, subcategory_label, tags
+            "SELECT id, name, description, category, subcategory, subcategory_label, tags
              FROM products
              WHERE category IN ('componenti','gaming','monitor','accessori','server')
                 OR subcategory IN ('cpu','mainboard','memorie-ram','ssd-interni','hard-disk-interni','schede-video')"
@@ -54,16 +88,19 @@ final class PcComponentSpecExtractor
         $subcategory = (string)($product['subcategory'] ?? '');
         $label = (string)($product['subcategory_label'] ?? '');
         $tags = (string)($product['tags'] ?? '');
-        $haystack = mb_strtolower($name . ' ' . $category . ' ' . $subcategory . ' ' . $label . ' ' . $tags, 'UTF-8');
+        $description = html_entity_decode(strip_tags((string)($product['description'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $nameHaystack = mb_strtolower($name, 'UTF-8');
+        $descriptionHaystack = mb_strtolower($description, 'UTF-8');
+        $haystack = mb_strtolower(implode(' ', [$name, $description, $category, $subcategory, $label, $tags]), 'UTF-8');
 
-        $type = $this->componentType($haystack, $subcategory);
+        $type = $this->componentType($haystack, $category, $subcategory);
         if ($type === null) {
             return null;
         }
 
         $socket = $this->socket($haystack, $type);
         $chipset = $this->chipset($haystack);
-        $memoryType = $this->memoryType($haystack, $socket, $chipset, $type);
+        $memoryType = $this->memoryType($nameHaystack, $descriptionHaystack, $socket, $chipset, $type);
         $formFactor = $this->formFactor($haystack, $type);
         $wattage = $this->wattage($haystack, $type);
         $capacity = $this->capacityGb($haystack, $type);
@@ -73,6 +110,7 @@ final class PcComponentSpecExtractor
             'supports_form_factors' => $type === 'case' ? $this->supportedFormFactors($formFactor) : [],
             'integrated_graphics' => $type === 'cpu' ? $this->integratedGraphics($haystack, $socket) : null,
             'raw_name' => $name,
+            'runner_category' => $label ?: $subcategory,
         ];
 
         return [
@@ -116,25 +154,34 @@ final class PcComponentSpecExtractor
         $stmt->execute(['product_id' => $productId] + $spec);
     }
 
-    private function componentType(string $haystack, string $subcategory): ?string
+    private function componentType(string $haystack, string $category, string $subcategory): ?string
     {
+        $category = mb_strtolower($category, 'UTF-8');
         $sub = mb_strtolower($subcategory, 'UTF-8');
-        if (in_array($sub, ['case-accessori', 'hard-disk-accessori', 'tastiere-e-mouse-accessori'], true)) {
+        if (isset(self::RUNNER_COMPONENT_TYPES[$sub])) {
+            return self::RUNNER_COMPONENT_TYPES[$sub];
+        }
+        if (in_array($sub, self::EXCLUDED_RUNNER_CATEGORIES, true)) {
+            return null;
+        }
+        // Do not mistake NAS, server RAM or notebooks for loose PC components
+        // merely because their detailed description mentions DDR, SSD or a GPU.
+        if (!in_array($category, ['componenti', 'gaming', 'monitor', 'accessori'], true)) {
             return null;
         }
         $portableBundle = preg_match('/\b(notebook|laptop|loq\s*15|tuf\s+gaming\s+a15|vivobook|ideapad|macbook)\b/u', $haystack)
             || preg_match('/\b(rtx|radeon|geforce).{0,24}\/\s*(?:ryzen|i[3579]|core)\b/u', $haystack)
             || preg_match('/\b(?:ryzen|i[3579]|core).{0,24}\/\s*(?:rtx|radeon|geforce)\b/u', $haystack);
 
-        if ($sub === 'case-ventole' || str_contains($haystack, 'ventola')) return 'fan';
-        if ($sub === 'cpu-dissipatori' || str_contains($haystack, 'dissipatore') || str_contains($haystack, 'aio ')) return 'cooler';
-        if ($sub === 'cpu' || preg_match('/\b(cpu|processore|processor)\b/u', $haystack)) return 'cpu';
-        if ($sub === 'mainboard' || str_contains($haystack, 'mainboard') || str_contains($haystack, 'motherboard') || str_contains($haystack, 'scheda madre')) return 'motherboard';
-        if ($sub === 'memorie-ram' || preg_match('/\b(ddr[45]|dimm|sodimm)\b/u', $haystack)) return 'ram';
-        if (str_contains($sub, 'ssd') || str_contains($sub, 'hard-disk') || preg_match('/\b(nvme|m\.2|sata|ssd|hdd)\b/u', $haystack)) return 'storage';
-        if ($sub === 'schede-video' || (!$portableBundle && preg_match('/\b(scheda video|geforce\s+rtx|rtx\s*\d{4}|radeon\s+rx|rx\s*\d{4}|arc\s+[ab])\b/u', $haystack))) return 'gpu';
-        if ($sub === 'alimentatori' || preg_match('/\b(psu|alimentatore|80\+|80 plus)\b/u', $haystack)) return 'psu';
-        if ($sub === 'case' || preg_match('/\b(case|tower)\b/u', $haystack)) return 'case';
+        if (str_contains($haystack, 'ventola')) return 'fan';
+        if (str_contains($haystack, 'dissipatore') || str_contains($haystack, 'aio ')) return 'cooler';
+        if (preg_match('/\b(cpu|processore|processor)\b/u', $haystack)) return 'cpu';
+        if (str_contains($haystack, 'mainboard') || str_contains($haystack, 'motherboard') || str_contains($haystack, 'scheda madre')) return 'motherboard';
+        if (preg_match('/\b(ddr[45]|dimm|sodimm)\b/u', $haystack)) return 'ram';
+        if (preg_match('/\b(nvme|m\.2|sata|ssd|hdd)\b/u', $haystack)) return 'storage';
+        if (!$portableBundle && preg_match('/\b(scheda video|geforce\s+rtx|rtx\s*\d{4}|radeon\s+rx|rx\s*\d{4}|arc\s+[ab])\b/u', $haystack)) return 'gpu';
+        if (preg_match('/\b(psu|alimentatore|80\+|80 plus)\b/u', $haystack)) return 'psu';
+        if (preg_match('/\b(case|tower)\b/u', $haystack)) return 'case';
         if (str_contains($sub, 'monitor') || preg_match('/\bmonitor\b/u', $haystack)) return 'monitor';
         if (str_contains($sub, 'tastiere') || preg_match('/\b(tastiera|keyboard)\b/u', $haystack)) return 'keyboard';
         if ($sub === 'mouse' || preg_match('/\bmouse\b/u', $haystack)) return 'mouse';
@@ -176,17 +223,32 @@ final class PcComponentSpecExtractor
         return null;
     }
 
-    private function memoryType(string $haystack, ?string $socket, ?string $chipset, string $type): ?string
+    private function memoryType(string $name, string $description, ?string $socket, ?string $chipset, string $type): ?string
     {
-        // Product feeds commonly use compact forms such as "2DDR5" and "DIMMDDR5".
-        // Do not treat GDDR graphics memory as system RAM.
-        if (preg_match('/(?<!g)ddr\s*5\b/u', $haystack)) return 'DDR5';
-        if (preg_match('/(?<!g)ddr\s*4\b/u', $haystack)) return 'DDR4';
+        $nameType = $this->explicitMemoryType($name);
+        $descriptionType = $this->explicitMemoryType($description);
+        // A conflicting supplier title and datasheet is unsafe data. Keep it
+        // unknown so the strict compatibility check excludes that SKU.
+        if ($nameType !== null && $descriptionType !== null && $nameType !== $descriptionType) {
+            return null;
+        }
+        if ($nameType !== null) return $nameType;
+        if ($descriptionType !== null) return $descriptionType;
         if ($type === 'cpu' || $type === 'motherboard') {
             if ($socket === 'AM5' || $socket === 'LGA1851') return 'DDR5';
             if ($socket === 'AM4') return 'DDR4';
             if ($chipset !== null && in_array($chipset, ['Z890', 'B860', 'H810', 'X870', 'B850', 'X670', 'B650', 'A620'], true)) return 'DDR5';
         }
+
+        return null;
+    }
+
+    private function explicitMemoryType(string $haystack): ?string
+    {
+        // Product feeds commonly use compact forms such as "2DDR5" and "DIMMDDR5".
+        // Do not treat GDDR graphics memory as system RAM.
+        if (preg_match('/(?<!g)ddr\s*5\b/u', $haystack)) return 'DDR5';
+        if (preg_match('/(?<!g)ddr\s*4\b/u', $haystack)) return 'DDR4';
 
         return null;
     }
