@@ -70,7 +70,13 @@ final class PcCompatibilityService
     {
         $options = [];
         foreach (self::SLOT_ORDER as $type) {
-            $options[$type] = $this->optionsForSlot($type, $selected, 80);
+            $slotOptions = $this->optionsForSlot($type, $selected, 80);
+            $selectedId = (int)($selected[$type] ?? 0);
+            $selectedOption = $selectedId > 0 ? $this->selectedOptionForSlot($type, $selectedId, $selected) : null;
+            if ($selectedOption !== null && !in_array($selectedId, array_column($slotOptions, 'id'), true)) {
+                array_unshift($slotOptions, $selectedOption);
+            }
+            $options[$type] = $slotOptions;
         }
 
         return $options;
@@ -99,6 +105,13 @@ final class PcCompatibilityService
     {
         $selectedSpecs = $this->selectedSpecs($selected);
         if (isset($selectedSpecs['cpu']) && empty($selectedSpecs['gpu']) && $this->cpuRequiresDiscreteGpu($selectedSpecs['cpu'])) {
+            return false;
+        }
+        if (isset($selectedSpecs['motherboard'], $selectedSpecs['ram'])
+            && !$this->sameKnown(
+                (string)($selectedSpecs['motherboard']['memory_type'] ?? ''),
+                (string)($selectedSpecs['ram']['memory_type'] ?? '')
+            )) {
             return false;
         }
 
@@ -160,6 +173,35 @@ final class PcCompatibilityService
     }
 
     /**
+     * A valid base component must remain selectable even when it falls below
+     * the option list limit; otherwise the browser silently selects option one.
+     *
+     * @param array<string,int> $selected
+     * @return array<string,mixed>|null
+     */
+    private function selectedOptionForSlot(string $type, int $productId, array $selected): ?array
+    {
+        $row = $this->specForProduct($productId);
+        if ($row === null || (string)$row['component_type'] !== $type) {
+            return null;
+        }
+        if ($type === 'ram' && $this->ramLooksUnsuitable((string)($row['name'] ?? ''))) {
+            return null;
+        }
+        if ($type === 'gpu' && $this->gpuLooksUnsuitable((string)($row['name'] ?? ''))) {
+            return null;
+        }
+
+        $otherSelected = $selected;
+        unset($otherSelected[$type]);
+        if (!$this->candidateCompatible($row, $type, $this->selectedSpecs($otherSelected))) {
+            return null;
+        }
+
+        return $this->formatOption($row);
+    }
+
+    /**
      * @param array<string,int> $selected
      * @return array<string,array<string,mixed>>
      */
@@ -217,12 +259,12 @@ final class PcCompatibilityService
         }
 
         if (isset($selected['motherboard']) && $type === 'ram') {
-            if ($this->knownDifferent((string)($candidate['memory_type'] ?? ''), (string)($selected['motherboard']['memory_type'] ?? ''))) {
+            if (!$this->sameKnown((string)($candidate['memory_type'] ?? ''), (string)($selected['motherboard']['memory_type'] ?? ''))) {
                 return false;
             }
         }
         if (isset($selected['ram']) && $type === 'motherboard') {
-            if ($this->knownDifferent((string)($candidate['memory_type'] ?? ''), (string)($selected['ram']['memory_type'] ?? ''))) {
+            if (!$this->sameKnown((string)($candidate['memory_type'] ?? ''), (string)($selected['ram']['memory_type'] ?? ''))) {
                 return false;
             }
         }
@@ -267,14 +309,6 @@ final class PcCompatibilityService
     private function gpuLooksUnsuitable(string $name): bool
     {
         return (bool)preg_match('/\b(gt\s*710|gt\s*730|gt\s*1030)\b/u', mb_strtolower($name, 'UTF-8'));
-    }
-
-    private function knownDifferent(string $a, string $b): bool
-    {
-        $a = strtoupper(trim($a));
-        $b = strtoupper(trim($b));
-
-        return $a !== '' && $b !== '' && $a !== $b;
     }
 
     /**

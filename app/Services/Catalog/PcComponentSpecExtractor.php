@@ -178,8 +178,10 @@ final class PcComponentSpecExtractor
 
     private function memoryType(string $haystack, ?string $socket, ?string $chipset, string $type): ?string
     {
-        if (preg_match('/\bddr\s*5\b/u', $haystack)) return 'DDR5';
-        if (preg_match('/\bddr\s*4\b/u', $haystack)) return 'DDR4';
+        // Product feeds commonly use compact forms such as "2DDR5" and "DIMMDDR5".
+        // Do not treat GDDR graphics memory as system RAM.
+        if (preg_match('/(?<!g)ddr\s*5\b/u', $haystack)) return 'DDR5';
+        if (preg_match('/(?<!g)ddr\s*4\b/u', $haystack)) return 'DDR4';
         if ($type === 'cpu' || $type === 'motherboard') {
             if ($socket === 'AM5' || $socket === 'LGA1851') return 'DDR5';
             if ($socket === 'AM4') return 'DDR4';
@@ -227,6 +229,9 @@ final class PcComponentSpecExtractor
     {
         if (!in_array($type, ['ram', 'storage'], true)) {
             return null;
+        }
+        if ($type === 'ram' && preg_match('/\b(\d+)\s*[x×]\s*(\d+)\s*gb\b/u', $haystack, $m)) {
+            return (int)$m[1] * (int)$m[2];
         }
         if (preg_match('/\b(\d+)\s*tb\b/u', $haystack, $m)) return (int)$m[1] * 1024;
         if (preg_match('/\b(\d+)\s*gb\b/u', $haystack, $m)) return (int)$m[1];
