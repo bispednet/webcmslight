@@ -105,6 +105,7 @@ $typeCounts = [];
 foreach ($types as $type) {
     $typeCounts[(string)$type['component_type']] = (int)$type['total'];
 }
+$specCount = array_sum($typeCounts);
 foreach (['cpu', 'motherboard', 'ram', 'storage', 'gpu', 'psu', 'case', 'cpu_cooler'] as $type) {
     $count = $typeCounts[$type] ?? 0;
     diagnosticLine($count > 0 ? 'OK' : 'FAIL', 'Specifiche ' . $type, $count);
@@ -158,8 +159,18 @@ if ($buildCount > 0) {
     exit(0);
 }
 
-if ($eligibleProducts === 0 || $availableSpecs === 0) {
+if ($eligibleProducts === 0) {
     fwrite(STDOUT, "Blocco catalogo: prima deve completarsi l'import Runner con componenti disponibili e prezzati.\n");
+    exit(3);
+}
+
+if ($specCount === 0) {
+    fwrite(STDOUT, "Specifiche non ancora estratte: eseguire generate-pc-catalog.php una volta dopo la migrazione.\n");
+    exit(1);
+}
+
+if ($availableSpecs === 0) {
+    fwrite(STDOUT, "Blocco disponibilita: le specifiche ci sono, ma nessun componente ha prezzo e disponibilita utilizzabili.\n");
     exit(3);
 }
 
