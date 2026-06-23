@@ -8,11 +8,34 @@ use App\Core\Database;
 $db = Database::connection();
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+$columns = [
+    'image_url' => ['definition' => 'VARCHAR(500) NULL', 'after' => 'description'],
+    'subcategory' => ['definition' => 'VARCHAR(80) NULL', 'after' => 'category'],
+    'subcategory_label' => ['definition' => 'VARCHAR(120) NULL', 'after' => 'subcategory'],
+    'stock_qty' => ['definition' => 'INT UNSIGNED DEFAULT 0', 'after' => 'stock_status'],
+];
+
+foreach ($columns as $column => $definition) {
+    $exists = $db->prepare(
+        'SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = \'products\' AND column_name = :column'
+    );
+    $exists->execute(['column' => $column]);
+    if ((int)$exists->fetchColumn() > 0) {
+        continue;
+    }
+
+    // MySQL 5.7 / older MariaDB do not support ADD COLUMN IF NOT EXISTS.
+    $db->exec(sprintf(
+        'ALTER TABLE products ADD COLUMN `%s` %s AFTER `%s`',
+        $column,
+        $definition['definition'],
+        $definition['after']
+    ));
+    fwrite(STDOUT, "Added products.{$column}\n");
+}
+
 $statements = [
-    "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(500) NULL AFTER description",
-    "ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory VARCHAR(80) NULL AFTER category",
-    "ALTER TABLE products ADD COLUMN IF NOT EXISTS subcategory_label VARCHAR(120) NULL AFTER subcategory",
-    "ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_qty INT UNSIGNED DEFAULT 0 AFTER stock_status",
     "CREATE TABLE IF NOT EXISTS pc_component_specs (
         product_id INT UNSIGNED PRIMARY KEY,
         component_type VARCHAR(40) NOT NULL,
