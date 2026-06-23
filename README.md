@@ -197,6 +197,13 @@ Su DirectAdmin/HOST.it aggiungere questo cron giornaliero dopo il cron di import
 30 4 * * * /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/generate-pc-catalog.php >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/pc-configurator-cron.log 2>&1
 ```
 
+Il deploy Git aggiorna solo i file: alla prima installazione eseguire anche la migrazione del database. Per una diagnosi non distruttiva della pipeline sul server:
+
+```bash
+/usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/migrate-pc-configurator.php
+/usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/diagnose-pc-catalog.php
+```
+
 ## Analytics e SEO locale
 
 - GA4 e Meta Pixel sono configurabili in `.env.php` dentro `analytics.ga4_measurement_id` e `analytics.meta_pixel_id`; se vuoti non viene caricato nessun tag esterno.
