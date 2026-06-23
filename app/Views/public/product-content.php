@@ -341,6 +341,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                 const addButton = root.querySelector('.pc-configurator__add');
                 const latestOptions = {};
                 const baseOptions = {};
+                const selectedState = {};
                 let busy = false;
 
                 function rows() {
@@ -357,11 +358,26 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
 
                 function collect() {
                     const params = new URLSearchParams();
-                    visibleRows().forEach(row => {
+                    rows().forEach(row => {
                         const select = row.querySelector('.pc-configurator__select');
-                        if (select.value) params.set(select.dataset.slot, select.value);
+                        if (!select) return;
+                        const slot = select.dataset.slot;
+                        const value = row.classList.contains('hidden')
+                            ? ''
+                            : (Object.prototype.hasOwnProperty.call(selectedState, slot) ? selectedState[slot] : select.value);
+                        // Sending an empty value is intentional: it removes an optional
+                        // component from the server-side selection.
+                        params.set(slot, value || '');
                     });
                     return params;
+                }
+
+                function setSelectedValue(slot, value) {
+                    if (value) {
+                        selectedState[slot] = String(value);
+                    } else {
+                        delete selectedState[slot];
+                    }
                 }
 
                 function selectedOption(select, options) {
@@ -452,6 +468,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         empty.dataset.optionValue = '';
                         empty.textContent = 'Nessuno';
                         if (!select.value) empty.style.fontWeight = '700';
+                        empty.addEventListener('click', () => chooseOption(slot, ''));
                         list.appendChild(empty);
                     }
 
@@ -462,6 +479,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         node.dataset.optionValue = option.id;
                         node.textContent = optionLabel(option, current);
                         if (String(option.id) === String(select.value)) node.style.fontWeight = '700';
+                        node.addEventListener('click', () => chooseOption(slot, option.id));
                         list.appendChild(node);
                     });
 
@@ -586,6 +604,8 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                 }
 
                 function render(data) {
+                    Object.keys(selectedState).forEach(slot => delete selectedState[slot]);
+                    Object.entries(data.selected || {}).forEach(([slot, value]) => setSelectedValue(slot, value));
                     Object.entries(data.options || {}).forEach(([slot, options]) => {
                         const select = root.querySelector('[data-slot="' + slot + '"]');
                         if (!select) return;
@@ -597,6 +617,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         if (!baseOptions[slot]) {
                             baseOptions[slot] = selectedOption(select, options || []);
                         }
+                        setSelectedValue(slot, select.value);
                         syncPicker(slot, options || []);
                     });
 
@@ -635,6 +656,15 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         .finally(() => { busy = false; });
                 }
 
+                function chooseOption(slot, value) {
+                    const select = root.querySelector('[data-slot="' + slot + '"]');
+                    if (!select) return;
+                    select.value = value || '';
+                    setSelectedValue(slot, value || '');
+                    closeMenus();
+                    refresh();
+                }
+
                 root.querySelectorAll('.pc-configurator__trigger').forEach(button => {
                     button.addEventListener('click', () => {
                         const slot = button.dataset.triggerSlot;
@@ -658,20 +688,10 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     });
                 });
 
-                selects().forEach(select => select.addEventListener('change', refresh));
-
-                root.addEventListener('click', event => {
-                    const optionButton = event.target.closest('[data-option-value]');
-                    if (!optionButton || !root.contains(optionButton)) return;
-                    const menu = optionButton.closest('.pc-configurator__menu');
-                    const slot = menu ? menu.dataset.menuSlot : '';
-                    if (!slot) return;
-                    const select = root.querySelector('[data-slot="' + slot + '"]');
-                    if (!select) return;
-                    select.value = optionButton.dataset.optionValue || '';
-                    closeMenus();
+                selects().forEach(select => select.addEventListener('change', () => {
+                    setSelectedValue(select.dataset.slot, select.value);
                     refresh();
-                });
+                }));
 
                 document.addEventListener('click', event => {
                     if (!root.contains(event.target)) closeMenus();
@@ -695,6 +715,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         const select = row ? row.querySelector('.pc-configurator__select') : null;
                         if (!row || !select) return;
                         select.value = '';
+                        setSelectedValue(select.dataset.slot, '');
                         row.classList.add('hidden');
                         refresh();
                     });
@@ -708,6 +729,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         row.classList.remove('hidden');
                         const firstOption = Array.from(select.options).find(option => option.value !== '');
                         select.value = firstOption ? firstOption.value : '';
+                        setSelectedValue(select.dataset.slot, select.value);
                         refresh();
                     });
                 }
