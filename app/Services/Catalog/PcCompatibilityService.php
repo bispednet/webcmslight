@@ -74,8 +74,9 @@ final class PcCompatibilityService
             $selectedId = (int)($selected[$type] ?? 0);
             $selectedOption = $selectedId > 0 ? $this->selectedOptionForSlot($type, $selectedId, $selected) : null;
             if ($selectedOption !== null && !in_array($selectedId, array_column($slotOptions, 'id'), true)) {
-                array_unshift($slotOptions, $selectedOption);
+                $slotOptions[] = $selectedOption;
             }
+            $this->sortOptionsByPrice($slotOptions);
             $options[$type] = $slotOptions;
         }
 
@@ -136,6 +137,10 @@ final class PcCompatibilityService
      */
     public function optionsForSlot(string $type, array $selected, int $limit = 60): array
     {
+        $baseRamCapacity = 0;
+        if ($type === 'ram' && !empty($selected['ram'])) {
+            $baseRamCapacity = (int)(($this->specForProduct((int)$selected['ram'])['capacity_gb'] ?? 0));
+        }
         $otherSelected = $selected;
         unset($otherSelected[$type]);
         $selectedSpecs = $this->selectedSpecs($otherSelected);
@@ -148,7 +153,9 @@ final class PcCompatibilityService
              INNER JOIN products p ON p.id = s.product_id
              WHERE s.component_type = :type
                AND COALESCE(p.stock_status, '') NOT IN ('esaurito','ritirato','outofstock','non disponibile')
-             ORDER BY (p.stock_status = 'disponibile') DESC, p.stock_qty DESC, s.confidence DESC, COALESCE(p.sale_price, p.price, 999999) ASC
+             ORDER BY CASE WHEN COALESCE(p.sale_price, p.price, 0) > 0 THEN 0 ELSE 1 END,
+                      COALESCE(p.sale_price, p.price, 999999) ASC,
+                      p.name ASC
              LIMIT :limit"
         );
         $stmt->bindValue(':type', $type);
@@ -158,6 +165,9 @@ final class PcCompatibilityService
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
             if ($type === 'ram' && $this->ramLooksUnsuitable((string)($row['name'] ?? ''))) {
+                continue;
+            }
+            if ($type === 'ram' && $baseRamCapacity > 0 && (int)($row['capacity_gb'] ?? 0) < $baseRamCapacity) {
                 continue;
             }
             if ($type === 'gpu' && $this->gpuLooksUnsuitable((string)($row['name'] ?? ''))) {
@@ -170,6 +180,25 @@ final class PcCompatibilityService
         }
 
         return $out;
+    }
+
+    /** @param array<int,array<string,mixed>> $options */
+    private function sortOptionsByPrice(array &$options): void
+    {
+        usort($options, static function (array $a, array $b): int {
+            $priceA = (float)($a['price'] ?? 0);
+            $priceB = (float)($b['price'] ?? 0);
+            $knownA = $priceA > 0;
+            $knownB = $priceB > 0;
+            if ($knownA !== $knownB) {
+                return $knownA ? -1 : 1;
+            }
+            if ($priceA !== $priceB) {
+                return $priceA <=> $priceB;
+            }
+
+            return strcasecmp((string)($a['name'] ?? ''), (string)($b['name'] ?? ''));
+        });
     }
 
     /**

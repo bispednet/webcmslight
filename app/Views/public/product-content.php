@@ -475,9 +475,20 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     filtered.forEach(option => {
                         const node = document.createElement('button');
                         node.type = 'button';
-                        node.className = 'pc-configurator__option block w-full rounded px-2 py-2 text-left text-sm';
+                        node.className = 'pc-configurator__option flex w-full items-start justify-between gap-3 rounded px-2 py-2 text-left text-sm';
                         node.dataset.optionValue = option.id;
-                        node.textContent = optionLabel(option, current);
+                        const label = document.createElement('span');
+                        label.className = 'min-w-0';
+                        label.textContent = option.name + ' - ' + option.price_label;
+                        node.appendChild(label);
+                        const delta = formatDelta(option, current);
+                        if (delta) {
+                            const deltaNode = document.createElement('span');
+                            deltaNode.className = 'shrink-0 font-bold';
+                            deltaNode.textContent = delta.text;
+                            deltaNode.style.color = delta.color;
+                            node.appendChild(deltaNode);
+                        }
                         if (String(option.id) === String(select.value)) node.style.fontWeight = '700';
                         node.addEventListener('click', () => chooseOption(slot, option.id));
                         list.appendChild(node);
