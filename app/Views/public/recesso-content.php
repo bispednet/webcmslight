@@ -32,7 +32,7 @@ $email = $settings['contact_email'] ?? 'negozio@bisped.net';
             <h2 class="font-display text-2xl font-black mb-6" style="color:var(--c-acc)">Dichiarazione di recesso online</h2>
             <form method="post" action="/recesso" class="space-y-5">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-                <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
+                <?= \App\Services\Security\SpamGuard::hiddenFields(); ?>
 
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
@@ -55,10 +55,12 @@ $email = $settings['contact_email'] ?? 'negozio@bisped.net';
                     <textarea class="form-textarea" name="message" id="withdrawal-message" rows="5" placeholder="Puoi aggiungere dettagli utili per identificare il contratto o il prodotto." style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)"></textarea>
                 </div>
 
+                <?= \App\Services\Security\SpamGuard::turnstileWidget(); ?>
                 <button type="submit" class="btn-primary w-full" style="justify-content:center">
                     Conferma recesso
                 </button>
             </form>
+            <?= \App\Services\Security\SpamGuard::turnstileScript(); ?>
         </section>
 
         <aside class="space-y-4" data-animate data-animate-delay="120">

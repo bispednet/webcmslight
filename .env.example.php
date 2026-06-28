@@ -197,4 +197,14 @@ return [
         'from_address' => 'noreply@bisped.net',
         'from_name' => 'Bisped',
     ],
+    // Antispam form pubblici. Le difese server-side (honeypot, time-trap,
+    // filtro contenuti, throttle IP) sono sempre attive. Turnstile è opzionale:
+    // compila site_key/secret_key (gratis su dash.cloudflare.com > Turnstile)
+    // per aggiungere il captcha invisibile. Vuoto = disabilitato.
+    'security' => [
+        'turnstile' => [
+            'site_key' => '',
+            'secret_key' => '',
+        ],
+    ],
 ];

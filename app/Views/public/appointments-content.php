@@ -33,6 +33,7 @@ $tomorrow = (new DateTimeImmutable('tomorrow', new DateTimeZone('Europe/Rome')))
 
         <form method="post" action="/appuntamenti" class="space-y-5">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+            <?= \App\Services\Security\SpamGuard::hiddenFields(); ?>
 
             <div class="grid gap-4 md:grid-cols-2">
                 <label class="block">
@@ -87,7 +88,9 @@ $tomorrow = (new DateTimeImmutable('tomorrow', new DateTimeZone('Europe/Rome')))
                 <textarea class="form-textarea" name="notes" rows="5" placeholder="Raccontaci modello dispositivo, urgenza, operatore o obiettivo della call." style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)"></textarea>
             </label>
 
+            <?= \App\Services\Security\SpamGuard::turnstileWidget(); ?>
             <button type="submit" class="btn-primary w-full" style="justify-content:center">Invia richiesta appuntamento</button>
         </form>
+        <?= \App\Services\Security\SpamGuard::turnstileScript(); ?>
     </div>
 </section>

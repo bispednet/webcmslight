@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Services\Security\Csrf;
+use App\Services\Security\SpamGuard;
 use App\Support\Flash;
 use App\Support\Sanitizer;
 use App\Support\Session;
@@ -24,8 +25,15 @@ final class ContactController extends Controller
             $this->redirect('/contatti');
         }
 
-        if (!empty($_POST['website'] ?? '')) {
-            Flash::set('contact_success', 'Richiesta ricevuta. Ti risponderemo appena possibile.');
+        $spam = SpamGuard::check($_POST, $_SERVER['REMOTE_ADDR'] ?? null);
+        if (!$spam['ok']) {
+            SpamGuard::logBlocked('contact', $spam['reason'], $_SERVER['REMOTE_ADDR'] ?? null, $_POST);
+            if ($spam['silent']) {
+                // Non riveliamo la difesa al bot: finto successo.
+                Flash::set('contact_success', 'Richiesta ricevuta. Ti risponderemo appena possibile.');
+            } else {
+                Flash::set('contact_error', 'Verifica antispam non superata. Riprova.');
+            }
             $this->redirect('/contatti');
         }
 
@@ -100,8 +108,14 @@ final class ContactController extends Controller
             $this->redirect('/recesso');
         }
 
-        if (!empty($_POST['website'] ?? '')) {
-            Flash::set('withdrawal_success', 'Richiesta di recesso ricevuta. Ti invieremo conferma appena possibile.');
+        $spam = SpamGuard::check($_POST, $_SERVER['REMOTE_ADDR'] ?? null);
+        if (!$spam['ok']) {
+            SpamGuard::logBlocked('withdrawal', $spam['reason'], $_SERVER['REMOTE_ADDR'] ?? null, $_POST);
+            if ($spam['silent']) {
+                Flash::set('withdrawal_success', 'Richiesta di recesso ricevuta. Ti invieremo conferma appena possibile.');
+            } else {
+                Flash::set('withdrawal_error', 'Verifica antispam non superata. Riprova.');
+            }
             $this->redirect('/recesso');
         }
 

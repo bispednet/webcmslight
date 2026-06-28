@@ -7,6 +7,7 @@ use App\Core\Container;
 use App\Core\Controller;
 use App\Core\Database;
 use App\Services\Security\Csrf;
+use App\Services\Security\SpamGuard;
 use App\Support\Flash;
 use App\Support\Session;
 use PDO;
@@ -36,6 +37,17 @@ final class AppointmentController extends Controller
         Session::ensureStarted();
         if (!Csrf::verify(is_string($_POST['csrf_token'] ?? null) ? $_POST['csrf_token'] : null)) {
             Flash::set('appointments.error', 'Sessione scaduta. Riprova.');
+            $this->redirect('/appuntamenti');
+        }
+
+        $spam = SpamGuard::check($_POST, $_SERVER['REMOTE_ADDR'] ?? null);
+        if (!$spam['ok']) {
+            SpamGuard::logBlocked('appointment', $spam['reason'], $_SERVER['REMOTE_ADDR'] ?? null, $_POST);
+            if ($spam['silent']) {
+                Flash::set('appointments.success', 'Richiesta ricevuta. Ti confermiamo l’appuntamento appena verificata la disponibilita in agenda.');
+            } else {
+                Flash::set('appointments.error', 'Verifica antispam non superata. Riprova.');
+            }
             $this->redirect('/appuntamenti');
         }
 

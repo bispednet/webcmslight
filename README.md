@@ -189,6 +189,16 @@ Revisione completa → [`docs/SECURITY_ASSESSMENT.md`](docs/SECURITY_ASSESSMENT.
 - `BispedBusinessContext.php` contiene stime di prezzo indicative — aggiornare manualmente se cambiano
 - Deploy produzione richiede: rotazione `app.key`, credenziali OAuth/SMTP, `app.url=https://bisped.net`
 
+## Antispam form pubblici
+
+I form pubblici (contatti, appuntamenti, recesso) sono protetti da `App\Services\Security\SpamGuard`: honeypot, time-trap firmato, filtro contenuti (URL/script non latini), throttle per IP e, opzionale, **Cloudflare Turnstile** (captcha invisibile). Per attivare Turnstile basta inserire `security.turnstile.site_key` e `secret_key` in `.env.php` (chiavi gratuite da `dash.cloudflare.com` › Turnstile); a campi vuoti resta attivo solo l'antispam server-side.
+
+I tentativi bloccati sono registrati in `storage/logs/spam.log` (una riga JSON ciascuno). Cron giornaliero che invia un riepilogo HTML agli admin **solo se ci sono stati tentativi** nelle ultime 24h (ruota il log a 30 giorni):
+
+```bash
+0 7 * * * /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/send-spam-digest.php >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/spam-digest-cron.log 2>&1
+```
+
 ## Cron produzione PC Custom
 
 Su DirectAdmin/HOST.it aggiungere questo cron giornaliero dopo il cron di import prodotti/prezzi Runner. Genera e aggiorna i prodotti `PC-Custom` dal catalogo componenti, usando Gemini per validare le configurazioni commercialmente sensate.

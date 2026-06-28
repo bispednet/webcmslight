@@ -43,7 +43,7 @@ if (!empty($prefill['prodotto'])) {
         <h2 class="font-display text-2xl font-black mb-6" style="color:var(--c-acc)">Invia una richiesta</h2>
         <form method="post" action="/contatti" class="space-y-5">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
+            <?= \App\Services\Security\SpamGuard::hiddenFields(); ?>
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div>
@@ -92,6 +92,8 @@ if (!empty($prefill['prodotto'])) {
                           style="background:var(--c-bg);color:var(--c-txt);border-color:var(--c-border)"><?= htmlspecialchars($defaultMessage, ENT_QUOTES, 'UTF-8') ?></textarea>
             </div>
 
+            <?= \App\Services\Security\SpamGuard::turnstileWidget(); ?>
+
             <button type="submit" class="btn-primary w-full" style="justify-content:center">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/>
@@ -100,6 +102,7 @@ if (!empty($prefill['prodotto'])) {
             </button>
         </form>
     </div>
+    <?= \App\Services\Security\SpamGuard::turnstileScript(); ?>
 
     <!-- Sidebar -->
     <aside class="space-y-4" data-animate data-animate-delay="120">
