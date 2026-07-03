@@ -55,6 +55,17 @@
                                     <?= htmlspecialchars((string)$order['product_name'], ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                                 <div class="text-xs text-muted font-mono"><?= htmlspecialchars((string)$order['public_id'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php if ($status === 'failed' && !empty($order['raw_response_json'])): ?>
+                                    <?php
+                                    $raw = json_decode((string)$order['raw_response_json'], true);
+                                    $errorText = is_array($raw) ? (string)($raw['error'] ?? '') : '';
+                                    ?>
+                                    <?php if ($errorText !== ''): ?>
+                                        <div class="mt-1 text-xs text-red-200">
+                                            <?= htmlspecialchars($errorText, ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                             </td>
                             <td class="py-3 text-muted">
                                 <?= htmlspecialchars((string)$order['payment_method'], ENT_QUOTES, 'UTF-8') ?>

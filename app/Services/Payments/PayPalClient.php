@@ -117,34 +117,23 @@ final class PayPalClient
             throw new RuntimeException('PayPal credentials are missing.');
         }
 
-        $ch = curl_init($this->baseUrl() . '/v1/oauth2/token');
-        if ($ch === false) {
-            throw new RuntimeException('Unable to initialize PayPal request.');
-        }
-
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_USERPWD => $this->clientId . ':' . $this->clientSecret,
-            CURLOPT_POSTFIELDS => 'grant_type=client_credentials',
-            CURLOPT_HTTPHEADER => [
+        [$status, $body, $error] = $this->sendHttpRequest(
+            'POST',
+            $this->baseUrl() . '/v1/oauth2/token',
+            [
                 'Accept: application/json',
                 'Accept-Language: en_US',
+                'Authorization: Basic ' . base64_encode($this->clientId . ':' . $this->clientSecret),
                 'Content-Type: application/x-www-form-urlencoded',
             ],
-            CURLOPT_TIMEOUT => 20,
-        ]);
-
-        $body = curl_exec($ch);
-        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($body === false || $status < 200 || $status >= 300) {
-            throw new RuntimeException('PayPal authentication failed' . ($error ? ': ' . $error : '.'));
-        }
+            'grant_type=client_credentials',
+            20
+        );
 
         $data = json_decode((string)$body, true);
+        if ($body === false || $status < 200 || $status >= 300) {
+            throw new RuntimeException('PayPal authentication failed' . $this->errorSuffix($data, $status, $error));
+        }
         if (!is_array($data) || empty($data['access_token'])) {
             throw new RuntimeException('PayPal authentication returned an invalid response.');
         }
@@ -158,40 +147,107 @@ final class PayPalClient
      */
     private function request(string $method, string $path, array|\stdClass|null $payload, string $accessToken): array
     {
-        $ch = curl_init($this->baseUrl() . $path);
-        if ($ch === false) {
-            throw new RuntimeException('Unable to initialize PayPal request.');
-        }
-
         $headers = [
             'Accept: application/json',
             'Authorization: Bearer ' . $accessToken,
             'Content-Type: application/json',
         ];
 
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 30,
-        ]);
-
-        if ($payload !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        }
-
-        $body = curl_exec($ch);
-        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
+        [$status, $body, $error] = $this->sendHttpRequest(
+            $method,
+            $this->baseUrl() . $path,
+            $headers,
+            $payload !== null ? json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null,
+            30
+        );
 
         $data = json_decode((string)$body, true);
         if ($body === false || $status < 200 || $status >= 300 || !is_array($data)) {
             $message = is_array($data) && isset($data['message']) ? (string)$data['message'] : 'PayPal request failed.';
-            throw new RuntimeException($message . ($error ? ' ' . $error : ''));
+            throw new RuntimeException($message . $this->errorSuffix($data, $status, $error));
         }
 
         return $data;
+    }
+
+    /**
+     * @param array<int,string> $headers
+     * @return array{0:int,1:string|false,2:string}
+     */
+    private function sendHttpRequest(string $method, string $url, array $headers, ?string $body, int $timeout): array
+    {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            if ($ch === false) {
+                throw new RuntimeException('Unable to initialize PayPal request.');
+            }
+
+            curl_setopt_array($ch, [
+                CURLOPT_CUSTOMREQUEST => $method,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_TIMEOUT => $timeout,
+            ]);
+
+            if ($body !== null) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            }
+
+            $responseBody = curl_exec($ch);
+            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            return [$status, $responseBody, $error];
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => $method,
+                'header' => implode("\r\n", $headers),
+                'content' => $body ?? '',
+                'ignore_errors' => true,
+                'timeout' => $timeout,
+            ],
+        ]);
+
+        $responseBody = @file_get_contents($url, false, $context);
+        $status = 0;
+        foreach (($http_response_header ?? []) as $header) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $match)) {
+                $status = (int)$match[1];
+                break;
+            }
+        }
+
+        return [$status, $responseBody, $responseBody === false ? 'HTTP stream request failed.' : ''];
+    }
+
+    /**
+     * @param mixed $data
+     */
+    private function errorSuffix(mixed $data, int $status, string $transportError): string
+    {
+        $bits = [];
+        if ($status > 0) {
+            $bits[] = 'HTTP ' . $status;
+        }
+        if (is_array($data)) {
+            if (!empty($data['name'])) {
+                $bits[] = (string)$data['name'];
+            }
+            if (!empty($data['debug_id'])) {
+                $bits[] = 'debug_id=' . (string)$data['debug_id'];
+            }
+            if (!empty($data['details'][0]['issue'])) {
+                $bits[] = 'issue=' . (string)$data['details'][0]['issue'];
+            }
+        }
+        if ($transportError !== '') {
+            $bits[] = $transportError;
+        }
+
+        return $bits ? ' (' . implode('; ', $bits) . ')' : '.';
     }
 
     private function baseUrl(): string

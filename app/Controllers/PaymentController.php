@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Database;
+use App\Core\Logger;
 use App\Core\Response;
 use App\Services\Cms\ContentRepository;
 use App\Services\Payments\PayPalClient;
@@ -25,34 +26,34 @@ final class PaymentController
 
     public function createPayPalOrder(string $slug): void
     {
-        $body = $this->jsonBody();
-        if (!$this->validCsrf($body)) {
-            Response::json(['ok' => false, 'error' => 'csrf'], 419);
-            return;
-        }
-
-        $product = $this->paymentProduct(rawurldecode($slug), 'paypal');
-        if ($product === null) {
-            Response::json(['ok' => false, 'error' => 'product_not_payable'], 404);
-            return;
-        }
-
-        if (!$this->paypal->isConfigured()) {
-            Response::json(['ok' => false, 'error' => 'paypal_not_configured'], 503);
-            return;
-        }
-
-        $amount = $this->amountForProduct($product);
-        if ($amount === null) {
-            Response::json(['ok' => false, 'error' => 'invalid_amount'], 422);
-            return;
-        }
-
-        $deliveryMethod = $this->deliveryMethod($product, (string)($body['delivery_method'] ?? ''));
-        $publicId = bin2hex(random_bytes(16));
-        $orderId = $this->insertLocalOrder($publicId, $product, 'paypal', $deliveryMethod, $amount, 'created');
-
         try {
+            $body = $this->jsonBody();
+            if (!$this->validCsrf($body)) {
+                $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'csrf', 'message' => 'Sessione scaduta: ricarica la pagina e riprova.'], 419);
+                return;
+            }
+
+            $product = $this->paymentProduct(rawurldecode($slug), 'paypal');
+            if ($product === null) {
+                $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'product_not_payable', 'message' => 'Prodotto non abilitato al pagamento PayPal.'], 404);
+                return;
+            }
+
+            if (!$this->paypal->isConfigured()) {
+                $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'paypal_not_configured', 'message' => 'PayPal non configurato sul server.'], 503);
+                return;
+            }
+
+            $amount = $this->amountForProduct($product);
+            if ($amount === null) {
+                $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'invalid_amount', 'message' => 'Importo prodotto non valido.'], 422);
+                return;
+            }
+
+            $deliveryMethod = $this->deliveryMethod($product, (string)($body['delivery_method'] ?? ''));
+            $publicId = bin2hex(random_bytes(16));
+            $orderId = $this->insertLocalOrder($publicId, $product, 'paypal', $deliveryMethod, $amount, 'created');
+
             $paypalOrder = $this->paypal->createOrder($product, $amount, $deliveryMethod, $publicId);
             $paypalOrderId = (string)($paypalOrder['id'] ?? '');
             if ($paypalOrderId === '') {
@@ -70,15 +71,22 @@ final class PaymentController
                 'id' => $orderId,
             ]);
 
-            Response::json([
+            $this->jsonWithFreshCsrf([
                 'ok' => true,
                 'id' => $paypalOrderId,
                 'public_id' => $publicId,
                 'status' => $paypalOrder['status'] ?? 'CREATED',
             ]);
         } catch (\Throwable $e) {
-            $this->markOrderFailed($orderId, $e->getMessage());
-            Response::json(['ok' => false, 'error' => 'paypal_create_failed'], 502);
+            Logger::error('PayPal order creation failed', ['error' => $e->getMessage(), 'slug' => $slug]);
+            if (isset($orderId)) {
+                $this->markOrderFailed((int)$orderId, $e->getMessage());
+            }
+            $this->jsonWithFreshCsrf([
+                'ok' => false,
+                'error' => 'paypal_create_failed',
+                'message' => 'PayPal non ha creato l\'ordine. Contatta il negozio o riprova.',
+            ], 502);
         }
     }
 
@@ -86,7 +94,7 @@ final class PaymentController
     {
         $body = $this->jsonBody();
         if (!$this->validCsrf($body)) {
-            Response::json(['ok' => false, 'error' => 'csrf'], 419);
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'csrf', 'message' => 'Sessione scaduta: ricarica la pagina e riprova.'], 419);
             return;
         }
 
@@ -94,7 +102,7 @@ final class PaymentController
         $stmt->execute(['id' => rawurldecode($paypalOrderId)]);
         $localOrder = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$localOrder) {
-            Response::json(['ok' => false, 'error' => 'order_not_found'], 404);
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'order_not_found', 'message' => 'Ordine locale non trovato: contatta il negozio.'], 404);
             return;
         }
 
@@ -123,14 +131,23 @@ final class PaymentController
                 'id' => (int)$localOrder['id'],
             ]);
 
-            Response::json([
+            $this->jsonWithFreshCsrf([
                 'ok' => true,
                 'status' => $capture['status'] ?? strtoupper($status),
                 'public_id' => $localOrder['public_id'],
             ]);
         } catch (\Throwable $e) {
+            Logger::error('PayPal order capture failed', [
+                'error' => $e->getMessage(),
+                'paypal_order_id' => (string)($localOrder['paypal_order_id'] ?? ''),
+                'local_order_id' => (int)($localOrder['id'] ?? 0),
+            ]);
             $this->markOrderFailed((int)$localOrder['id'], $e->getMessage());
-            Response::json(['ok' => false, 'error' => 'paypal_capture_failed'], 502);
+            $this->jsonWithFreshCsrf([
+                'ok' => false,
+                'error' => 'paypal_capture_failed',
+                'message' => 'PayPal ha approvato il pagamento, ma la conferma server non e riuscita. Contatta il negozio prima di riprovare.',
+            ], 502);
         }
     }
 
@@ -138,19 +155,19 @@ final class PaymentController
     {
         $body = $this->jsonBody();
         if (!$this->validCsrf($body)) {
-            Response::json(['ok' => false, 'error' => 'csrf'], 419);
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'csrf'], 419);
             return;
         }
 
         $product = $this->paymentProduct(rawurldecode($slug), 'crypto');
         if ($product === null) {
-            Response::json(['ok' => false, 'error' => 'product_not_payable'], 404);
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'product_not_payable'], 404);
             return;
         }
 
         $amount = $this->amountForProduct($product);
         if ($amount === null) {
-            Response::json(['ok' => false, 'error' => 'invalid_amount'], 422);
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'invalid_amount'], 422);
             return;
         }
 
@@ -158,7 +175,7 @@ final class PaymentController
         $publicId = bin2hex(random_bytes(16));
         $this->insertLocalOrder($publicId, $product, 'crypto', $deliveryMethod, $amount, 'pending_crypto');
 
-        Response::json([
+        $this->jsonWithFreshCsrf([
             'ok' => true,
             'public_id' => $publicId,
             'message' => 'Richiesta crypto registrata. Il negozio confermera wallet, rete e disponibilita prima del pagamento.',
@@ -177,6 +194,15 @@ final class PaymentController
 
         $data = json_decode($raw, true);
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function jsonWithFreshCsrf(array $payload, int $status = 200): void
+    {
+        $payload['csrf'] = Csrf::token();
+        Response::json($payload, $status);
     }
 
     /**
@@ -262,13 +288,17 @@ final class PaymentController
 
     private function markOrderFailed(int $orderId, string $reason): void
     {
-        $stmt = $this->db->prepare(
-            'UPDATE product_payment_orders SET status = :status, raw_response_json = :raw_response_json WHERE id = :id'
-        );
-        $stmt->execute([
-            'status' => 'failed',
-            'raw_response_json' => json_encode(['error' => mb_substr($reason, 0, 500)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            'id' => $orderId,
-        ]);
+        try {
+            $stmt = $this->db->prepare(
+                'UPDATE product_payment_orders SET status = :status, raw_response_json = :raw_response_json WHERE id = :id'
+            );
+            $stmt->execute([
+                'status' => 'failed',
+                'raw_response_json' => json_encode(['error' => mb_substr($reason, 0, 500)], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $orderId,
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('Unable to mark payment order as failed', ['error' => $e->getMessage(), 'order_id' => $orderId]);
+        }
     }
 }

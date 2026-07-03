@@ -276,7 +276,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                             if (!root || !window.paypal) return;
                             const status = root.querySelector('[data-payment-status]');
                             const deliverySelect = root.querySelector('[data-delivery-select]');
-                            const csrfToken = <?= json_encode($paymentCsrf ?? '') ?>;
+                            let csrfToken = <?= json_encode($paymentCsrf ?? '') ?>;
                             const slug = <?= json_encode($slug) ?>;
 
                             function selectedDelivery() {
@@ -287,6 +287,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                                 if (!status) return;
                                 status.textContent = message;
                                 status.style.color = isError ? 'var(--bisped-red)' : 'var(--c-muted)';
+                                status.dataset.paymentStatusKind = isError ? 'error' : 'info';
                             }
 
                             async function postJson(url, payload) {
@@ -299,10 +300,29 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                                     body: JSON.stringify(payload || {})
                                 });
                                 const data = await response.json().catch(() => ({}));
+                                if (data && typeof data.csrf === 'string' && data.csrf !== '') {
+                                    csrfToken = data.csrf;
+                                }
                                 if (!response.ok || data.ok === false) {
-                                    throw new Error(data.error || 'payment_error');
+                                    const error = new Error(data.message || data.error || 'payment_error');
+                                    error.code = data.error || 'payment_error';
+                                    error.payload = data;
+                                    throw error;
                                 }
                                 return data;
+                            }
+
+                            function describeError(error, fallback) {
+                                const code = error && error.code ? String(error.code) : '';
+                                if (error && error.message && error.message !== code) {
+                                    return error.message;
+                                }
+                                if (code === 'csrf') return 'Sessione scaduta: ricarica la pagina e riprova.';
+                                if (code === 'paypal_not_configured') return 'PayPal non e configurato sul server.';
+                                if (code === 'product_not_payable') return 'Prodotto non abilitato al pagamento online.';
+                                if (code === 'order_not_found') return 'Ordine locale non trovato: contatta il negozio.';
+                                if (code === 'paypal_capture_failed') return 'PayPal ha approvato il pagamento, ma la conferma server non e riuscita. Contatta il negozio prima di riprovare.';
+                                return fallback;
                             }
 
                             function paypalButtonConfig(fundingSource) {
@@ -315,22 +335,32 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                                     },
                                     createOrder: async function () {
                                         setStatus('Creo ordine sicuro PayPal...', false);
-                                        const data = await postJson('/payments/paypal/orders/' + encodeURIComponent(slug), {
-                                            delivery_method: selectedDelivery()
-                                        });
-                                        return data.id;
+                                        try {
+                                            const data = await postJson('/payments/paypal/orders/' + encodeURIComponent(slug), {
+                                                delivery_method: selectedDelivery()
+                                            });
+                                            return data.id;
+                                        } catch (error) {
+                                            setStatus(describeError(error, "PayPal non ha creato l'ordine. Riprova o contatta il negozio."), true);
+                                            throw error;
+                                        }
                                     },
                                     onApprove: async function (data) {
                                         setStatus('Pagamento approvato, confermo la cattura...', false);
-                                        const orderId = data.orderID || data.orderId;
-                                        const capture = await postJson('/payments/paypal/orders/' + encodeURIComponent(orderId) + '/capture', {});
-                                        setStatus('Pagamento completato. Codice ordine: ' + capture.public_id, false);
+                                        try {
+                                            const orderId = data.orderID || data.orderId;
+                                            const capture = await postJson('/payments/paypal/orders/' + encodeURIComponent(orderId) + '/capture', {});
+                                            setStatus('Pagamento completato. Codice ordine: ' + capture.public_id, false);
+                                        } catch (error) {
+                                            setStatus(describeError(error, 'PayPal ha approvato il pagamento, ma la conferma server non e riuscita. Contatta il negozio prima di riprovare.'), true);
+                                        }
                                     },
                                     onCancel: function () {
                                         setStatus('Pagamento annullato. Puoi riprovare quando vuoi.', true);
                                     },
-                                    onError: function () {
-                                        setStatus('PayPal non ha completato il pagamento. Riprova o contatta il negozio.', true);
+                                    onError: function (error) {
+                                        if (status && status.textContent && status.dataset.paymentStatusKind === 'error') return;
+                                        setStatus(describeError(error, 'PayPal non ha completato il pagamento. Riprova o contatta il negozio.'), true);
                                     }
                                 };
                                 if (fundingSource) {
@@ -372,7 +402,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         const button = root.querySelector('[data-crypto-request]');
                         const status = root.querySelector('[data-crypto-status]');
                         const deliverySelect = root.querySelector('[data-delivery-select]');
-                        const csrfToken = <?= json_encode($paymentCsrf ?? '') ?>;
+                        let csrfToken = <?= json_encode($paymentCsrf ?? '') ?>;
                         const slug = <?= json_encode($slug) ?>;
                         if (!button || !status) return;
                         button.addEventListener('click', async function () {
@@ -385,6 +415,9 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                                     body: JSON.stringify({delivery_method: deliverySelect ? deliverySelect.value : <?= json_encode($deliveryMethod === 'shipping' ? 'shipping' : 'pickup') ?>})
                                 });
                                 const data = await response.json();
+                                if (data && typeof data.csrf === 'string' && data.csrf !== '') {
+                                    csrfToken = data.csrf;
+                                }
                                 if (!response.ok || data.ok === false) throw new Error(data.error || 'crypto_error');
                                 status.textContent = data.message + ' Codice richiesta: ' + data.public_id;
                             } catch (e) {
