@@ -8,6 +8,8 @@ use App\Core\Database;
 use App\Models\Product;
 use App\Services\Security\Csrf;
 use App\Support\Flash;
+use App\Support\Media;
+use App\Support\Uploads;
 use PDO;
 
 final class ProductsController extends Controller
@@ -55,9 +57,14 @@ final class ProductsController extends Controller
 
         $input = $this->extractProductInput($_POST);
         $features = $input['features'];
+        $uploadError = $input['_upload_error'];
         unset($input['features']);
+        unset($input['_upload_error']);
 
         $errors = $this->validate($input, $features);
+        if ($uploadError !== null) {
+            $errors[] = $uploadError;
+        }
         if ($errors) {
             $this->renderForm($input, $features, $errors, 'Create Product', '/admin/products/store', 'create');
             return;
@@ -102,9 +109,14 @@ final class ProductsController extends Controller
 
         $input = $this->extractProductInput($_POST);
         $features = $input['features'];
+        $uploadError = $input['_upload_error'];
         unset($input['features']);
+        unset($input['_upload_error']);
 
         $errors = $this->validate($input, $features, (int)$id);
+        if ($uploadError !== null) {
+            $errors[] = $uploadError;
+        }
         if ($errors) {
             $this->renderForm($input + ['id' => $id], $features, $errors, 'Edit Product', "/admin/products/update/{$id}", 'edit');
             return;
@@ -148,6 +160,7 @@ final class ProductsController extends Controller
         $this->view('admin/products/form', [
             'title' => $title,
             'product' => $product,
+            'categoryOptions' => $this->categoryOptions((string)($product['category'] ?? '')),
             'featureText' => $featureText,
             'features' => $features,
             'errors' => $errors,
@@ -162,12 +175,34 @@ final class ProductsController extends Controller
     {
         $lines = preg_split('/\r\n|\r|\n/', (string)($source['features'] ?? '')) ?: [];
         $features = array_values(array_filter(array_map('trim', $lines), static fn (string $line) => $line !== ''));
+        $paymentMethod = $this->allowedValue((string)($source['payment_method'] ?? 'none'), ['none', 'paypal', 'crypto'], 'none');
+        $deliveryMethod = $this->allowedValue((string)($source['delivery_method'] ?? 'pickup'), ['shipping', 'pickup', 'both'], 'pickup');
+        $isPaymentProduct = $paymentMethod !== 'none' ? 1 : 0;
+        $description = trim((string)($source['description'] ?? ''));
+        $iconKey = trim((string)($source['icon_key'] ?? ''));
+        if ($isPaymentProduct && $iconKey === '') {
+            $iconKey = 'shopping-bag';
+        }
+        if ($isPaymentProduct && $features === [] && $description !== '') {
+            $features[] = mb_substr($description, 0, 180);
+        }
+
+        $imageUrl = trim((string)($source['image_url'] ?? ''));
+        $uploadError = null;
+        if ($this->hasFileUpload($_FILES['image_upload'] ?? null)) {
+            try {
+                $imageUrl = $this->storeUploadedFile($_FILES['image_upload'], (string)($source['name'] ?? 'product'));
+            } catch (\Throwable $e) {
+                $uploadError = $e->getMessage();
+            }
+        }
 
         return [
             'name' => trim((string)($source['name'] ?? '')),
             'slug' => trim((string)($source['slug'] ?? '')),
-            'description' => trim((string)($source['description'] ?? '')),
-            'icon_key' => trim((string)($source['icon_key'] ?? '')),
+            'description' => $description,
+            'image_url' => $this->normalizeImageValue($imageUrl),
+            'icon_key' => $iconKey,
             'external_link' => trim((string)($source['external_link'] ?? '')),
             'hero_title' => trim((string)($source['hero_title'] ?? '')),
             'hero_subtitle' => trim((string)($source['hero_subtitle'] ?? '')),
@@ -182,7 +217,13 @@ final class ProductsController extends Controller
             'stock_status' => trim((string)($source['stock_status'] ?? '')),
             'featured_order' => max(0, (int)($source['featured_order'] ?? 0)),
             'content_html' => (string)($source['content_html'] ?? ''),
+            'is_payment_product' => $isPaymentProduct,
+            'payment_method' => $paymentMethod,
+            'delivery_method' => $deliveryMethod,
+            'paypal_pay_later_enabled' => $paymentMethod === 'paypal' && isset($source['paypal_pay_later_enabled']) ? 1 : 0,
+            'payment_notes' => mb_substr(trim((string)($source['payment_notes'] ?? '')), 0, 255),
             'features' => $features,
+            '_upload_error' => $uploadError,
         ];
     }
 
@@ -222,6 +263,19 @@ final class ProductsController extends Controller
 
         if (empty($features)) {
             $errors[] = 'Add at least one feature.';
+        }
+
+        if (($product['is_payment_product'] ?? 0) && in_array($product['payment_method'], ['paypal', 'crypto'], true)) {
+            $amount = $product['sale_price'] ?: $product['price'];
+            if ($amount === null || (float)$amount <= 0) {
+                $errors[] = 'A payable product needs a price greater than zero.';
+            }
+            if (($product['image_url'] ?? '') === '') {
+                $errors[] = 'A payable product needs an image URL or uploaded photo.';
+            }
+            if ($product['payment_method'] !== 'paypal' && (int)($product['paypal_pay_later_enabled'] ?? 0) === 1) {
+                $errors[] = 'Pay Later can only be enabled for PayPal products.';
+            }
         }
 
         return $errors;
@@ -302,6 +356,7 @@ final class ProductsController extends Controller
             'description' => '',
             'icon_key' => '',
             'external_link' => '',
+            'image_url' => '',
             'hero_title' => '',
             'hero_subtitle' => '',
             'cta_text' => '',
@@ -315,6 +370,71 @@ final class ProductsController extends Controller
             'stock_status' => '',
             'featured_order' => 0,
             'content_html' => '',
+            'is_payment_product' => 0,
+            'payment_method' => 'none',
+            'delivery_method' => 'pickup',
+            'paypal_pay_later_enabled' => 0,
+            'payment_notes' => '',
         ];
+    }
+
+    /**
+     * @param array<int,string> $allowed
+     */
+    private function allowedValue(string $value, array $allowed, string $fallback): string
+    {
+        return in_array($value, $allowed, true) ? $value : $fallback;
+    }
+
+    private function hasFileUpload(mixed $file): bool
+    {
+        return is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+    }
+
+    private function storeUploadedFile(array $file, string $nameHint): string
+    {
+        $stored = Uploads::store($file, $nameHint ?: 'product');
+        return Media::normalizeMediaPath($stored['path']);
+    }
+
+    private function normalizeImageValue(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+
+        return Media::normalizeMediaPath($value);
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function categoryOptions(string $current = ''): array
+    {
+        $defaults = [
+            'smartphone',
+            'notebook',
+            'pc-assemblati',
+            'pc-custom',
+            'componenti',
+            'monitor',
+            'gaming',
+            'connettivita',
+            'server',
+            'stampa',
+            'audio-video',
+            'accessori',
+            'personalizzato',
+        ];
+
+        $stmt = $this->db->query("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category <> '' ORDER BY category ASC");
+        $existing = array_map(static fn (array $row): string => (string)$row['category'], $stmt->fetchAll() ?: []);
+
+        return array_values(array_unique(array_filter(array_merge($defaults, $existing, [$current]))));
     }
 }

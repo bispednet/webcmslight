@@ -8,6 +8,7 @@ use App\Core\Response;
 use App\Services\Cms\ContentRepository;
 use App\Services\Analytics\ProductMetricsService;
 use App\Services\Catalog\PcCompatibilityService;
+use App\Services\Payments\PayPalClient;
 use App\Services\Security\Csrf;
 use App\Support\Flash;
 use App\Support\Session;
@@ -116,7 +117,10 @@ final class PageController extends Controller
             $pcConfigurator = null;
         }
 
-        $this->view('public/product', compact('product', 'pcConfigurator'));
+        $paymentCsrf = Csrf::token();
+        $paypalPublicConfig = (new PayPalClient())->publicConfig();
+
+        $this->view('public/product', compact('product', 'pcConfigurator', 'paymentCsrf', 'paypalPublicConfig'));
     }
 
     public function brandLanding(string $slug): void

@@ -47,6 +47,7 @@ use App\Controllers\AuthController;
 use App\Controllers\ContactController;
 use App\Controllers\AppointmentController;
 use App\Controllers\AiConciergeController;
+use App\Controllers\PaymentController;
 use App\Controllers\Api\AgentApiController;
 
 $router = new Router();
@@ -88,6 +89,9 @@ $router->get('/ai/concierge/bootstrap', [AiConciergeController::class, 'bootstra
 $router->post('/ai/concierge/message', [AiConciergeController::class, 'message']);
 $router->post('/ai/concierge/choice', [AiConciergeController::class, 'choice']);
 $router->post('/ai/concierge/handoff/whatsapp', [AiConciergeController::class, 'whatsappHandoff']);
+$router->post('/payments/paypal/orders/{slug}', [PaymentController::class, 'createPayPalOrder']);
+$router->post('/payments/paypal/orders/{orderId}/capture', [PaymentController::class, 'capturePayPalOrder']);
+$router->post('/payments/crypto/orders/{slug}', [PaymentController::class, 'createCryptoRequest']);
 $router->get('/products', [PageController::class, 'products']);
 $router->get('/products/load', [PageController::class, 'loadProducts']);
 $router->get('/it/prodotti', [PageController::class, 'products']);

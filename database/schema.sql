@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS products (
     name VARCHAR(150) NOT NULL,
     slug VARCHAR(150) NOT NULL UNIQUE,
     description TEXT NOT NULL,
+    image_url VARCHAR(500) NULL,
     icon_key VARCHAR(50) NOT NULL,
     external_link VARCHAR(255) NULL,
     hero_title VARCHAR(200) NULL,
@@ -145,6 +146,11 @@ CREATE TABLE IF NOT EXISTS products (
     stock_qty INT UNSIGNED DEFAULT 0,
     content_html LONGTEXT NULL,
     featured_order INT UNSIGNED DEFAULT 0,
+    is_payment_product TINYINT(1) NOT NULL DEFAULT 0,
+    payment_method ENUM('none','paypal','crypto') NOT NULL DEFAULT 'none',
+    delivery_method ENUM('shipping','pickup','both') NOT NULL DEFAULT 'pickup',
+    paypal_pay_later_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    payment_notes VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -172,6 +178,30 @@ CREATE TABLE IF NOT EXISTS product_metric_daily (
     views INT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (product_id, metric_date),
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS product_payment_orders (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    public_id CHAR(32) NOT NULL UNIQUE,
+    product_id INT UNSIGNED NOT NULL,
+    product_name VARCHAR(190) NOT NULL,
+    product_slug VARCHAR(150) NOT NULL,
+    payment_method ENUM('paypal','crypto') NOT NULL,
+    delivery_method ENUM('shipping','pickup') NOT NULL DEFAULT 'pickup',
+    status ENUM('created','approved','completed','cancelled','failed','pending_crypto') NOT NULL DEFAULT 'created',
+    currency CHAR(3) NOT NULL DEFAULT 'EUR',
+    amount DECIMAL(10,2) NOT NULL,
+    paypal_order_id VARCHAR(64) NULL UNIQUE,
+    paypal_capture_id VARCHAR(120) NULL,
+    payer_email VARCHAR(190) NULL,
+    payer_name VARCHAR(190) NULL,
+    raw_response_json JSON NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    INDEX idx_product_payment_orders_product (product_id),
+    INDEX idx_product_payment_orders_status (status),
+    INDEX idx_product_payment_orders_paypal_order (paypal_order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pc_component_specs (

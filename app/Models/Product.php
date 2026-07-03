@@ -30,5 +30,10 @@ final class Product extends Model
         'stock_qty',
         'content_html',
         'featured_order',
+        'is_payment_product',
+        'payment_method',
+        'delivery_method',
+        'paypal_pay_later_enabled',
+        'payment_notes',
     ];
 }

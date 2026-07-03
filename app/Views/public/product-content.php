@@ -1,6 +1,8 @@
 <?php
 /** @var array $product */
 /** @var array|null $pcConfigurator */
+/** @var string $paymentCsrf */
+/** @var array $paypalPublicConfig */
 use App\Support\AdminMode;
 
 if (!function_exists('bisped_product_category_label')) {
@@ -41,6 +43,29 @@ $isSale = !$isConfigurablePc && $salePrice && $regularPrice && (float)$salePrice
 
 $priceFormatted = $displayPrice ? number_format((float)$displayPrice, 2, ',', '.') : null;
 $oldFormatted   = $isSale ? number_format((float)$regularPrice, 2, ',', '.') : null;
+$paymentMethod = (string)($product['payment_method'] ?? 'none');
+$isPaymentProduct = (int)($product['is_payment_product'] ?? 0) === 1;
+$isCheckoutEnabled = $isPaymentProduct && in_array($paymentMethod, ['paypal', 'crypto'], true);
+$paymentAmount = $displayPrice ? number_format((float)$displayPrice, 2, '.', '') : null;
+$deliveryMethod = (string)($product['delivery_method'] ?? 'pickup');
+if (!in_array($deliveryMethod, ['shipping', 'pickup', 'both'], true)) {
+    $deliveryMethod = 'pickup';
+}
+$paypalConfig = $paypalPublicConfig ?? ['configured' => false, 'client_id' => '', 'currency' => 'EUR'];
+$paypalConfigured = !empty($paypalConfig['configured']) && (string)($paypalConfig['client_id'] ?? '') !== '';
+$paypalCurrency = strtoupper((string)($paypalConfig['currency'] ?? 'EUR'));
+$paypalSdkUrl = '';
+if ($paymentMethod === 'paypal' && $paypalConfigured) {
+    $paypalSdkUrl = 'https://www.paypal.com/sdk/js?' . http_build_query([
+        'client-id' => (string)$paypalConfig['client_id'],
+        'currency' => $paypalCurrency,
+        'intent' => 'capture',
+        'components' => 'buttons,messages',
+        'enable-funding' => 'paylater',
+        'locale' => 'it_IT',
+    ], '', '&', PHP_QUERY_RFC3986);
+}
+$checkoutDomId = 'checkout-' . (int)($product['id'] ?? 0);
 
 // Stock
 $rawStock = strtolower(trim((string)($product['stock_status'] ?? '')));
@@ -182,6 +207,196 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                 Chiama il negozio
             </a>
         </div>
+
+        <?php if ($isCheckoutEnabled && $paymentAmount !== null): ?>
+            <section id="<?= htmlspecialchars($checkoutDomId, ENT_QUOTES, 'UTF-8') ?>"
+                     class="mt-6 rounded-lg border p-5"
+                     style="border-color:var(--c-border);background:var(--c-surface)"
+                     data-checkout-root
+                     data-slug="<?= htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 class="text-sm font-black uppercase tracking-widest" style="color:var(--c-muted)">Acquisto online</h2>
+                        <div class="mt-1 font-display text-2xl font-black" style="color:var(--c-acc)">
+                            € <?= htmlspecialchars(number_format((float)$paymentAmount, 2, ',', '.'), ENT_QUOTES, 'UTF-8') ?>
+                        </div>
+                        <div class="text-xs text-muted">IVA inclusa. Disponibilità e consegna secondo opzione selezionata.</div>
+                    </div>
+                    <?php if ($deliveryMethod === 'both'): ?>
+                        <label class="text-sm text-muted flex flex-col gap-2 min-w-[190px]">
+                            <span>Consegna</span>
+                            <select class="form-input text-sm" data-delivery-select>
+                                <option value="pickup">Ritiro in negozio</option>
+                                <option value="shipping">Spedizione</option>
+                            </select>
+                        </label>
+                    <?php else: ?>
+                        <div class="rounded-md border px-3 py-2 text-sm" style="border-color:var(--c-border)">
+                            <?= $deliveryMethod === 'shipping' ? 'Spedizione' : 'Ritiro in negozio' ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (($product['payment_notes'] ?? '') !== ''): ?>
+                    <p class="mt-3 text-sm text-muted"><?= htmlspecialchars((string)$product['payment_notes'], ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
+
+                <?php if ($paymentMethod === 'paypal'): ?>
+                    <?php if ($paypalConfigured): ?>
+                        <?php if (!empty($product['paypal_pay_later_enabled'])): ?>
+                            <div class="mt-4 rounded-md border px-3 py-3" style="border-color:var(--c-border);background:rgba(255,255,255,.03)">
+                                <div data-pp-message
+                                     data-pp-placement="product"
+                                     data-pp-amount="<?= htmlspecialchars($paymentAmount, ENT_QUOTES, 'UTF-8') ?>"
+                                     data-pp-style-layout="text"
+                                     data-pp-style-logo-type="inline"
+                                     data-pp-style-text-color="white"
+                                     data-pp-style-text-size="13"></div>
+                                <div class="mt-2 text-xs text-muted">Pagamento in 3 rate disponibile solo se PayPal lo rende eleggibile per cliente e importo.</div>
+                            </div>
+                        <?php endif; ?>
+                        <div class="mt-4 grid gap-3 md:grid-cols-2">
+                            <div>
+                                <div class="mb-2 text-xs font-bold uppercase tracking-widest text-muted">PayPal</div>
+                                <div id="<?= htmlspecialchars($checkoutDomId, ENT_QUOTES, 'UTF-8') ?>-paypal-buttons"></div>
+                            </div>
+                            <?php if (!empty($product['paypal_pay_later_enabled'])): ?>
+                                <div>
+                                    <div class="mb-2 text-xs font-bold uppercase tracking-widest text-muted">PayPal 3 rate</div>
+                                    <div id="<?= htmlspecialchars($checkoutDomId, ENT_QUOTES, 'UTF-8') ?>-paylater-buttons"></div>
+                                    <div class="hidden text-xs text-muted" data-paylater-unavailable>Pay Later non risulta disponibile per questa sessione.</div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="mt-3 text-sm" style="color:var(--c-muted)" data-payment-status></div>
+                        <script src="<?= htmlspecialchars($paypalSdkUrl, ENT_QUOTES, 'UTF-8') ?>"></script>
+                        <script>
+                        (function () {
+                            const root = document.getElementById(<?= json_encode($checkoutDomId) ?>);
+                            if (!root || !window.paypal) return;
+                            const status = root.querySelector('[data-payment-status]');
+                            const deliverySelect = root.querySelector('[data-delivery-select]');
+                            const csrfToken = <?= json_encode($paymentCsrf ?? '') ?>;
+                            const slug = <?= json_encode($slug) ?>;
+
+                            function selectedDelivery() {
+                                return deliverySelect ? deliverySelect.value : <?= json_encode($deliveryMethod === 'shipping' ? 'shipping' : 'pickup') ?>;
+                            }
+
+                            function setStatus(message, isError) {
+                                if (!status) return;
+                                status.textContent = message;
+                                status.style.color = isError ? 'var(--bisped-red)' : 'var(--c-muted)';
+                            }
+
+                            async function postJson(url, payload) {
+                                const response = await fetch(url, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-Token': csrfToken
+                                    },
+                                    body: JSON.stringify(payload || {})
+                                });
+                                const data = await response.json().catch(() => ({}));
+                                if (!response.ok || data.ok === false) {
+                                    throw new Error(data.error || 'payment_error');
+                                }
+                                return data;
+                            }
+
+                            function paypalButtonConfig(fundingSource) {
+                                const config = {
+                                    style: {
+                                        layout: 'vertical',
+                                        shape: 'rect',
+                                        color: fundingSource ? 'gold' : 'blue',
+                                        label: fundingSource ? 'paylater' : 'paypal'
+                                    },
+                                    createOrder: async function () {
+                                        setStatus('Creo ordine sicuro PayPal...', false);
+                                        const data = await postJson('/payments/paypal/orders/' + encodeURIComponent(slug), {
+                                            delivery_method: selectedDelivery()
+                                        });
+                                        return data.id;
+                                    },
+                                    onApprove: async function (data) {
+                                        setStatus('Pagamento approvato, confermo la cattura...', false);
+                                        const orderId = data.orderID || data.orderId;
+                                        const capture = await postJson('/payments/paypal/orders/' + encodeURIComponent(orderId) + '/capture', {});
+                                        setStatus('Pagamento completato. Codice ordine: ' + capture.public_id, false);
+                                    },
+                                    onCancel: function () {
+                                        setStatus('Pagamento annullato. Puoi riprovare quando vuoi.', true);
+                                    },
+                                    onError: function () {
+                                        setStatus('PayPal non ha completato il pagamento. Riprova o contatta il negozio.', true);
+                                    }
+                                };
+                                if (fundingSource) {
+                                    config.fundingSource = fundingSource;
+                                }
+                                return config;
+                            }
+
+                            paypal.Buttons(paypalButtonConfig()).render('#' + <?= json_encode($checkoutDomId . '-paypal-buttons') ?>);
+
+                            const payLaterTarget = document.getElementById(<?= json_encode($checkoutDomId . '-paylater-buttons') ?>);
+                            if (payLaterTarget && paypal.FUNDING && paypal.FUNDING.PAYLATER) {
+                                const payLaterButton = paypal.Buttons(paypalButtonConfig(paypal.FUNDING.PAYLATER));
+                                if (payLaterButton.isEligible()) {
+                                    payLaterButton.render(payLaterTarget);
+                                } else {
+                                    payLaterTarget.classList.add('hidden');
+                                    const unavailable = root.querySelector('[data-paylater-unavailable]');
+                                    if (unavailable) unavailable.classList.remove('hidden');
+                                }
+                            }
+                        })();
+                        </script>
+                    <?php else: ?>
+                        <div class="mt-4 rounded-md border p-4 text-sm text-muted" style="border-color:var(--c-border)">
+                            Pagamento online momentaneamente non disponibile. Contattaci per completare l'acquisto di questo prodotto.
+                        </div>
+                    <?php endif; ?>
+                <?php elseif ($paymentMethod === 'crypto'): ?>
+                    <div class="mt-4 rounded-md border p-4" style="border-color:var(--c-border);background:rgba(255,255,255,.03)">
+                        <p class="text-sm text-muted">Prodotto abilitato al pagamento crypto. Per sicurezza confermiamo wallet, rete e disponibilità prima dell'invio fondi.</p>
+                        <button type="button" class="btn-primary mt-3" data-crypto-request>Richiedi pagamento crypto</button>
+                        <div class="mt-3 text-sm text-muted" data-crypto-status></div>
+                    </div>
+                    <script>
+                    (function () {
+                        const root = document.getElementById(<?= json_encode($checkoutDomId) ?>);
+                        if (!root) return;
+                        const button = root.querySelector('[data-crypto-request]');
+                        const status = root.querySelector('[data-crypto-status]');
+                        const deliverySelect = root.querySelector('[data-delivery-select]');
+                        const csrfToken = <?= json_encode($paymentCsrf ?? '') ?>;
+                        const slug = <?= json_encode($slug) ?>;
+                        if (!button || !status) return;
+                        button.addEventListener('click', async function () {
+                            button.disabled = true;
+                            status.textContent = 'Registro la richiesta...';
+                            try {
+                                const response = await fetch('/payments/crypto/orders/' + encodeURIComponent(slug), {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                                    body: JSON.stringify({delivery_method: deliverySelect ? deliverySelect.value : <?= json_encode($deliveryMethod === 'shipping' ? 'shipping' : 'pickup') ?>})
+                                });
+                                const data = await response.json();
+                                if (!response.ok || data.ok === false) throw new Error(data.error || 'crypto_error');
+                                status.textContent = data.message + ' Codice richiesta: ' + data.public_id;
+                            } catch (e) {
+                                status.textContent = 'Non sono riuscito a registrare la richiesta. Contatta il negozio.';
+                                button.disabled = false;
+                            }
+                        });
+                    })();
+                    </script>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
 
         <?php if (!empty($pcConfigurator)): ?>
             <?php

@@ -25,6 +25,7 @@ use App\Controllers\Admin\TransparencyController;
 use App\Controllers\Admin\NavigationController;
 use App\Controllers\Admin\IngestController;
 use App\Controllers\Admin\MessagesController;
+use App\Controllers\Admin\PaymentsController;
 use App\Controllers\Admin\AppointmentsController;
 use App\Controllers\Admin\AiConciergeController as AdminAiConciergeController;
 
@@ -39,6 +40,7 @@ $router->post('/admin/products/store', [ProductsController::class, 'store'], [$r
 $router->get('/admin/products/edit/{id}', [ProductsController::class, 'edit'], [$requireAdmin]);
 $router->post('/admin/products/update/{id}', [ProductsController::class, 'update'], [$requireAdmin]);
 $router->post('/admin/products/delete/{id}', [ProductsController::class, 'destroy'], [$requireAdmin]);
+$router->get('/admin/payments', [PaymentsController::class, 'index'], [$requireAdmin]);
 
 $apiGuard = new AdminApiGuard();
 $router->post('/admin/api/update-field', [AdminInlineController::class, 'updateField'], [$apiGuard]);

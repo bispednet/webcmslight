@@ -19,6 +19,10 @@ $category = trim((string)($product['category'] ?? '')) ?: 'Catalogo';
 $categoryLabel = bisped_product_category_label($category);
 $imgUrl   = trim((string)($product['image_url'] ?? ''));
 $sku      = trim((string)($product['sku'] ?? ''));
+$paymentMethod = (string)($product['payment_method'] ?? 'none');
+$payLaterEnabled = (int)($product['is_payment_product'] ?? 0) === 1
+    && $paymentMethod === 'paypal'
+    && !empty($product['paypal_pay_later_enabled']);
 
 // Price logic
 $regularPrice = $product['price'] ?? null;
@@ -85,6 +89,11 @@ foreach ($catSlugs as $k => $v) {
 
     <div class="product-card__body">
         <div class="product-card__cat"><?= htmlspecialchars($categoryLabel, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php if ($payLaterEnabled): ?>
+            <div class="mt-1 text-[10px] font-bold uppercase tracking-wide" style="color:var(--bisped-red)">PayPal 3 rate</div>
+        <?php elseif ((int)($product['is_payment_product'] ?? 0) === 1 && $paymentMethod === 'crypto'): ?>
+            <div class="mt-1 text-[10px] font-bold uppercase tracking-wide" style="color:var(--c-stock-ok)">Crypto</div>
+        <?php endif; ?>
 
         <h3 class="product-card__name"
             <?= AdminMode::dataAttrs('products', 'name', $slug) ?>>

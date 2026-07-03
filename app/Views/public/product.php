@@ -3,6 +3,8 @@ use App\Core\View;
 
 /** @var array $product */
 /** @var array|null $pcConfigurator */
+/** @var string $paymentCsrf */
+/** @var array $paypalPublicConfig */
 
 $productName = (string)($product['name'] ?? 'Prodotto');
 $category = (string)($product['category'] ?? 'catalogo');
@@ -18,5 +20,5 @@ View::renderPartial('layouts/main', [
     'seoSocialTitle' => $productName . ' | bisp&d',
     'seoSocialDescription' => $metaDescription,
     'contentTemplate' => 'public/product-content',
-    'contentData' => compact('product', 'pcConfigurator'),
+    'contentData' => compact('product', 'pcConfigurator', 'paymentCsrf', 'paypalPublicConfig'),
 ]);

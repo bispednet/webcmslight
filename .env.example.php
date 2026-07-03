@@ -47,6 +47,16 @@ return [
         // Meta/Facebook Pixel ID. Lascia vuoto per disattivare.
         'meta_pixel_id' => '',
     ],
+    'paypal' => [
+        // REST app credentials da developer.paypal.com > Apps & Credentials.
+        // Usa sandbox in test, live in produzione. Non committare mai valori reali.
+        'environment' => 'sandbox',
+        'client_id' => '',
+        'client_secret' => '',
+        'currency' => 'EUR',
+        'brand_name' => 'Bisped',
+        'payee_email' => '',
+    ],
     'gemini' => [
         'api_key' => '',
         'editorial' => [

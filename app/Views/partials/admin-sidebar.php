@@ -32,6 +32,9 @@ if ($siteLogoUrl === '') {
             <a href="/admin/products" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
                 <span class="text-muted">Products</span>
             </a>
+            <a href="/admin/payments" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
+                <span class="text-muted">Pagamenti</span>
+            </a>
             <a href="/admin/agents" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-glass transition">
                 <span class="text-muted">Agents</span>
             </a>

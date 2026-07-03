@@ -36,6 +36,7 @@
                     <tr>
                         <th class="text-left py-2">Name</th>
                         <th class="text-left py-2">Slug</th>
+                        <th class="text-left py-2 hidden lg:table-cell">Payment</th>
                         <th class="text-left py-2 hidden md:table-cell">Updated</th>
                         <th class="text-left py-2 hidden md:table-cell">Featured Order</th>
                         <th class="text-right py-2">Actions</th>
@@ -49,6 +50,16 @@
                             </td>
                             <td class="py-3 text-muted">
                                 <?= htmlspecialchars($product['slug'], ENT_QUOTES, 'UTF-8') ?>
+                            </td>
+                            <td class="py-3 text-muted hidden lg:table-cell">
+                                <?php $method = (string)($product['payment_method'] ?? 'none'); ?>
+                                <?php if ($method === 'paypal'): ?>
+                                    <span class="inline-flex rounded px-2 py-1 text-xs font-semibold bg-blue-500/10 text-blue-200">PayPal<?= !empty($product['paypal_pay_later_enabled']) ? ' · 3 rate' : '' ?></span>
+                                <?php elseif ($method === 'crypto'): ?>
+                                    <span class="inline-flex rounded px-2 py-1 text-xs font-semibold bg-emerald-500/10 text-emerald-200">Crypto</span>
+                                <?php else: ?>
+                                    <span class="text-xs text-muted">Preventivo</span>
+                                <?php endif; ?>
                             </td>
                             <td class="py-3 text-muted hidden md:table-cell">
                                 <?= htmlspecialchars($product['updated_at'] ?? '', ENT_QUOTES, 'UTF-8') ?>
