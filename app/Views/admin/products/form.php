@@ -3,6 +3,7 @@ use App\Core\View;
 
 /** @var string $title */
 /** @var array $product */
+/** @var array $categoryOptions */
 /** @var string $featureText */
 /** @var array $errors */
 /** @var string $formAction */
@@ -15,6 +16,7 @@ View::renderPartial('layouts/admin', [
     'contentTemplate' => 'admin/products/form-content',
     'contentData' => [
         'product' => $product,
+        'categoryOptions' => $categoryOptions ?? [],
         'featureText' => $featureText,
         'errors' => $errors,
         'formAction' => $formAction,

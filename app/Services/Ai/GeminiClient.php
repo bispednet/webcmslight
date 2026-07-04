@@ -21,6 +21,9 @@ final class GeminiClient
         private readonly bool $stripReasoningOutput = true,
         private readonly string $thinkingLevel = 'minimal',
         private readonly int $thinkingBudget = 0,
+        private readonly string $backend = 'gemini',
+        private readonly string $chatUrl = '',
+        private readonly string $surface = 'gemini',
     ) {
     }
 
@@ -32,8 +35,13 @@ final class GeminiClient
     {
         $gemini = $config['gemini'] ?? [];
         $settings = $gemini[$profile] ?? ($profile === 'editorial' ? $gemini : []);
-        $apiKey = trim((string)($gemini['api_key'] ?? $settings['api_key'] ?? ''));
-        if ($apiKey === '' || empty($settings['model'])) {
+        $settings = is_array($settings) ? $settings : [];
+        $gateway = self::gatewaySettings($config, $settings);
+        $backend = (string)($gateway['backend'] ?? 'gemini');
+        $apiKey = trim((string)($gateway['api_key'] ?? $gemini['api_key'] ?? $settings['api_key'] ?? ''));
+        $chatUrl = trim((string)($gateway['chat_url'] ?? ''));
+
+        if ($apiKey === '' || empty($settings['model']) || ($backend !== 'gemini' && $chatUrl === '')) {
             return null;
         }
 
@@ -51,6 +59,9 @@ final class GeminiClient
             (bool)($settings['strip_reasoning'] ?? true),
             (string)($settings['thinking_level'] ?? ($settings['thinking_config']['thinkingLevel'] ?? 'minimal')),
             (int)($settings['thinking_budget'] ?? 0),
+            $backend,
+            $chatUrl,
+            (string)($gateway['surface'] ?? 'gemini'),
         );
     }
 
@@ -59,25 +70,36 @@ final class GeminiClient
         $mode = in_array($mode, ['text', 'html', 'json'], true) ? $mode : 'text';
         $reservation = $this->estimateTokens($prompt, $maxOutputTokens);
         if (!$this->reserveRequest($reservation)) {
-            Logger::error('Gemini request skipped: local rate limit reached', ['profile' => $this->profile, 'model' => $this->model]);
+            Logger::error('AI request skipped: local rate limit reached', ['profile' => $this->profile, 'model' => $this->model]);
             return null;
         }
 
-        $this->useThinkingFallback = self::$thinkingFallbackModels[$this->model] ?? $this->useThinkingFallback;
-        [$status, $response] = $this->request($prompt, $maxOutputTokens, $mode, $this->useThinkingFallback);
-        $error = strtolower((string)($response['error']['message'] ?? ''));
-        if ($status === 400 && !$this->useThinkingFallback && str_contains($error, 'thinking')) {
-            $this->useThinkingFallback = true;
-            self::$thinkingFallbackModels[$this->model] = true;
-            Logger::info('Gemini thinkingConfig fallback enabled', ['profile' => $this->profile, 'model' => $this->model]);
-            [$status, $response] = $this->request($prompt, $maxOutputTokens, $mode, true);
+        if ($this->backend === 'gemini') {
+            $this->useThinkingFallback = self::$thinkingFallbackModels[$this->model] ?? $this->useThinkingFallback;
+            [$status, $response] = $this->requestGemini($prompt, $maxOutputTokens, $mode, $this->useThinkingFallback);
+            $error = strtolower((string)($response['error']['message'] ?? ''));
+            if ($status === 400 && !$this->useThinkingFallback && str_contains($error, 'thinking')) {
+                $this->useThinkingFallback = true;
+                self::$thinkingFallbackModels[$this->model] = true;
+                Logger::info('Gemini thinkingConfig fallback enabled', ['profile' => $this->profile, 'model' => $this->model]);
+                [$status, $response] = $this->requestGemini($prompt, $maxOutputTokens, $mode, true);
+            }
+        } else {
+            [$status, $response] = $this->requestOpenAiCompatible($prompt, $maxOutputTokens, $mode);
         }
+
         if ($status < 200 || $status >= 300 || !$response) {
-            Logger::error('Gemini generation failed', ['profile' => $this->profile, 'model' => $this->model, 'status' => $status]);
+            Logger::error('AI generation failed', [
+                'backend' => $this->backend,
+                'surface' => $this->surface,
+                'profile' => $this->profile,
+                'model' => $this->model,
+                'status' => $status,
+            ]);
             return null;
         }
 
-        $actualTokens = (int)($response['usageMetadata']['totalTokenCount'] ?? $reservation);
+        $actualTokens = (int)($response['usageMetadata']['totalTokenCount'] ?? $response['usage']['total_tokens'] ?? $reservation);
         $this->replaceReservation($reservation, max(1, $actualTokens));
         $text = $this->extractVisibleText($response);
         return $text === null ? null : $this->normalizeModelOutput($text, $mode);
@@ -86,7 +108,44 @@ final class GeminiClient
     /**
      * @return array{0:int,1:?array}
      */
-    private function request(string $prompt, int $maxOutputTokens, string $mode, bool $fallback): array
+    private static function gatewaySettings(array $config, array $settings): array
+    {
+        $gateway = (array)($config['gemrouter'] ?? []);
+        $surface = strtolower(trim((string)($settings['surface'] ?? $gateway['default_surface'] ?? 'gemrouter')));
+        $enabled = (bool)($gateway['enabled'] ?? false);
+        $provider = strtolower(trim((string)($settings['provider'] ?? '')));
+
+        if (!$enabled && !in_array($provider, ['gemrouter', 'openai', 'deepseek'], true)) {
+            return ['backend' => 'gemini', 'surface' => 'gemini'];
+        }
+
+        $enabledSurfaces = $gateway['enabled_surfaces'] ?? [];
+        if (is_string($enabledSurfaces)) {
+            $enabledSurfaces = array_map('trim', explode(',', $enabledSurfaces));
+        }
+        $enabledSurfaces = array_map(static fn (mixed $value): string => strtolower((string)$value), (array)$enabledSurfaces);
+        if ($enabledSurfaces !== [] && !in_array($surface, $enabledSurfaces, true)) {
+            $surface = (string)($enabledSurfaces[0] ?? 'gemrouter');
+        }
+
+        $surfaces = (array)($gateway['surfaces'] ?? []);
+        $surfaceConfig = (array)($surfaces[$surface] ?? $gateway[$surface] ?? []);
+        if (array_key_exists('enabled', $surfaceConfig) && !(bool)$surfaceConfig['enabled']) {
+            return ['backend' => 'gemini', 'surface' => 'gemini'];
+        }
+
+        $chatUrl = trim((string)($settings['chat_url'] ?? $surfaceConfig['chat_url'] ?? $surfaceConfig['chat'] ?? ''));
+        $apiKey = trim((string)($settings['api_key'] ?? $gateway['api_key'] ?? $gateway['auth_token'] ?? ''));
+
+        return [
+            'backend' => 'openai_compatible',
+            'surface' => $surface,
+            'chat_url' => $chatUrl,
+            'api_key' => $apiKey,
+        ];
+    }
+
+    private function requestGemini(string $prompt, int $maxOutputTokens, string $mode, bool $fallback): array
     {
         $thinkingConfig = $fallback
             ? ['includeThoughts' => $this->includeThoughts]
@@ -106,17 +165,69 @@ final class GeminiClient
         ], JSON_THROW_ON_ERROR);
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
             . rawurlencode($this->model) . ':generateContent';
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-goog-api-key: ' . $this->apiKey],
-            CURLOPT_TIMEOUT => $this->timeoutSeconds,
-            CURLOPT_CONNECTTIMEOUT => 8,
-        ]);
-        $raw = curl_exec($ch);
-        $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        return $this->postJson($url, ['Content-Type: application/json', 'x-goog-api-key: ' . $this->apiKey], $payload);
+    }
+
+    /**
+     * @return array{0:int,1:?array}
+     */
+    private function requestOpenAiCompatible(string $prompt, int $maxOutputTokens, string $mode): array
+    {
+        $payload = json_encode([
+            'model' => $this->model,
+            'messages' => [
+                ['role' => 'system', 'content' => $this->systemInstructionForMode($mode)],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+            'temperature' => $this->temperature,
+            'max_tokens' => $maxOutputTokens,
+        ], JSON_THROW_ON_ERROR);
+
+        return $this->postJson($this->chatUrl, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $this->apiKey,
+        ], $payload);
+    }
+
+    /**
+     * @param array<int,string> $headers
+     * @return array{0:int,1:?array}
+     */
+    private function postJson(string $url, array $headers, string $payload): array
+    {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $payload,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_TIMEOUT => $this->timeoutSeconds,
+                CURLOPT_CONNECTTIMEOUT => 8,
+            ]);
+            $raw = curl_exec($ch);
+            $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            curl_close($ch);
+        } else {
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => implode("\r\n", $headers),
+                    'content' => $payload,
+                    'ignore_errors' => true,
+                    'timeout' => $this->timeoutSeconds,
+                ],
+            ]);
+            $raw = @file_get_contents($url, false, $context);
+            $status = 0;
+            foreach (($http_response_header ?? []) as $header) {
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $match)) {
+                    $status = (int)$match[1];
+                    break;
+                }
+            }
+        }
+
         $response = is_string($raw) ? json_decode($raw, true) : null;
         return [$status, is_array($response) ? $response : null];
     }
@@ -133,6 +244,22 @@ Do not expose reasoning, chain-of-thought, thoughts, analysis, scratchpad, hidde
 
     private function extractVisibleText(array $response): ?string
     {
+        $messageContent = $response['choices'][0]['message']['content'] ?? null;
+        if (is_string($messageContent)) {
+            $messageContent = trim($messageContent);
+            return $messageContent === '' ? null : $messageContent;
+        }
+        if (is_array($messageContent)) {
+            $visible = [];
+            foreach ($messageContent as $part) {
+                if (is_array($part) && isset($part['text'])) {
+                    $visible[] = trim((string)$part['text']);
+                }
+            }
+            $text = trim(implode("\n", array_filter($visible)));
+            return $text === '' ? null : $text;
+        }
+
         $visible = [];
         $removedThoughts = 0;
         foreach ((array)($response['candidates'][0]['content']['parts'] ?? []) as $part) {

@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+define('BISPED_SKIP_DB_BOOTSTRAP', true);
+
 require dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Services\Ai\GeminiClient;
@@ -35,6 +37,16 @@ $visible = $extract->invoke($client, [
 ]);
 if ($visible !== '{"reply":"ok"}') {
     fwrite(STDERR, 'FAIL thought-part filtering' . PHP_EOL);
+    exit(1);
+}
+
+$openAiVisible = $extract->invoke($client, [
+    'choices' => [[
+        'message' => ['content' => '{"reply":"gemrouter ok"}'],
+    ]],
+]);
+if ($openAiVisible !== '{"reply":"gemrouter ok"}') {
+    fwrite(STDERR, 'FAIL OpenAI-compatible response extraction' . PHP_EOL);
     exit(1);
 }
 

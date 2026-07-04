@@ -57,6 +57,42 @@ return [
         'brand_name' => 'Bisped',
         'payee_email' => '',
     ],
+    'gemrouter' => [
+        // Gateway OpenAI-compatible opzionale. Se enabled=false il sito usa Gemini nativo.
+        'enabled' => false,
+        'api_key' => '',
+        'default_surface' => 'gemrouter',
+        'enabled_surfaces' => ['gemrouter', 'openai'],
+        'surfaces' => [
+            'gemrouter' => [
+                'enabled' => true,
+                'api_url' => 'https://gemr.airewardrop.xyz',
+                'models_url' => 'https://gemr.airewardrop.xyz/models',
+                'chat_url' => 'https://gemr.airewardrop.xyz/chat/completions',
+                'images_url' => 'https://gemr.airewardrop.xyz/images/generations',
+            ],
+            'openai' => [
+                'enabled' => true,
+                'api_url' => 'https://gemr.airewardrop.xyz/v1',
+                'models_url' => 'https://gemr.airewardrop.xyz/v1/models',
+                'chat_url' => 'https://gemr.airewardrop.xyz/v1/chat/completions',
+                'images_url' => 'https://gemr.airewardrop.xyz/v1/images/generations',
+                'responses_url' => 'https://gemr.airewardrop.xyz/v1/responses',
+            ],
+            'deepseek' => [
+                'enabled' => false,
+                'api_url' => 'https://gemr.airewardrop.xyz',
+                'models_url' => 'https://gemr.airewardrop.xyz/models',
+                'chat_url' => 'https://gemr.airewardrop.xyz/chat/completions',
+                'images_url' => 'https://gemr.airewardrop.xyz/images/generations',
+            ],
+            'ollama' => [
+                'enabled' => false,
+                'api_url' => 'https://gemr.airewardrop.xyz/api',
+                'chat_url' => 'https://gemr.airewardrop.xyz/api/chat',
+            ],
+        ],
+    ],
     'gemini' => [
         'api_key' => '',
         'editorial' => [
