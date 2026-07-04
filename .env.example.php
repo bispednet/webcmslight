@@ -57,8 +57,17 @@ return [
         'brand_name' => 'Bisped',
         'payee_email' => '',
     ],
+    'ai' => [
+        // Switch provider: gemini, gemrouter, openai, deepseek.
+        // Puoi anche sovrascrivere per profilo con ai.profiles.concierge.provider.
+        'provider' => 'gemini',
+        'profiles' => [
+            // 'editorial' => ['provider' => 'gemrouter', 'surface' => 'gemrouter'],
+            // 'concierge' => ['provider' => 'gemini'],
+        ],
+    ],
     'gemrouter' => [
-        // Gateway OpenAI-compatible opzionale. Se enabled=false il sito usa Gemini nativo.
+        // Gateway OpenAI-compatible opzionale. Si usa solo quando ai.provider = gemrouter.
         'enabled' => false,
         'api_key' => '',
         'default_surface' => 'gemrouter',
@@ -92,6 +101,20 @@ return [
                 'chat_url' => 'https://gemr.airewardrop.xyz/api/chat',
             ],
         ],
+    ],
+    'openai' => [
+        'enabled' => false,
+        'api_key' => '',
+        'api_url' => 'https://api.openai.com/v1',
+        'chat_url' => 'https://api.openai.com/v1/chat/completions',
+        'model' => '',
+    ],
+    'deepseek' => [
+        'enabled' => false,
+        'api_key' => '',
+        'api_url' => 'https://api.deepseek.com',
+        'chat_url' => 'https://api.deepseek.com/chat/completions',
+        'model' => '',
     ],
     'gemini' => [
         'api_key' => '',

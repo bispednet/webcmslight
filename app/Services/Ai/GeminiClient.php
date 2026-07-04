@@ -22,6 +22,7 @@ final class GeminiClient
         private readonly string $thinkingLevel = 'minimal',
         private readonly int $thinkingBudget = 0,
         private readonly string $backend = 'gemini',
+        private readonly string $provider = 'gemini',
         private readonly string $chatUrl = '',
         private readonly string $surface = 'gemini',
     ) {
@@ -36,19 +37,22 @@ final class GeminiClient
         $gemini = $config['gemini'] ?? [];
         $settings = $gemini[$profile] ?? ($profile === 'editorial' ? $gemini : []);
         $settings = is_array($settings) ? $settings : [];
-        $gateway = self::gatewaySettings($config, $settings);
-        $backend = (string)($gateway['backend'] ?? 'gemini');
-        $apiKey = trim((string)($gateway['api_key'] ?? $gemini['api_key'] ?? $settings['api_key'] ?? ''));
-        $chatUrl = trim((string)($gateway['chat_url'] ?? ''));
+        $provider = self::providerSettings($config, $settings, $profile);
+        $backend = (string)($provider['backend'] ?? 'gemini');
+        $apiKey = $backend === 'gemini'
+            ? trim((string)($gemini['api_key'] ?? $settings['api_key'] ?? ''))
+            : trim((string)($provider['api_key'] ?? ''));
+        $chatUrl = trim((string)($provider['chat_url'] ?? ''));
+        $model = trim((string)($provider['model'] ?? $settings['model'] ?? ''));
 
-        if ($apiKey === '' || empty($settings['model']) || ($backend !== 'gemini' && $chatUrl === '')) {
+        if ($apiKey === '' || $model === '' || ($backend !== 'gemini' && $chatUrl === '')) {
             return null;
         }
 
         return new self(
             $apiKey,
             preg_replace('/[^a-z0-9_-]/i', '', $profile) ?: 'default',
-            (string)$settings['model'],
+            $model,
             max(1, (int)($settings['requests_per_minute'] ?? 10)),
             max(1, (int)($settings['tokens_per_minute'] ?? 5000)),
             max(1, (int)($settings['requests_per_day'] ?? 1000)),
@@ -60,8 +64,9 @@ final class GeminiClient
             (string)($settings['thinking_level'] ?? ($settings['thinking_config']['thinkingLevel'] ?? 'minimal')),
             (int)($settings['thinking_budget'] ?? 0),
             $backend,
+            (string)($provider['provider'] ?? 'gemini'),
             $chatUrl,
-            (string)($gateway['surface'] ?? 'gemini'),
+            (string)($provider['surface'] ?? 'gemini'),
         );
     }
 
@@ -91,6 +96,7 @@ final class GeminiClient
         if ($status < 200 || $status >= 300 || !$response) {
             Logger::error('AI generation failed', [
                 'backend' => $this->backend,
+                'provider' => $this->provider,
                 'surface' => $this->surface,
                 'profile' => $this->profile,
                 'model' => $this->model,
@@ -108,41 +114,110 @@ final class GeminiClient
     /**
      * @return array{0:int,1:?array}
      */
-    private static function gatewaySettings(array $config, array $settings): array
+    private static function providerSettings(array $config, array $settings, string $profile): array
+    {
+        $ai = (array)($config['ai'] ?? []);
+        $profileAi = (array)(($ai['profiles'] ?? [])[$profile] ?? []);
+        $provider = strtolower(trim((string)(
+            $settings['provider']
+            ?? $profileAi['provider']
+            ?? $ai['provider']
+            ?? $ai['default_provider']
+            ?? 'gemini'
+        )));
+
+        if (!in_array($provider, ['gemini', 'gemrouter', 'openai', 'deepseek'], true)) {
+            $provider = 'gemini';
+        }
+
+        if ($provider === 'gemini') {
+            return [
+                'backend' => 'gemini',
+                'provider' => 'gemini',
+                'surface' => 'gemini',
+            ];
+        }
+
+        if ($provider === 'gemrouter') {
+            return self::gemrouterProviderSettings($config, $settings, $profileAi);
+        }
+
+        return self::openAiCompatibleProviderSettings($config, $settings, $profileAi, $provider);
+    }
+
+    /**
+     * @return array{backend:string,provider:string,surface:string,chat_url:string,api_key:string,model?:string}
+     */
+    private static function gemrouterProviderSettings(array $config, array $settings, array $profileAi): array
     {
         $gateway = (array)($config['gemrouter'] ?? []);
-        $surface = strtolower(trim((string)($settings['surface'] ?? $gateway['default_surface'] ?? 'gemrouter')));
-        $enabled = (bool)($gateway['enabled'] ?? false);
-        $provider = strtolower(trim((string)($settings['provider'] ?? '')));
-
-        if (!$enabled && !in_array($provider, ['gemrouter', 'openai', 'deepseek'], true)) {
-            return ['backend' => 'gemini', 'surface' => 'gemini'];
-        }
-
-        $enabledSurfaces = $gateway['enabled_surfaces'] ?? [];
-        if (is_string($enabledSurfaces)) {
-            $enabledSurfaces = array_map('trim', explode(',', $enabledSurfaces));
-        }
-        $enabledSurfaces = array_map(static fn (mixed $value): string => strtolower((string)$value), (array)$enabledSurfaces);
+        $surface = strtolower(trim((string)($settings['surface'] ?? $profileAi['surface'] ?? $gateway['default_surface'] ?? 'gemrouter')));
+        $enabledSurfaces = self::stringList($gateway['enabled_surfaces'] ?? []);
         if ($enabledSurfaces !== [] && !in_array($surface, $enabledSurfaces, true)) {
             $surface = (string)($enabledSurfaces[0] ?? 'gemrouter');
         }
 
         $surfaces = (array)($gateway['surfaces'] ?? []);
         $surfaceConfig = (array)($surfaces[$surface] ?? $gateway[$surface] ?? []);
-        if (array_key_exists('enabled', $surfaceConfig) && !(bool)$surfaceConfig['enabled']) {
-            return ['backend' => 'gemini', 'surface' => 'gemini'];
+        if (!(bool)($gateway['enabled'] ?? false) || (array_key_exists('enabled', $surfaceConfig) && !(bool)$surfaceConfig['enabled'])) {
+            return [
+                'backend' => 'gemini',
+                'provider' => 'gemini',
+                'surface' => 'gemini',
+                'chat_url' => '',
+                'api_key' => '',
+            ];
         }
-
-        $chatUrl = trim((string)($settings['chat_url'] ?? $surfaceConfig['chat_url'] ?? $surfaceConfig['chat'] ?? ''));
-        $apiKey = trim((string)($settings['api_key'] ?? $gateway['api_key'] ?? $gateway['auth_token'] ?? ''));
 
         return [
             'backend' => 'openai_compatible',
+            'provider' => 'gemrouter',
             'surface' => $surface,
-            'chat_url' => $chatUrl,
-            'api_key' => $apiKey,
+            'chat_url' => trim((string)($settings['chat_url'] ?? $profileAi['chat_url'] ?? $surfaceConfig['chat_url'] ?? $surfaceConfig['chat'] ?? '')),
+            'api_key' => trim((string)($settings['api_key'] ?? $profileAi['api_key'] ?? $gateway['api_key'] ?? $gateway['auth_token'] ?? '')),
+            'model' => trim((string)($settings['model'] ?? $profileAi['model'] ?? '')),
         ];
+    }
+
+    /**
+     * @return array{backend:string,provider:string,surface:string,chat_url:string,api_key:string,model?:string}
+     */
+    private static function openAiCompatibleProviderSettings(array $config, array $settings, array $profileAi, string $provider): array
+    {
+        $providerConfig = (array)($config[$provider] ?? []);
+        if (array_key_exists('enabled', $providerConfig) && !(bool)$providerConfig['enabled']) {
+            return [
+                'backend' => 'gemini',
+                'provider' => 'gemini',
+                'surface' => 'gemini',
+                'chat_url' => '',
+                'api_key' => '',
+            ];
+        }
+
+        return [
+            'backend' => 'openai_compatible',
+            'provider' => $provider,
+            'surface' => $provider,
+            'chat_url' => trim((string)($settings['chat_url'] ?? $profileAi['chat_url'] ?? $providerConfig['chat_url'] ?? $providerConfig['chat'] ?? '')),
+            'api_key' => trim((string)($settings['api_key'] ?? $profileAi['api_key'] ?? $providerConfig['api_key'] ?? $providerConfig['auth_token'] ?? '')),
+            'model' => trim((string)($settings['model'] ?? $profileAi['model'] ?? $providerConfig['model'] ?? '')),
+        ];
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private static function stringList(mixed $value): array
+    {
+        if (is_string($value)) {
+            $value = explode(',', $value);
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $item): string => strtolower(trim((string)$item)),
+            (array)$value
+        )));
     }
 
     private function requestGemini(string $prompt, int $maxOutputTokens, string $mode, bool $fallback): array

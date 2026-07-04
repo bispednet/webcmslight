@@ -50,4 +50,46 @@ if ($openAiVisible !== '{"reply":"gemrouter ok"}') {
     exit(1);
 }
 
+$config = [
+    'ai' => ['provider' => 'gemini'],
+    'gemrouter' => [
+        'enabled' => true,
+        'api_key' => 'router-key',
+        'default_surface' => 'gemrouter',
+        'enabled_surfaces' => ['gemrouter'],
+        'surfaces' => [
+            'gemrouter' => [
+                'enabled' => true,
+                'chat_url' => 'https://gemr.airewardrop.xyz/chat/completions',
+            ],
+        ],
+    ],
+    'gemini' => [
+        'api_key' => 'gemini-key',
+        'concierge' => [
+            'model' => 'gemini-3.1-flash-lite',
+        ],
+    ],
+];
+
+$providerProp = $reflection->getProperty('provider');
+$backendProp = $reflection->getProperty('backend');
+$chatUrlProp = $reflection->getProperty('chatUrl');
+
+$geminiClient = GeminiClient::fromConfig($config, 'concierge');
+if (!$geminiClient instanceof GeminiClient || $providerProp->getValue($geminiClient) !== 'gemini' || $backendProp->getValue($geminiClient) !== 'gemini') {
+    fwrite(STDERR, 'FAIL provider selector must keep Gemini when selected' . PHP_EOL);
+    exit(1);
+}
+
+$config['ai']['provider'] = 'gemrouter';
+$routerClient = GeminiClient::fromConfig($config, 'concierge');
+if (!$routerClient instanceof GeminiClient
+    || $providerProp->getValue($routerClient) !== 'gemrouter'
+    || $backendProp->getValue($routerClient) !== 'openai_compatible'
+    || !str_contains((string)$chatUrlProp->getValue($routerClient), '/chat/completions')) {
+    fwrite(STDERR, 'FAIL provider selector must route Gemrouter only when selected' . PHP_EOL);
+    exit(1);
+}
+
 echo "Gemini normalizer tests passed\n";
