@@ -33,6 +33,7 @@ final class DashboardController extends Controller
             'title' => 'Dashboard',
             'stats' => $stats,
             'recentSessions' => $recentSessions,
+            'catalogHealth' => \App\Services\Catalog\CatalogHealth::report($this->db, (array)config('catalog', [])),
         ]);
     }
 

@@ -45,7 +45,8 @@ $priceFormatted = $displayPrice ? number_format((float)$displayPrice, 2, ',', '.
 $oldFormatted   = $isSale ? number_format((float)$regularPrice, 2, ',', '.') : null;
 $paymentMethod = (string)($product['payment_method'] ?? 'none');
 $isPaymentProduct = (int)($product['is_payment_product'] ?? 0) === 1;
-$isCheckoutEnabled = $isPaymentProduct && in_array($paymentMethod, ['paypal', 'crypto'], true);
+$isCheckoutEnabled = $isPaymentProduct && in_array($paymentMethod, ['paypal', 'crypto'], true)
+    && \App\Services\Catalog\CatalogSaleGuard::reason($product, (array)config('catalog', [])) === null;
 $paymentAmount = $displayPrice ? number_format((float)$displayPrice, 2, '.', '') : null;
 $deliveryMethod = (string)($product['delivery_method'] ?? 'pickup');
 if (!in_array($deliveryMethod, ['shipping', 'pickup', 'both'], true)) {
@@ -337,7 +338,8 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                                         setStatus('Creo ordine sicuro PayPal...', false);
                                         try {
                                             const data = await postJson('/payments/paypal/orders/' + encodeURIComponent(slug), {
-                                                delivery_method: selectedDelivery()
+                                                delivery_method: selectedDelivery(),
+                                                expected_amount: <?= json_encode($paymentAmount) ?>
                                             });
                                             return data.id;
                                         } catch (error) {

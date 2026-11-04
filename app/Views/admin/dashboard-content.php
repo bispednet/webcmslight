@@ -11,6 +11,14 @@ $statConfig = [
     'contactMessages' => 'Contact Messages',
 ];
 ?>
+<?php if (isset($catalogHealth)): ?>
+<section class="card mb-6" style="border:1px solid <?= !empty($catalogHealth['warning']) ? '#d88a25' : '#368b65' ?>">
+    <h2 class="text-lg font-semibold">Sincronizzazione catalogo</h2>
+    <p class="mt-2"><?= !empty($catalogHealth['warning']) ? 'Attenzione: il catalogo richiede una verifica. Gli articoli senza prezzo e stock verificati non sono acquistabili.' : 'Prezzi e disponibilità verificati dal fornitore.' ?></p>
+    <p class="text-sm mt-2">Ultimo aggiornamento riuscito (UTC): <?= htmlspecialchars((string)($catalogHealth['last_success_utc'] ?? 'nessuno'), ENT_QUOTES, 'UTF-8') ?> · Dati scaduti: <?= (int)$catalogHealth['expired'] ?> · Ritirati: <?= (int)$catalogHealth['retired'] ?></p>
+    <?php if (!empty($catalogHealth['last']['error_message'])): ?><p class="text-sm mt-2"><?= htmlspecialchars((string)$catalogHealth['last']['error_message'], ENT_QUOTES, 'UTF-8') ?></p><?php endif; ?>
+</section>
+<?php endif; ?>
 <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
     <?php foreach ($statConfig as $key => $label): ?>
         <div class="card">

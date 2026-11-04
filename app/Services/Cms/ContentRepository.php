@@ -4,16 +4,22 @@ declare(strict_types=1);
 namespace App\Services\Cms;
 
 use App\Core\Database;
+use App\Services\Catalog\CatalogPricing;
+use App\Services\Catalog\CatalogSaleGuard;
 use App\Support\I18n;
 use PDO;
 
 final class ContentRepository
 {
     private PDO $db;
+    private array $catalogConfig;
+    private string $visibility;
 
     public function __construct()
     {
         $this->db = Database::connection();
+        $this->catalogConfig = CatalogPricing::configuration($this->db, (array)(\App\Core\Container::get('config', [])['catalog'] ?? []));
+        $this->visibility = CatalogSaleGuard::visibilitySql($this->db, $this->catalogConfig);
     }
 
     public function getSettings(): array
@@ -24,7 +30,7 @@ final class ContentRepository
 
     public function getProducts(): array
     {
-        $stmt = $this->db->query('SELECT * FROM products ORDER BY featured_order ASC, name ASC');
+        $stmt = $this->db->query("SELECT * FROM products WHERE {$this->visibility} ORDER BY featured_order ASC, name ASC");
         $products = $stmt->fetchAll() ?: [];
 
         $features = $this->getProductFeatures();
@@ -93,7 +99,7 @@ final class ContentRepository
                        ) AS showcase_score
                 FROM products
                 {$metricsJoin}
-                WHERE category IS NOT NULL
+                WHERE {$this->visibility} AND category IS NOT NULL
                   AND category <> ''
                   AND COALESCE(sale_price, price, 0) >= 60
                   AND stock_status IN ('disponibile','instock','in-stock','1','true')
@@ -280,7 +286,7 @@ final class ContentRepository
         $logic = count($terms) > 1 ? implode(' AND ', $where) : implode(' OR ', $where);
         $sql = "SELECT *
                 FROM products
-                WHERE ({$logic})
+                WHERE {$this->visibility} AND ({$logic})
                   AND image_url IS NOT NULL AND image_url <> ''
                 ORDER BY (stock_status IN ('disponibile','instock','in-stock','1','true')) DESC,
                          stock_qty DESC,
@@ -520,7 +526,7 @@ final class ContentRepository
      */
     public function searchProducts(string $cat = 'all', string $sub = 'all', string $q = '', int $limit = 30, int $offset = 0, string $sort = 'featured'): array
     {
-        $where  = ['1=1'];
+        $where  = [$this->visibility];
         $params = [];
         if ($cat !== 'all' && $cat !== '') {
             $where[]        = 'category = :cat';
@@ -571,7 +577,7 @@ final class ContentRepository
      */
     public function productCategoryCounts(): array
     {
-        $stmt = $this->db->query("SELECT category, COUNT(*) n FROM products WHERE category IS NOT NULL AND category <> '' GROUP BY category");
+        $stmt = $this->db->query("SELECT category, COUNT(*) n FROM products WHERE {$this->visibility} AND category IS NOT NULL AND category <> '' GROUP BY category");
 
         return $stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
     }
@@ -586,7 +592,7 @@ final class ContentRepository
         $stmt = $this->db->query(
             "SELECT category, subcategory, subcategory_label, COUNT(*) n
              FROM products
-             WHERE category <> '' AND subcategory IS NOT NULL AND subcategory <> ''
+             WHERE {$this->visibility} AND category <> '' AND subcategory IS NOT NULL AND subcategory <> ''
              GROUP BY category, subcategory, subcategory_label
              ORDER BY subcategory_label"
         );
@@ -630,7 +636,7 @@ final class ContentRepository
         }
         $sql = "SELECT id, name, slug, image_url, sale_price, price, campaign_label, stock_status, stock_qty, subcategory_label
                 FROM products
-                WHERE (" . implode(' OR ', $clauses) . ")
+                WHERE {$this->visibility} AND (" . implode(' OR ', $clauses) . ")
                   AND image_url IS NOT NULL AND image_url <> ''
                 ORDER BY (stock_status = 'disponibile') DESC, stock_qty DESC, featured_order ASC
                 LIMIT :limit";
@@ -664,7 +670,7 @@ final class ContentRepository
         $features = $this->getProductFeatures();
         $product['features'] = $features[$product['id']] ?? [];
 
-        return $product;
+        return CatalogSaleGuard::publicProduct($product, $this->catalogConfig);
     }
 
     private function getProductFeatures(): array

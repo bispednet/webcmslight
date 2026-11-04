@@ -105,112 +105,55 @@ Se vuoi portare SUBITO su bisped.net gli articoli già generati in locale (senza
 
 ---
 
-## Import automatico prodotti da fornitore (Runner S.p.A.)
+## Import automatico prodotti da Runner
 
-Modulo che importa i prodotti dal listino **Runner** nel catalogo Bisped, con pricing automatico e filtro per categoria. Basato sul tracciato ufficiale Runner (file `.txt` pipe-delimited via FTP).
+Il riferimento completo per protezioni, prezzi e pubblicazione e' [CATALOG_SAFETY.md](CATALOG_SAFETY.md).
 
-### Componenti
+Il server verificato e' `runnertechstore.it`, porta `21`, FTP standard
+(`ftp_ssl=false`). Credenziali e codice cliente restano nel file privato `.env.php`.
+I file obbligatori sono `articoli.txt`, `{CODICE_CLIENTE}/prezzi.txt` e
+`dispo.txt`: vengono scaricati e verificati insieme. Una fotografia fallita
+non riutilizza file precedenti. Immagini e descrizioni vengono aggiornate nel full.
 
-- `app/Services/Catalog/Suppliers/RunnerAdapter.php` — scarica e joina i tracciati Runner
-- `app/Services/Catalog/ProductImporter.php` — upsert per SKU, pricing, filtro categorie
-- `scripts/auto-update/import-products.php` — comando CLI per il cron
+### Aggiornamenti commerciali ogni ora, catalogo completo ogni giorno
 
-### Come funziona
-
-1. **Scarica via FTP** dal server Runner:
-   - `articoli.txt` (anagrafica: codice, descrizione, produttore, categoria, disponibilità)
-   - `{CODICE_CLIENTE}/prezzi.txt` (il TUO prezzo di acquisto personalizzato)
-   - `immagini.txt` (URL foto prodotto)
-   - `descp.txt` (descrizioni estese)
-2. **Joina per Codice** anagrafica + prezzo + immagine + descrizione.
-3. **Filtra le categorie**: importa solo smartphone, notebook, desktop, componenti-pc, gaming, tablet, connettività, accessori. Scarta il resto (es. elettrodomestici).
-4. **Calcola il prezzo di vendita** dal costo B2B (`PrezzoPers`): `costo × (1 + markup) × (1 + IVA)`, arrotondato a `,90`. Markup configurabile per categoria.
-5. **Upsert per SKU**: se il prodotto esiste aggiorna prezzo e disponibilità, altrimenti lo crea.
-
-### ⚠️ Host FTP Runner
-
-`ftp.runner.it` è dietro **Cloudflare** e NON instrada il traffico FTP. Il vero host FTP è un altro: cercalo nella mail con le credenziali (user `C111445`), oppure aprilo un ticket nell'area assistenza Runner. Inserisci quell'host in `catalog.runner.ftp_host`.
-
-### Configurazione (`.env.php`)
-
-```php
-'catalog' => [
-    'enabled'        => true,
-    'markup_default' => 0.18,
-    'vat'            => 0.22,
-    'markup' => [
-        'smartphone'    => 0.12,
-        'notebook'      => 0.15,
-        'componenti-pc' => 0.20,
-        'gaming'        => 0.22,
-        'connettivita'  => 0.20,
-        'accessori'     => 0.30,
-    ],
-    'runner' => [
-        'ftp_host'      => 'HOST_FTP_RUNNER',   // dalla mail Runner (non ftp.runner.it)
-        'ftp_user'      => 'C111445',
-        'ftp_pass'      => '••••••••',
-        'ftp_port'      => 21,
-        'ftp_ssl'       => false,               // true se Runner usa FTPS
-        'customer_code' => 'C111445',           // cartella prezzi personalizzati
-        'work_dir'      => '/home/uu4c5pdm/domains/bisped.net/public_html/storage/imports/runner',
-    ],
-],
-```
-
-### Test prima di andare live
-
-```bash
-# Dry-run: non scrive nulla, mostra solo cosa farebbe
-php scripts/auto-update/import-products.php --supplier=runner --dry-run --verbose
-```
-
-### Due cron: disponibilità (6h) + catalogo completo (24h)
-
-La disponibilità è critica: **non vogliamo a catalogo prodotti non disponibili su Runner**. Per questo ci sono due modalità separate.
-
-| Modalità | Cosa fa | Frequenza |
+| Modalita | Operazioni | Frequenza |
 |---|---|---|
-| `--mode=availability` | Scarica solo `dispo.txt` (leggero), mette `esaurito` ciò che è a 0 e `disponibile` ciò che torna. Non crea/rimuove. | **ogni 6h** |
-| `--mode=full` | Import completo: crea nuovi, aggiorna prezzi, esaurisce stock 0, marca `ritirato` i prodotti non più nel listino. | **ogni 24h** |
+| `commercial` | Verifica appartenenza, costo, prezzo e stock; ritira gli assenti | Ogni ora |
+| `full` | Esegue le stesse verifiche e aggiunge nuovi articoli con immagini | Ogni giorno alle 4 |
 
-**Cron su DirectAdmin** (sostituisci il path PHP se diverso):
+Il vecchio nome `availability` resta un alias di `commercial`.
 
 ```bash
-# Disponibilità — ogni 6 ore
-0 */6 * * *  /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=availability >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
-
-# Catalogo completo — ogni giorno alle 4:00
-0 4 * * *    /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=full >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
-
-# PC configurabili — dopo il catalogo completo
-30 4 * * *  /usr/local/php81/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/generate-pc-catalog.php >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/pc-configurator-cron.log 2>&1
+0 * * * * /opt/alt/php83/usr/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=commercial >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
+0 4 * * * /opt/alt/php83/usr/bin/php /home/uu4c5pdm/domains/bisped.net/public_html/scripts/auto-update/import-products.php --supplier=runner --mode=full >> /home/uu4c5pdm/domains/bisped.net/public_html/storage/logs/products-cron.log 2>&1
 ```
 
-### Sicurezza del prune
+Conservare gli altri cron del sito. L'import completo puo durare alcuni minuti.
+Il lock sul database impedisce due riconciliazioni contemporanee; il controllo
+pre-incasso puo aggiornare un singolo articolo senza attendere il cron.
 
-Il prune (rimozione prodotti non più nel listino) gira **solo** se l'import legge almeno 500 prodotti, per evitare di svuotare il catalogo se il feed FTP arriva vuoto o corrotto. I prodotti rimossi passano a `ritirato`, non vengono cancellati dal DB.
+### Prezzo e sicurezza
 
-### Pricing (formula)
+Il costo d'acquisto e' netto IVA. Il ricarico e' 20% fino a 150 EUR,
+scende linearmente al 5,5% a 1.000 EUR e rimane 5,5% oltre la soglia.
+Si aggiungono sempre 5 EUR, poi IVA; l'arrotondamento verso l'alto termina a ,90.
+Nella fascia alta e' richiesto almeno un ricarico netto di 50 EUR prima delle spese.
+I parametri DB in Impostazioni hanno precedenza sulla configurazione del file.
 
+Un articolo senza costo valido, esaurito, ritirato, scaduto o sotto soglia non
+e' acquistabile. L'assenza dal catalogo porta a ritiro e stock zero, senza
+cancellare lo storico. Le vecchie promozioni vengono eliminate dal ricalcolo.
+Il pruning richiede almeno 500 righe e controlli sulla completezza del feed.
+
+### Verifiche manuali
+
+```bash
+php scripts/auto-update/import-products.php --supplier=runner --mode=commercial --dry-run
+php scripts/diagnose-catalog-safety.php
 ```
-prezzo_vendita = ( costo_acquisto × (1 + markup%) + markup_fisso ) × (1 + IVA)
-```
-arrotondato a `,90`. Esempi reali verificati:
-- Cavo USB costo €3,16 → **€11,90** (i 5€ fissi scoraggiano la minuteria)
-- SSD Crucial 500GB costo €84,66 → **€119,90**
-- Notebook Acer i9 costo €700 → **€934,90** (markup 8%)
-- iPhone 17 Pro Max costo €1262 → **€1672,90**
 
-Parametri in `catalog` (`.env.php`): `markup_default`, `markup_fixed`, `vat`, override `markup[categoria]` e `fixed[categoria]`. Modificabili anche dalla dashboard admin (Impostazioni → Catalogo).
-
-### Famiglie escluse
-
-Non vengono importate: Elettrodomestici/Articoli regalo, Educational, Digital Signage, Software, Ufficio e Consumabili. Modificabile in `ProductImporter::FAMILY_EXCLUDE` o via `catalog.family_exclude`.
-
-### Note
-
-- **Prezzo:** `PrezzoPers` è il TUO prezzo di acquisto netto (cartella `C111445/prezzi.txt`). Il prezzo di vendita lo calcola l'importer con markup + IVA. Solo i prodotti con un prezzo personalizzato vengono importati.
-- **Immagini:** il tracciato fornisce URL (`immagini.txt`). Per ora salviamo l'URL remoto Runner; volendo si possono scaricare in locale con lo stesso meccanismo `media/fetch` dell'Agent API.
-- **Categorie:** il filtro usa `DescCatMerc`. Se Runner usa nomi categoria non ancora mappati, aggiungili in `ProductImporter::$categoryMap`.
-- **Permessi:** assicurati che `storage/imports/runner/` sia scrivibile (chmod 755).
+La dashboard segnala ultimo aggiornamento, errori e dati scaduti. Le cartelle
+`storage/imports/runner` e `public/media/products/runner` devono essere scrivibili.
+Le foto scaricate sono locali; i dati commerciali vengono aggiornati anche se
+una fotografia non e' disponibile.

@@ -28,7 +28,7 @@ $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 $specStats = (new PcComponentSpecExtractor($db))->syncCatalog($dryRun);
 
-$llm = isset($opts['no-llm']) ? null : GeminiClient::fromConfig(Container::get('config', []), 'editorial');
+$llm = isset($opts['no-llm']) ? null : GeminiClient::fromConfig(Container::get('config', []), 'pc_configurator');
 $policy = new PcCommercialPolicyService($db, $llm);
 $buildStats = (new PcBuildPlanner($db, new PcCompatibilityService($db), null, $policy))->generateDailyBuilds($dryRun);
 

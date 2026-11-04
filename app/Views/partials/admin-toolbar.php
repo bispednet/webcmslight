@@ -16,6 +16,9 @@ if (!isset($logoutCsrf)) {
         </span>
         <div class="admin-toolbar__spacer"></div>
         <a href="/admin/dashboard" class="admin-toolbar__link admin-toolbar__link--primary">Dashboard</a>
+        <?php if (in_array(config('app.env'), ['local', 'staging'], true) && is_file(BASE_PATH . '/scripts/dev/ai-settings.php')): ?>
+            <a href="/_dev/ai" class="admin-toolbar__link">Configurazione AI</a>
+        <?php endif; ?>
         <form method="post" action="/auth/logout" class="admin-toolbar__form">
             <?php if (!empty($logoutCsrf)) { ?>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$logoutCsrf, ENT_QUOTES, 'UTF-8'); ?>">

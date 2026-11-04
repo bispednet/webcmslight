@@ -11,5 +11,6 @@ View::renderPartial('layouts/admin', [
     'contentData' => [
         'stats' => $stats,
         'recentSessions' => $recentSessions,
+        'catalogHealth' => $catalogHealth,
     ],
 ]);

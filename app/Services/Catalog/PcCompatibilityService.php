@@ -27,8 +27,13 @@ final class PcCompatibilityService
         'cpu', 'motherboard', 'ram', 'storage', 'gpu', 'psu', 'case', 'cooler', 'fan', 'monitor', 'keyboard', 'mouse', 'headset',
     ];
 
+    private array $catalogConfig;
+    private string $catalogVisibility;
+
     public function __construct(private PDO $db)
     {
+        $this->catalogConfig = CatalogPricing::configuration($db, (array)(\App\Core\Container::get('config', [])['catalog'] ?? []));
+        $this->catalogVisibility = CatalogSaleGuard::visibilitySql($db, $this->catalogConfig, 'p');
     }
 
     /**
@@ -152,6 +157,7 @@ final class PcCompatibilityService
              FROM pc_component_specs s
              INNER JOIN products p ON p.id = s.product_id
              WHERE s.component_type = :type
+               AND {$this->catalogVisibility}
                AND COALESCE(p.stock_status, '') NOT IN ('esaurito','ritirato','outofstock','non disponibile')
              ORDER BY CASE WHEN COALESCE(p.sale_price, p.price, 0) > 0 THEN 0 ELSE 1 END,
                       COALESCE(p.sale_price, p.price, 999999) ASC,
@@ -258,7 +264,7 @@ final class PcCompatibilityService
                     s.wattage, s.capacity_gb, s.interface_type, s.metadata_json, s.confidence
              FROM pc_component_specs s
              INNER JOIN products p ON p.id = s.product_id
-             WHERE s.product_id = :id
+             WHERE s.product_id = :id AND {$this->catalogVisibility}
              LIMIT 1"
         );
         $stmt->execute(['id' => $productId]);
@@ -379,9 +385,11 @@ final class PcCompatibilityService
         }
         $ids = array_values(array_unique(array_map('intval', $selected)));
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $this->db->prepare("SELECT id, COALESCE(sale_price, price, 0) price FROM products WHERE id IN ({$placeholders})");
+        $visibility = CatalogSaleGuard::visibilitySql($this->db, $this->catalogConfig);
+        $stmt = $this->db->prepare("SELECT id, COALESCE(sale_price, price, 0) price FROM products WHERE {$visibility} AND id IN ({$placeholders})");
         $stmt->execute($ids);
         $prices = $stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+        if (count($prices) !== count($ids)) return 0.0;
         $total = 0.0;
         foreach ($selected as $id) {
             $total += (float)($prices[$id] ?? 0);
@@ -402,7 +410,7 @@ final class PcCompatibilityService
 
         $ids = array_values(array_unique(array_map('intval', $selected)));
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $this->db->prepare("SELECT id, stock_status, stock_qty FROM products WHERE id IN ({$placeholders})");
+        $stmt = $this->db->prepare("SELECT * FROM products WHERE id IN ({$placeholders})");
         $stmt->execute($ids);
 
         $byId = [];
@@ -413,7 +421,7 @@ final class PcCompatibilityService
         $minQty = null;
         foreach ($selected as $id) {
             $row = $byId[(int)$id] ?? null;
-            if ($row === null || !$this->stockStatusIsAvailable((string)($row['stock_status'] ?? ''))) {
+            if ($row === null || CatalogSaleGuard::reason($row, $this->catalogConfig) !== null) {
                 return ['available' => false, 'qty' => 0, 'label' => 'Su richiesta'];
             }
             $qty = max(0, (int)($row['stock_qty'] ?? 0));

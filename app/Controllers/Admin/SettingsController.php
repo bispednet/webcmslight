@@ -148,19 +148,35 @@ final class SettingsController extends Controller
     private function handlePricingUpdate(): string
     {
         // Percentuali inserite come numeri interi (es. 10 = 10%, 22 = IVA 22%)
-        $markupPct = max(0.0, min(200.0, (float)str_replace(',', '.', (string)($_POST['markup_default'] ?? '10'))));
+        $lowPct = max(0.0, min(200.0, (float)str_replace(',', '.', (string)($_POST['markup_low'] ?? '20'))));
+        $highPct = max(0.0, min($lowPct, (float)str_replace(',', '.', (string)($_POST['markup_high'] ?? '5.5'))));
+        $lowCost = max(0.0, (float)str_replace(',', '.', (string)($_POST['low_cost_limit'] ?? '150')));
+        $highCost = max($lowCost + 1, (float)str_replace(',', '.', (string)($_POST['high_cost_limit'] ?? '1000')));
+        $absoluteMinimum = max(0.0, (float)str_replace(',', '.', (string)($_POST['minimum_sale_markup'] ?? '50')));
         $vatPct    = max(0.0, min(100.0, (float)str_replace(',', '.', (string)($_POST['vat'] ?? '22'))));
         $discPct   = max(0.0, min(100.0, (float)str_replace(',', '.', (string)($_POST['max_discount'] ?? '5'))));
         $fixed     = max(0.0, min(1000.0, (float)str_replace(',', '.', (string)($_POST['markup_fixed'] ?? '5'))));
+        $minimumMarkup = max(0.0, min(200.0, (float)str_replace(',', '.', (string)($_POST['minimum_markup'] ?? '5.5'))));
+        $minimumProfit = max(0.0, min(1000.0, (float)str_replace(',', '.', (string)($_POST['minimum_profit'] ?? '5'))));
+        $maxAgeHours = max(1.0, min(24.0, (float)($_POST['max_age_hours'] ?? 2)));
 
         $this->persistSettings([
-            'catalog_markup_default' => (string)round($markupPct / 100, 4),
+            'catalog_pricing_mode' => 'graduated',
+            'catalog_markup_low' => (string)round($lowPct / 100, 4),
+            'catalog_markup_high' => (string)round($highPct / 100, 4),
+            'catalog_low_cost_limit' => (string)round($lowCost, 2),
+            'catalog_high_cost_limit' => (string)round($highCost, 2),
+            'catalog_minimum_sale_markup' => (string)round($absoluteMinimum, 2),
+            'catalog_minimum_sale_markup_from_cost' => (string)round($highCost, 2),
             'catalog_markup_fixed'   => (string)round($fixed, 2),
             'catalog_vat'            => (string)round($vatPct / 100, 4),
             'catalog_max_discount'   => (string)round($discPct / 100, 4),
+            'catalog_minimum_markup' => (string)round($minimumMarkup / 100, 4),
+            'catalog_minimum_profit' => (string)round($minimumProfit, 2),
+            'catalog_max_age_seconds' => (string)(int)round($maxAgeHours * 3600),
         ]);
 
-        return 'Parametri pricing catalogo salvati.';
+        return 'Ricarico salvato. I prezzi saranno ricalcolati alla prossima sincronizzazione del catalogo.';
     }
 
     private function persistSettings(array $settings): void

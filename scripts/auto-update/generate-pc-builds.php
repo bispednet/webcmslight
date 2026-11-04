@@ -25,7 +25,7 @@ $dryRun = isset($opts['dry-run']);
 $db = Database::connection();
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-$llm = isset($opts['no-llm']) ? null : GeminiClient::fromConfig(Container::get('config', []), 'editorial');
+$llm = isset($opts['no-llm']) ? null : GeminiClient::fromConfig(Container::get('config', []), 'pc_configurator');
 $policy = new PcCommercialPolicyService($db, $llm);
 $planner = new PcBuildPlanner($db, new PcCompatibilityService($db), null, $policy);
 $stats = $planner->generateDailyBuilds($dryRun);

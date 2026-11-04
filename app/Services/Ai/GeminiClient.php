@@ -29,12 +29,20 @@ final class GeminiClient
     }
 
     private bool $useThinkingFallback = false;
+    public function configurationSignature(): string
+    {
+        return hash('sha256', json_encode([$this->backend, $this->provider, $this->surface, $this->profile, $this->model, $this->temperature, $this->thinkingLevel, $this->thinkingBudget, $this->chatUrl], JSON_THROW_ON_ERROR));
+    }
     /** @var array<string,bool> */
     private static array $thinkingFallbackModels = [];
 
     public static function fromConfig(array $config, string $profile = 'editorial'): ?self
     {
         $gemini = $config['gemini'] ?? [];
+        if ($profile === 'pc_configurator' && !isset($gemini[$profile])) {
+            $gemini[$profile] = $gemini['editorial'] ?? [];
+            $config['ai']['profiles'][$profile] ??= $config['ai']['profiles']['editorial'] ?? [];
+        }
         $settings = $gemini[$profile] ?? ($profile === 'editorial' ? $gemini : []);
         $settings = is_array($settings) ? $settings : [];
         $provider = self::providerSettings($config, $settings, $profile);

@@ -169,6 +169,18 @@ return [
         'markup_fixed'    => 5.00,    // +5€ fissi (scoraggia la minuteria a basso margine)
         'max_discount'    => 0.05,    // sconto massimo applicabile in trattativa (5%)
         'require_image'   => true,    // scarta i prodotti senza foto valida
+        // Soglie applicate anche al checkout. I costi fornitore sono netti IVA.
+        'pricing_mode' => 'graduated',
+        'low_cost_limit' => 150.00,
+        'high_cost_limit' => 1000.00,
+        'markup_low' => 0.20,
+        'markup_high' => 0.055,
+        'minimum_markup' => 0.055,
+        'minimum_profit' => 5.00,
+        'minimum_sale_markup' => 50.00,
+        'minimum_sale_markup_from_cost' => 1000.00,
+        'max_age_seconds' => 7200,
+        'checkout_max_age_seconds' => 300,
         'import_unmapped' => false,   // se true importa anche famiglie non mappate (in "accessori")
         'family_exclude'  => [],      // famiglie Runner extra da escludere (oltre ai default)
         'markup' => [                 // markup % per categoria (override del default)
@@ -186,11 +198,11 @@ return [
         ],
         // Fornitore Runner S.p.A. — tracciati txt pipe-delimited via FTPS
         'runner' => [
-            'ftp_host'      => 'techstore.runner.it', // host FTP Runner (NON ftp.runner.it: è Cloudflare)
+            'ftp_host'      => 'runnertechstore.it', // endpoint comunicato da Runner
             'ftp_user'      => '',         // codice cliente, es. C111445
             'ftp_pass'      => '',
             'ftp_port'      => 21,
-            'ftp_ssl'       => true,       // Runner richiede FTPS (TLS esplicito)
+            'ftp_ssl'       => false,      // questo endpoint rifiuta il TLS esplicito; porta 21
             'customer_code' => '',         // cartella prezzi personalizzati (= codice cliente)
             'work_dir'      => '',         // es. '/home/uu4c5pdm/.../storage/imports/runner'
             'skip_download' => false,      // true per usare solo i file già in work_dir (test)

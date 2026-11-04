@@ -165,52 +165,35 @@ $baseSiteName = $settings['site_name'] ?? 'Bisped';
     </form>
 
     <?php
-    // Valori pricing correnti (settings DB con fallback ai default)
-    $pMarkup = isset($settings['catalog_markup_default']) ? round((float)$settings['catalog_markup_default'] * 100, 2) : 10;
-    $pFixed  = isset($settings['catalog_markup_fixed'])   ? round((float)$settings['catalog_markup_fixed'], 2)      : 5;
-    $pVat    = isset($settings['catalog_vat'])            ? round((float)$settings['catalog_vat'] * 100, 2)         : 22;
-    $pDisc   = isset($settings['catalog_max_discount'])   ? round((float)$settings['catalog_max_discount'] * 100, 2) : 5;
+    $pricing = \App\Services\Catalog\CatalogPricing::configuration(\App\Core\Database::connection(), (array)config('catalog', []));
+    $fields = [
+        ['markup_low', 'Ricarico fino alla prima soglia (%)', (float)($pricing['markup_low'] ?? .20) * 100, .1],
+        ['low_cost_limit', 'Prima soglia: costo netto (EUR)', $pricing['low_cost_limit'] ?? 150, .01],
+        ['markup_high', 'Ricarico dalla fascia alta (%)', (float)($pricing['markup_high'] ?? .055) * 100, .1],
+        ['high_cost_limit', 'Fascia alta: costo netto da (EUR)', $pricing['high_cost_limit'] ?? 1000, .01],
+        ['markup_fixed', 'Quota fissa su tutti i prodotti (EUR)', $pricing['markup_fixed'] ?? 5, .01],
+        ['vat', 'IVA (%)', (float)($pricing['vat'] ?? .22) * 100, .1],
+        ['minimum_sale_markup', 'Ricarico minimo nella fascia alta (EUR)', $pricing['minimum_sale_markup'] ?? 50, .01],
+        ['minimum_markup', 'Ricarico minimo di sicurezza (%)', (float)($pricing['minimum_markup'] ?? .055) * 100, .1],
+        ['minimum_profit', 'Quota fissa minima di sicurezza (EUR)', $pricing['minimum_profit'] ?? 5, .01],
+        ['max_age_hours', 'Scadenza dati fornitore (ore)', (float)($pricing['max_age_seconds'] ?? 7200) / 3600, .5],
+        ['max_discount', 'Sconto massimo indicativo in trattativa (%)', (float)($pricing['max_discount'] ?? .05) * 100, .5],
+    ];
     ?>
     <form method="post" action="/admin/settings" class="card space-y-4">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
         <input type="hidden" name="action" value="pricing">
-        <h2 class="text-sm font-semibold text-acc uppercase tracking-wide">Catalogo — Ricarico prezzi (Runner)</h2>
-        <p class="text-xs text-muted">
-            Formula prezzo di vendita: <code>(costo × (1 + ricarico%) + fisso€) × (1 + IVA%)</code>, arrotondato a ,90.
-            Il ricarico fisso scoraggia la vendita di minuteria a basso margine.
-        </p>
+        <h2 class="text-sm font-semibold text-acc uppercase tracking-wide">Catalogo Runner: ricarico per costo</h2>
+        <p class="text-xs text-muted">Il ricarico percentuale scende in modo lineare tra le due soglie di costo netto e resta costante fuori dalle soglie. Si aggiunge la quota fissa su ogni prodotto, poi l'IVA. Il prezzo viene arrotondato verso l'alto a ,90.</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <?php foreach ($fields as [$name, $label, $value, $step]): ?>
             <label class="text-sm text-muted flex flex-col gap-2">
-                Ricarico percentuale (%)
-                <input type="number" step="0.1" min="0" max="200" name="markup_default" value="<?= htmlspecialchars((string)$pMarkup, ENT_QUOTES, 'UTF-8') ?>"
-                       class="bg-bg border border-border rounded-md px-3 py-2 text-txt">
-                <span class="text-xs text-muted">Default su tutte le categorie (es. 10). Le override per categoria restano in .env.php</span>
+                <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                <input type="number" step="<?= $step ?>" min="<?= $name === 'max_age_hours' ? 1 : 0 ?>" <?= $name === 'max_age_hours' ? 'max="24"' : '' ?> name="<?= $name ?>" value="<?= htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8') ?>" required class="bg-bg border border-border rounded-md px-3 py-2 text-txt">
             </label>
-            <label class="text-sm text-muted flex flex-col gap-2">
-                Ricarico fisso (€)
-                <input type="number" step="0.5" min="0" max="1000" name="markup_fixed" value="<?= htmlspecialchars((string)$pFixed, ENT_QUOTES, 'UTF-8') ?>"
-                       class="bg-bg border border-border rounded-md px-3 py-2 text-txt">
-                <span class="text-xs text-muted">Somma fissa su ogni prodotto (es. 5€)</span>
-            </label>
-            <label class="text-sm text-muted flex flex-col gap-2">
-                IVA (%)
-                <input type="number" step="0.1" min="0" max="100" name="vat" value="<?= htmlspecialchars((string)$pVat, ENT_QUOTES, 'UTF-8') ?>"
-                       class="bg-bg border border-border rounded-md px-3 py-2 text-txt">
-            </label>
-            <label class="text-sm text-muted flex flex-col gap-2">
-                Sconto massimo in trattativa (%)
-                <input type="number" step="0.5" min="0" max="100" name="max_discount" value="<?= htmlspecialchars((string)$pDisc, ENT_QUOTES, 'UTF-8') ?>"
-                       class="bg-bg border border-border rounded-md px-3 py-2 text-txt">
-                <span class="text-xs text-muted">Limite indicativo per il personale (es. 5%)</span>
-            </label>
+            <?php endforeach; ?>
         </div>
-        <div class="card bg-bg/50 border-border/60 text-xs text-muted">
-            Esempio: costo €100 con ricarico <?= htmlspecialchars((string)$pMarkup, ENT_QUOTES, 'UTF-8') ?>% + €<?= htmlspecialchars((string)$pFixed, ENT_QUOTES, 'UTF-8') ?> fisso →
-            (100 × <?= number_format(1 + $pMarkup/100, 2) ?> + <?= htmlspecialchars((string)$pFixed, ENT_QUOTES, 'UTF-8') ?>) × <?= number_format(1 + $pVat/100, 2) ?> =
-            <strong class="text-acc">€<?= number_format((100 * (1 + $pMarkup/100) + $pFixed) * (1 + $pVat/100), 2) ?></strong> circa
-        </div>
-        <div class="flex items-center gap-3 pt-2">
-            <button type="submit" class="bg-pri text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-red-500/80 transition">Salva ricarico</button>
-        </div>
+        <p class="text-xs text-muted">Il minimo in euro vale dalla soglia alta e indica il ricarico prima di commissioni e altri costi. Le protezioni valgono anche per promozioni e incasso. Dopo il salvataggio i prezzi vengono ricalcolati alla prossima sincronizzazione oraria.</p>
+        <button type="submit" class="bg-pri text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-red-500/80 transition">Salva ricarico</button>
     </form>
 </section>

@@ -5,6 +5,8 @@ namespace App\Controllers\Api;
 
 use App\Core\AgentAuth;
 use App\Core\Database;
+use App\Services\Catalog\CatalogPricing;
+use App\Services\Catalog\CatalogSaleGuard;
 use PDO;
 
 /**
@@ -14,11 +16,14 @@ use PDO;
 final class AgentApiController
 {
     private PDO $db;
+    private string $visibility;
 
     public function __construct()
     {
         AgentAuth::requireAuth();
         $this->db = Database::connection();
+        $catalog = CatalogPricing::configuration($this->db, (array)(\App\Core\Container::get('config', [])['catalog'] ?? []));
+        $this->visibility = CatalogSaleGuard::visibilitySql($this->db, $catalog);
         header('Content-Type: application/json; charset=utf-8');
         header('X-Robots-Tag: noindex');
         // CORS permissivo per OpenAI/Gemini (il token protegge l'accesso)
@@ -55,8 +60,8 @@ final class AgentApiController
         if ($search !== '') {
             // Placeholder unici: native prepares non ammettono :s ripetuto (HY093).
             $stmt = $this->db->prepare(
-                'SELECT id,name,slug,category,price,sale_price,stock_status,sku,featured_order,updated_at
-                 FROM products WHERE name LIKE :sn OR category LIKE :sc OR sku LIKE :sk ORDER BY featured_order,name LIMIT :l'
+                "SELECT id,name,slug,category,price,sale_price,stock_status,sku,featured_order,updated_at
+                 FROM products WHERE {$this->visibility} AND (name LIKE :sn OR category LIKE :sc OR sku LIKE :sk) ORDER BY featured_order,name LIMIT :l"
             );
             $like = '%' . $search . '%';
             $stmt->bindValue(':sn', $like);
@@ -65,8 +70,8 @@ final class AgentApiController
             $stmt->bindValue(':l', $limit, PDO::PARAM_INT);
         } else {
             $stmt = $this->db->prepare(
-                'SELECT id,name,slug,category,price,sale_price,stock_status,sku,featured_order,updated_at
-                 FROM products ORDER BY featured_order,name LIMIT :l'
+                "SELECT id,name,slug,category,price,sale_price,stock_status,sku,featured_order,updated_at
+                 FROM products WHERE {$this->visibility} ORDER BY featured_order,name LIMIT :l"
             );
             $stmt->bindValue(':l', $limit, PDO::PARAM_INT);
         }
@@ -76,7 +81,7 @@ final class AgentApiController
 
     public function getProduct(int $id): void
     {
-        $stmt = $this->db->prepare('SELECT * FROM products WHERE id=:id');
+        $stmt = $this->db->prepare("SELECT * FROM products WHERE {$this->visibility} AND id=:id");
         $stmt->execute(['id' => $id]);
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$product) {

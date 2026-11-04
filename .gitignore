@@ -33,3 +33,16 @@ airewagcms_mysql_db.sql
 
 # credenziali deploy FTP (mai committare)
 .deploy-ftp.local
+
+# Configurazione e credenziali del solo ambiente locale
+/.cloudflared/
+/github/
+/.github/
+/.local/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Contenuti recuperati dall'hosting: i file gia versionati restano tracciati
+/public/media/

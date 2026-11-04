@@ -125,6 +125,11 @@ bisped.net/
 
 ## Setup locale
 
+Su Windows usare la [guida sviluppo locale](docs/SVILUPPO_LOCALE.md):
+`Avvia-Locale.cmd` avvia PHP 8.3, MySQL 8.0 e la raccolta locale delle email.
+La copia dei dati e della configurazione dell'hosting resta nelle cartelle private
+escluse da Git. I comandi Linux seguenti descrivono il precedente ambiente.
+
 ```bash
 cp .env.example.php .env.php
 # configurare: database, app.url, app.key, gemini.api_key, whatsapp.phone_number

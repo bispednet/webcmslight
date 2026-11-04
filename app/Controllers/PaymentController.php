@@ -7,6 +7,9 @@ use App\Core\Database;
 use App\Core\Logger;
 use App\Core\Response;
 use App\Services\Cms\ContentRepository;
+use App\Services\Catalog\CatalogPricing;
+use App\Services\Catalog\CatalogSaleGuard;
+use App\Services\Catalog\RunnerCheckoutVerifier;
 use App\Services\Payments\PayPalClient;
 use App\Services\Security\Csrf;
 use PDO;
@@ -38,6 +41,8 @@ final class PaymentController
                 $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'product_not_payable', 'message' => 'Prodotto non abilitato al pagamento PayPal.'], 404);
                 return;
             }
+
+            $product = $this->checkedProduct($product, isset($body['expected_amount']) ? (string)$body['expected_amount'] : null);
 
             if (!$this->paypal->isConfigured()) {
                 $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'paypal_not_configured', 'message' => 'PayPal non configurato sul server.'], 503);
@@ -77,6 +82,8 @@ final class PaymentController
                 'public_id' => $publicId,
                 'status' => $paypalOrder['status'] ?? 'CREATED',
             ]);
+        } catch (\DomainException $e) {
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'catalog_changed', 'message' => $e->getMessage() . '. Ricarica la pagina prima di procedere.'], 409);
         } catch (\Throwable $e) {
             Logger::error('PayPal order creation failed', ['error' => $e->getMessage(), 'slug' => $slug]);
             if (isset($orderId)) {
@@ -106,9 +113,21 @@ final class PaymentController
             return;
         }
 
+        if ($localOrder['status'] === 'completed') {
+            $this->jsonWithFreshCsrf(['ok' => true, 'status' => 'COMPLETED', 'public_id' => $localOrder['public_id']]);
+            return;
+        }
+
         try {
+            $product = $this->paymentProduct((string)$localOrder['product_slug'], 'paypal');
+            if (!$product) throw new \DomainException('Prodotto non piu acquistabile');
+            $this->checkedProduct($product, (string)$localOrder['amount'], true);
             $capture = $this->paypal->captureOrder((string)$localOrder['paypal_order_id']);
             $captureInfo = $capture['purchase_units'][0]['payments']['captures'][0] ?? [];
+            if (!isset($captureInfo['amount']['value']) || (int)round((float)$captureInfo['amount']['value'] * 100) !== (int)round((float)$localOrder['amount'] * 100)
+                || strtoupper((string)($captureInfo['amount']['currency_code'] ?? '')) !== strtoupper((string)$localOrder['currency'])) {
+                throw new \RuntimeException('Capture amount/currency mismatch: manual reconciliation required');
+            }
             $payer = (array)($capture['payer'] ?? []);
             $payerName = trim((string)($payer['name']['given_name'] ?? '') . ' ' . (string)($payer['name']['surname'] ?? ''));
             $status = strtoupper((string)($capture['status'] ?? '')) === 'COMPLETED' ? 'completed' : 'approved';
@@ -136,6 +155,8 @@ final class PaymentController
                 'status' => $capture['status'] ?? strtoupper($status),
                 'public_id' => $localOrder['public_id'],
             ]);
+        } catch (\DomainException $e) {
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'catalog_changed', 'message' => $e->getMessage() . '. Incasso non eseguito; ricarica la pagina.'], 409);
         } catch (\Throwable $e) {
             Logger::error('PayPal order capture failed', [
                 'error' => $e->getMessage(),
@@ -165,6 +186,11 @@ final class PaymentController
             return;
         }
 
+        try { $product = $this->checkedProduct($product, isset($body['expected_amount']) ? (string)$body['expected_amount'] : null); }
+        catch (\DomainException $e) {
+            $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'catalog_changed', 'message' => $e->getMessage()], 409);
+            return;
+        }
         $amount = $this->amountForProduct($product);
         if ($amount === null) {
             $this->jsonWithFreshCsrf(['ok' => false, 'error' => 'invalid_amount'], 422);
@@ -219,7 +245,9 @@ final class PaymentController
      */
     private function paymentProduct(string $slug, string $method): ?array
     {
-        $product = $this->content->getProductBySlug($slug);
+        $statement = $this->db->prepare('SELECT * FROM products WHERE slug=:slug LIMIT 1');
+        $statement->execute(['slug' => $slug]);
+        $product = $statement->fetch(PDO::FETCH_ASSOC);
         if (!$product) {
             return null;
         }
@@ -228,6 +256,19 @@ final class PaymentController
             return null;
         }
 
+        return $product;
+    }
+
+    private function checkedProduct(array $product, ?string $expected = null, bool $force = false): array
+    {
+        $catalog = CatalogPricing::configuration($this->db, (array)config('catalog', []));
+        $expected ??= $this->amountForProduct($product);
+        $product = (new RunnerCheckoutVerifier($this->db, $catalog))->refresh((int)$product['id'], $force);
+        $reason = CatalogSaleGuard::reason($product, $catalog);
+        if ($reason !== null) throw new \DomainException('Disponibilita o prezzo non confermati dal fornitore');
+        if ($expected === null || !is_numeric($expected) || (int)round((float)$expected * 100) !== (int)round((float)$this->amountForProduct($product) * 100)) {
+            throw new \DomainException('Il prezzo e cambiato: verifica il nuovo importo');
+        }
         return $product;
     }
 

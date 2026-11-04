@@ -38,6 +38,7 @@ jobs:
             **/runtime/**
             **/runtime
             **/.env.php
+            **/.env*.php
             **/storage/gemini-rate-limit.json
             **/storage/*.log
             **/storage/*.lock
@@ -48,3 +49,13 @@ jobs:
             **/*.local.*
             **/playwright_*.py
             **/runtime/mariadb-data/**
+            **/.cloudflared/**
+            **/.local/**
+            **/github/**
+            **/*.pem
+            **/*.key
+            **/*.p12
+            **/*.pfx
+            **/scripts/dev/**
+            **/*-Locale.ps1
+            **/*-Locale.cmd

@@ -144,6 +144,14 @@ CREATE TABLE IF NOT EXISTS products (
     campaign_label VARCHAR(120) NULL,
     stock_status VARCHAR(80) NULL,
     stock_qty INT UNSIGNED DEFAULT 0,
+    supplier_key VARCHAR(32) NULL,
+    supplier_cost DECIMAL(12,4) NULL,
+    supplier_status VARCHAR(32) NOT NULL DEFAULT 'unverified',
+    supplier_seen_at DATETIME NULL,
+    supplier_stock_checked_at DATETIME NULL,
+    supplier_price_checked_at DATETIME NULL,
+    min_sell_price DECIMAL(12,2) NULL,
+    catalog_block_reason VARCHAR(80) NULL,
     content_html LONGTEXT NULL,
     featured_order INT UNSIGNED DEFAULT 0,
     is_payment_product TINYINT(1) NOT NULL DEFAULT 0,
@@ -601,4 +609,17 @@ CREATE TABLE IF NOT EXISTS ai_special_conditions (
     sort_order INT UNSIGNED NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS catalog_sync_runs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    supplier_key VARCHAR(32) NOT NULL,
+    mode VARCHAR(32) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    started_at DATETIME NOT NULL,
+    completed_at DATETIME NULL,
+    input_count INT UNSIGNED NOT NULL DEFAULT 0,
+    stats_json JSON NULL,
+    error_message VARCHAR(500) NULL,
+    INDEX idx_catalog_sync_supplier (supplier_key, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

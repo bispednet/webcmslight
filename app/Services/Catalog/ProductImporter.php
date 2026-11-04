@@ -11,7 +11,7 @@ use PDO;
  *
  * Pricing (configurabile da dashboard):
  *   prezzo_vendita = ( costo_acquisto × (1 + markup%) + markup_fisso ) × (1 + IVA)
- *   arrotondato a ,90. markup% e markup_fisso hanno override per categoria.
+ *   arrotondato verso l'alto a ,90. Ricarico graduato sul costo netto.
  *   Il markup_fisso (default 5€) evita che convenga comprare minuteria da noi.
  *
  * Disponibilità:
@@ -165,6 +165,8 @@ final class ProductImporter
     {
     }
 
+    private ?\PDOStatement $commercialUpdate = null;
+
     /** Sotto questa soglia di prodotti letti, il prune NON gira (feed sospetto). */
     private const PRUNE_SAFETY_THRESHOLD = 500;
 
@@ -179,167 +181,162 @@ final class ProductImporter
      */
     public function import(SupplierAdapterInterface $adapter, bool $dryRun = false, int $limit = 0): array
     {
-        $products = $adapter->fetchProducts();
-        $stats = ['created' => 0, 'updated' => 0, 'depleted' => 0, 'skipped' => 0, 'errors' => 0, 'pruned' => 0];
-        $processed = 0;
-        $seenSkus = [];
+        return $this->synchronize($adapter->fetchProducts(), $adapter->key(), $dryRun, $limit, true,
+            $adapter instanceof \App\Services\Catalog\Suppliers\RunnerAdapter ? $adapter->capturedAt() : time());
+    }
 
+    public function syncCommercial(\App\Services\Catalog\Suppliers\RunnerAdapter $adapter, bool $dryRun = false): array
+    {
+        return $this->synchronize($adapter->fetchCommercialProducts(), $adapter->key(), $dryRun, 0, false, $adapter->capturedAt());
+    }
+
+    /** Aggiorna un articolo al checkout usando la stessa fotografia validata. */
+    public function refreshOne(array $raw, string $supplier = 'runner', ?int $capturedAt = null): void
+    {
+        $row = $this->db->prepare('SELECT * FROM products WHERE sku=:sku LIMIT 1');
+        $row->execute(['sku' => $raw['sku']]); $existing = $row->fetch(PDO::FETCH_ASSOC);
+        if (!$existing || (!empty($existing['supplier_key']) && $existing['supplier_key'] !== $supplier)) throw new \RuntimeException('Articolo fornitore non riconosciuto');
+        $this->saveCommercial((int)$existing['id'], $raw, $supplier, $capturedAt ?? time());
+    }
+
+    private function synchronize(array $products, string $supplier, bool $dryRun, int $limit, bool $details, int $capturedAt): array
+    {
+        if (!$this->db->query("SHOW COLUMNS FROM products LIKE 'supplier_key'")->fetch()) throw new \RuntimeException('Eseguire migrate-catalog-safety.php prima della sincronizzazione');
+        if ($products === []) throw new \RuntimeException('Fotografia fornitore vuota: sincronizzazione annullata');
+        $stats = ['created'=>0,'updated'=>0,'depleted'=>0,'skipped'=>0,'errors'=>0,'pruned'=>0,'image_errors'=>0,'invalid_prices'=>0,'input_count'=>count($products)];
+        $seen = [];
         foreach ($products as $raw) {
-            if ($limit > 0 && $processed >= $limit) {
-                break;
-            }
-
-            $family = mb_strtoupper((string)($raw['family'] ?? ''), 'UTF-8');
-            if ($this->familyExcluded($family)) {
-                $stats['skipped']++;
-                continue;
-            }
-
-            $descCat = (string)($raw['category'] ?? '');
-            $mapped = $this->mapCategory($family, $descCat, (string)($raw['name'] ?? ''));
-            if ($mapped === null) {
-                $stats['skipped']++;
-                continue;
-            }
-            // Sotto-categoria = categoria merceologica Runner (DescCatMerc)
-            $mapped['subcategory']       = $this->slugify($descCat);
-            $mapped['subcategory_label'] = $this->prettyLabel($descCat);
-
-            $sku        = (string)$raw['sku'];
-            $stock      = (int)($raw['stock'] ?? 0);
-            $seenSkus[] = $sku;
-
-            try {
-                $existingId = $this->findBySku($sku);
-
-                // Disponibilità: stock 0 = non vendibile.
-                if ($stock <= 0) {
-                    if ($existingId !== null && !$dryRun) {
-                        $this->markDepleted($existingId);
-                    }
-                    $stats['depleted']++;
-                    continue;
-                }
-
-                // Foto: scarica e valida. Senza foto vera, il prodotto non entra
-                // a catalogo (richiesta: "non voglio prodotti senza foto").
-                $localImage = null;
-                if (!empty($this->config['require_image']) || !$dryRun) {
-                    $localImage = $this->localizeImage((string)($raw['image_url'] ?? ''), $sku, $dryRun);
-                    if ($localImage === null && !empty($this->config['require_image'])) {
-                        $stats['skipped']++;
-                        continue;
-                    }
-                }
-
-                $price = $this->computeSalePrice((float)$raw['cost'], $mapped['category']);
-
-                if ($existingId !== null) {
-                    if (!$dryRun) {
-                        $this->updateProduct($existingId, $price, $stock, $localImage, (string)($raw['description'] ?? ''), $mapped);
-                    }
-                    $stats['updated']++;
-                } else {
-                    if (!$dryRun) {
-                        $this->createProduct($sku, $price, $stock, $mapped, $raw, $localImage);
-                    }
-                    $stats['created']++;
-                }
-            } catch (\Throwable $e) {
-                $stats['errors']++;
-            }
-            $processed++;
+            $sku = trim((string)($raw['sku'] ?? ''));
+            if ($sku === '' || isset($seen[strtoupper($sku)])) throw new \RuntimeException('SKU mancante o duplicato nella fotografia fornitore');
+            $seen[strtoupper($sku)] = true;
         }
-
-        // Prune: marca "ritirato" i prodotti non più presenti nel listino fornitore.
-        // Solo in full (limit=0), non dry-run, e con abbastanza prodotti letti
-        // (guardia anti-azzeramento se il feed arriva vuoto o corrotto).
-        $allSkus = array_column($products, 'sku');
-        if ($limit === 0 && !$dryRun && count($allSkus) >= self::PRUNE_SAFETY_THRESHOLD) {
-            $stats['pruned'] = $this->pruneMissing($allSkus);
+        $count = $this->db->prepare("SELECT COUNT(*) FROM products WHERE supplier_key=:supplier AND supplier_status<>'retired'");
+        $count->execute(['supplier'=>$supplier]); $existingCount = (int)$count->fetchColumn();
+        if (count($products) < max(1, (int)($this->config['min_catalog_items'] ?? ($supplier === 'runner' ? self::PRUNE_SAFETY_THRESHOLD : 1)))
+            || ($existingCount > 0 && count($products) < $existingCount * (float)($this->config['min_snapshot_ratio'] ?? 0.7))) {
+            throw new \RuntimeException('Fotografia fornitore sospetta o incompleta: nessun prodotto modificato');
         }
+        $lock = $this->db->prepare('SELECT GET_LOCK(:name,0)');
+        $lockName = 'bisped-catalog-' . substr(hash('sha256', $this->db->query('SELECT DATABASE()')->fetchColumn() . ':' . $supplier), 0, 32);
+        $lock->execute(['name'=>$lockName]);
+        if ((int)$lock->fetchColumn() !== 1) throw new \RuntimeException('Sincronizzazione catalogo gia in corso');
+        $records = $limit > 0 ? array_slice($products, 0, $limit) : $products;
+        $pending = [];
+        $existingBySku = [];
+        foreach ($this->db->query("SELECT * FROM products WHERE sku IS NOT NULL AND sku<>''")->fetchAll(PDO::FETCH_ASSOC) as $existing) $existingBySku[strtoupper((string)$existing['sku'])] = $existing;
+        try {
+            if (!$dryRun) $this->db->beginTransaction();
+            foreach ($records as $raw) {
+                $existing = $existingBySku[strtoupper((string)$raw['sku'])] ?? null;
+                if ($existing && !empty($existing['supplier_key']) && $existing['supplier_key'] !== $supplier) { $stats['skipped']++; continue; }
+                if ((float)($raw['cost'] ?? 0) <= 0) $stats['invalid_prices']++;
+                if ($existing) {
+                    if (!$dryRun) $this->saveCommercial((int)$existing['id'], $raw, $supplier, $capturedAt);
+                    $stats[(int)($raw['stock'] ?? 0) > 0 ? 'updated' : 'depleted']++;
+                }
+                if ($details) $pending[] = [$raw, $existing ?: null];
+                elseif (!$existing) $stats['skipped']++;
+            }
+            if ($limit === 0 && !$dryRun) $stats['pruned'] = $this->pruneMissing(array_keys($seen), $supplier, $capturedAt);
+            if (!$dryRun) $this->db->commit();
+            // Foto e descrizioni non possono impedire un aggiornamento di costo/stock.
+            foreach ($pending as [$raw, $existing]) {
+                $family = mb_strtoupper((string)($raw['family'] ?? ''), 'UTF-8');
+                $mapped = $this->familyExcluded($family) ? null : $this->mapCategory($family, (string)($raw['category'] ?? ''), (string)($raw['name'] ?? ''));
+                if (!$mapped || (float)($raw['cost'] ?? 0) <= 0 || (int)($raw['stock'] ?? 0) <= 0) { $stats['skipped']++; continue; }
+                $mapped['subcategory'] = $this->slugify((string)$raw['category']);
+                $mapped['subcategory_label'] = $this->prettyLabel((string)$raw['category']);
+                try {
+                    $image = $this->localizeImage((string)($raw['image_url'] ?? ''), (string)$raw['sku'], $dryRun);
+                    if ($existing) {
+                        if (!$dryRun) {
+                            $sets = ['category=:category','subcategory=:subcategory','subcategory_label=:label'];
+                            $params = ['category'=>$mapped['category'],'subcategory'=>$mapped['subcategory'],'label'=>$mapped['subcategory_label'],'id'=>$existing['id']];
+                            if ($image) { $sets[]='image_url=:image'; $params['image']=$image; }
+                            $description = $this->cleanDescription((string)($raw['description'] ?? ''));
+                            if ($description !== '') { $sets[]='description=:description'; $params['description']=$description; }
+                            $this->db->prepare('UPDATE products SET '.implode(',',$sets).' WHERE id=:id')->execute($params);
+                        }
+                    } elseif ($image || empty($this->config['require_image'])) {
+                        if (!$dryRun) {
+                            $this->createProduct((string)$raw['sku'], $this->computeSalePrice((float)$raw['cost'], $mapped['category']), (int)$raw['stock'], $mapped, $raw, $image);
+                            $this->saveCommercial((int)$this->db->lastInsertId(), $raw, $supplier, $capturedAt);
+                        }
+                        $stats['created']++;
+                    } else $stats['skipped']++;
+                } catch (\Throwable $error) {
+                    $stats['image_errors']++;
+                    \App\Core\Logger::error('Supplier image/details update failed', ['supplier'=>$supplier,'sku'=>$raw['sku'],'type'=>get_class($error)]);
+                }
+            }
+            return $stats;
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        } finally { $release=$this->db->prepare('SELECT RELEASE_LOCK(:name)'); $release->execute(['name'=>$lockName]); }
+    }
 
+    private function saveCommercial(int $id, array $raw, string $supplier, int $capturedAt): void
+    {
+        $family = mb_strtoupper((string)($raw['family'] ?? ''), 'UTF-8');
+        $mapped = $this->familyExcluded($family) ? null : $this->mapCategory($family, (string)($raw['category'] ?? ''), (string)($raw['name'] ?? ''));
+        $cost = (float)($raw['cost'] ?? 0); $quantity = max(0, (int)($raw['stock'] ?? 0));
+        $valid = is_finite($cost) && $cost > 0;
+        $reason = !$mapped ? 'excluded_category' : (!$valid ? 'invalid_supplier_price' : ($quantity <= 0 ? 'out_of_stock' : null));
+        $price = $valid ? $this->computeSalePrice($cost, $mapped['category'] ?? '') : null;
+        $minimum = $valid ? CatalogPricing::minimumPrice($cost, $this->config) : null;
+        $status = $reason === null ? 'active' : ($reason === 'out_of_stock' ? 'out_of_stock' : 'blocked');
+        $checked = gmdate('Y-m-d H:i:s', $capturedAt);
+        $statement = $this->commercialUpdate ??= $this->db->prepare("UPDATE products SET supplier_key=:supplier,supplier_cost=:cost,supplier_status=:status,
+            supplier_seen_at=:seen,supplier_price_checked_at=:price_checked,supplier_stock_checked_at=:stock_checked,
+            min_sell_price=:minimum,catalog_block_reason=:reason,price=:price,sale_price=NULL,
+            stock_status=:stock_status,stock_qty=:qty,updated_at=NOW() WHERE id=:id
+            AND (supplier_stock_checked_at IS NULL OR supplier_stock_checked_at <= :comparison_time)");
+        $statement->execute([
+                'supplier'=>$supplier,'cost'=>$valid?$cost:null,'status'=>$status,'seen'=>$checked,
+                'price_checked'=>$valid?$checked:null,'stock_checked'=>$checked,'minimum'=>$minimum,'reason'=>$reason,
+                'price'=>$price,'stock_status'=>$reason===null?'disponibile':($reason==='out_of_stock'?'esaurito':'sospeso'),
+                'qty'=>$reason===null?$quantity:0,'id'=>$id,'comparison_time'=>$checked,
+            ]);
+    }
+
+    public function pruneMissing(array $seenSkus, string $supplierTag = 'runner', ?int $capturedAt = null): int
+    {
+        if ($seenSkus === []) throw new \RuntimeException('Riconciliazione rifiutata: elenco SKU vuoto');
+        $seen = array_fill_keys(array_map('strtoupper', $seenSkus), true);
+        $query = $this->db->prepare("SELECT id,sku FROM products WHERE supplier_key=:supplier AND (supplier_status<>'retired' OR stock_qty>0 OR stock_status<>'ritirato')");
+        $query->execute(['supplier'=>$supplierTag]); $missing=[];
+        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) if (!isset($seen[strtoupper((string)$row['sku'])])) $missing[]=(int)$row['id'];
+        $count=0;
+        foreach (array_chunk($missing,500) as $ids) {
+            $placeholders=implode(',',array_fill(0,count($ids),'?'));
+            $statement=$this->db->prepare("UPDATE products SET stock_status='ritirato',stock_qty=0,supplier_status='retired',catalog_block_reason='missing_from_supplier',supplier_stock_checked_at=UTC_TIMESTAMP(),sale_price=NULL,updated_at=NOW() WHERE id IN ({$placeholders}) AND (supplier_stock_checked_at IS NULL OR supplier_stock_checked_at <= ?)");
+            $statement->execute([...$ids, gmdate('Y-m-d H:i:s', $capturedAt ?? time())]); $count+=$statement->rowCount();
+        }
+        return $count;
+    }
+
+    /** Compatibilita: lo stock da solo puo esaurire, mai convalidare un prezzo. */
+    public function syncAvailability(array $availability, bool $dryRun = false): array
+    {
+        if ($availability === []) throw new \RuntimeException('Disponibilita vuota: aggiornamento rifiutato');
+        $stats=['available'=>0,'depleted'=>0];
+        $query=$this->db->query("SELECT * FROM products WHERE supplier_key='runner'");
+        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $qty=max(0,(int)($availability[$row['sku']]??0));
+            $canRemain=$qty>0 && CatalogSaleGuard::reason($row,$this->config)===null;
+            if (!$dryRun) {
+                if ($qty===0) $this->markDepleted((int)$row['id']);
+                elseif ($canRemain) $this->db->prepare('UPDATE products SET stock_qty=:qty WHERE id=:id')->execute(['qty'=>$qty,'id'=>$row['id']]);
+            }
+            $stats[$canRemain?'available':'depleted']++;
+        }
         return $stats;
     }
 
-    /**
-     * Marca "ritirato" i prodotti del fornitore non più presenti nel listino.
-     * Solo modalità full (limit=0) e non dry-run. Identifica i prodotti importati
-     * (sku presente) confrontandoli con quelli visti in questo import.
-     *
-     * @param list<string> $seenSkus
-     */
-    public function pruneMissing(array $seenSkus, string $supplierTag = 'runner'): int
-    {
-        if (empty($seenSkus)) {
-            return 0;
-        }
-        // Considera solo prodotti che hanno uno sku (creati da import fornitore).
-        $placeholders = implode(',', array_fill(0, count($seenSkus), '?'));
-        $sql = "UPDATE products SET stock_status='ritirato'
-                WHERE sku IS NOT NULL AND sku <> ''
-                  AND sku NOT IN ({$placeholders})
-                  AND stock_status <> 'ritirato'
-                  AND featured_order >= 100"; // 100 = soglia prodotti da import automatico
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($seenSkus);
-
-        return $stmt->rowCount();
-    }
-
-    /**
-     * Cron disponibilità (ogni 6h): aggiorna SOLO lo stock_status dei prodotti
-     * già a catalogo, in base alla mappa [sku => qty] da dispo.txt.
-     * - qty > 0  → disponibile
-     * - qty <= 0 o sku non in mappa → esaurito
-     * Tocca solo i prodotti da import automatico (featured_order >= 100).
-     *
-     * @param array<string,int> $availability
-     * @return array{available:int, depleted:int}
-     */
-    public function syncAvailability(array $availability, bool $dryRun = false): array
-    {
-        $res = ['available' => 0, 'depleted' => 0];
-        $stmt = $this->db->query("SELECT id, sku, stock_status FROM products WHERE sku IS NOT NULL AND sku <> '' AND featured_order >= 100");
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $up = $this->db->prepare('UPDATE products SET stock_status = :s, stock_qty = :q, updated_at = NOW() WHERE id = :id');
-        foreach ($rows as $r) {
-            $qty = $availability[$r['sku']] ?? 0;
-            $new = $qty > 0 ? 'disponibile' : 'esaurito';
-            if (!$dryRun) {
-                $up->execute(['s' => $new, 'q' => max(0, $qty), 'id' => $r['id']]);
-            }
-            if ($new !== $r['stock_status']) {
-                $res[$qty > 0 ? 'available' : 'depleted']++;
-            }
-        }
-
-        return $res;
-    }
-
-    // ── Pricing ──────────────────────────────────────────────────────────────
     public function computeSalePrice(float $cost, string $category): float
     {
-        $pct   = (float)($this->config['markup'][$category] ?? $this->config['markup_default'] ?? 0.10);
-        $fixed = (float)($this->config['fixed'][$category] ?? $this->config['markup_fixed'] ?? 5.00);
-        $vat   = (float)($this->config['vat'] ?? 0.22);
-
-        // (costo × (1 + markup%) + fisso) × (1 + IVA)
-        $price = ($cost * (1 + $pct) + $fixed) * (1 + $vat);
-
-        return $this->roundPsychological($price);
-    }
-
-    private function roundPsychological(float $price): float
-    {
-        // Arrotonda a ",90" non sotto il prezzo calcolato.
-        $candidate = floor($price) + 0.90;
-        if ($candidate < $price) {
-            $candidate += 1.0;
-        }
-
-        return round(max($candidate, 0.90), 2);
+        return CatalogPricing::salePrice($cost,$category,$this->config);
     }
 
     /** Keyword che qualificano un prodotto come "gaming" (doppia visibilità). */

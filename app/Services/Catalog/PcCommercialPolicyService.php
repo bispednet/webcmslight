@@ -8,8 +8,12 @@ use PDO;
 
 final class PcCommercialPolicyService
 {
+    private string $catalogVisibility;
+
     public function __construct(private PDO $db, private ?GeminiClient $llm)
     {
+        $catalog = CatalogPricing::configuration($db, (array)(\App\Core\Container::get('config', [])['catalog'] ?? []));
+        $this->catalogVisibility = CatalogSaleGuard::visibilitySql($db, $catalog, 'p');
     }
 
     /**
@@ -110,7 +114,7 @@ final class PcCommercialPolicyService
             $json = $stmt ? $stmt->fetchColumn() : false;
             $decoded = is_string($json) ? json_decode($json, true) : null;
 
-            return is_array($decoded) ? $decoded : [];
+            return $this->llm !== null && is_array($decoded) && ($decoded['model_signature'] ?? null) === $this->llm->configurationSignature() ? $decoded : [];
         } catch (\Throwable) {
             return [];
         }
@@ -121,6 +125,7 @@ final class PcCommercialPolicyService
      */
     private function storePolicy(array $policy, string $source, string $notes): void
     {
+        $policy['model_signature'] = $this->llm?->configurationSignature();
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO pc_commercial_policies (source, policy_json, notes, generated_at)
@@ -177,6 +182,7 @@ final class PcCommercialPolicyService
              INNER JOIN products p ON p.id = s.product_id
              WHERE s.component_type = :type
                AND COALESCE(p.sale_price, p.price, 0) > 0
+               AND {$this->catalogVisibility}
                AND COALESCE(p.stock_status, '') NOT IN ('esaurito','ritirato','outofstock','non disponibile')
              ORDER BY COALESCE(p.sale_price, p.price, 0) ASC
              LIMIT :limit"

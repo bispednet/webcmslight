@@ -28,8 +28,11 @@ final class PcBuildPlanner
         private ?PcCommercialPolicyService $commercialPolicyService = null,
     ) {
         $this->nameGenerator = $nameGenerator === null ? null : Closure::fromCallable($nameGenerator);
+        $catalog = CatalogPricing::configuration($db, (array)(\App\Core\Container::get('config', [])['catalog'] ?? []));
+        $this->catalogVisibility = CatalogSaleGuard::visibilitySql($db, $catalog, 'p');
     }
 
+    private string $catalogVisibility;
     private ?Closure $nameGenerator;
     /** @var array<string,mixed> */
     private array $commercialPolicy = [];
@@ -225,6 +228,7 @@ final class PcBuildPlanner
                AND s.socket IS NOT NULL
                AND COALESCE(p.sale_price, p.price, 0) > 0
                AND COALESCE(p.sale_price, p.price, 0) <= :max_price
+               AND {$this->catalogVisibility}
                AND COALESCE(p.stock_status, '') NOT IN ('esaurito','ritirato','outofstock','non disponibile')
              ORDER BY COALESCE(p.sale_price, p.price, 0) {$direction}
              LIMIT {$candidateLimit}"
