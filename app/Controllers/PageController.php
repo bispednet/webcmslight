@@ -116,6 +116,14 @@ final class PageController extends Controller
         } catch (\Throwable) {
             $pcConfigurator = null;
         }
+        if ($pcConfigurator !== null) {
+            $available = $pcConfigurator['valid'] && $pcConfigurator['stock']['available'];
+            $product['price'] = $available ? $pcConfigurator['total'] : null;
+            $product['sale_price'] = null;
+            $product['stock_status'] = $available ? 'disponibile' : 'sospeso';
+            $product['stock_qty'] = $available ? $pcConfigurator['stock']['qty'] : 0;
+            $product['catalog_available'] = $available;
+        }
 
         $paymentCsrf = Csrf::token();
         $paypalPublicConfig = (new PayPalClient())->publicConfig();
@@ -159,6 +167,15 @@ final class PageController extends Controller
             }
 
             $selected = (array)($configurator['selected'] ?? []);
+            $quantities = (array)($configurator['quantities'] ?? []);
+            if (isset($_GET['ram_quantity'])) {
+                $quantity = filter_var($_GET['ram_quantity'], FILTER_VALIDATE_INT);
+                if (!in_array($quantity, [1, 2, 4], true)) {
+                    Response::json(['ok' => false, 'error' => 'invalid_ram_quantity'], 422);
+                    return;
+                }
+                $quantities['ram'] = $quantity;
+            }
             foreach (PcCompatibilityService::SLOT_LABELS as $slot => $_label) {
                 if (!array_key_exists($slot, $_GET)) {
                     continue;
@@ -171,7 +188,8 @@ final class PageController extends Controller
                 }
             }
 
-            Response::json(['ok' => true] + $service->selectionSummary($selected));
+            $quantities = array_intersect_key($quantities, $selected);
+            Response::json(['ok' => true] + $service->selectionSummary($selected, $quantities));
         } catch (\Throwable) {
             Response::json(['ok' => false, 'error' => 'configurator_unavailable'], 503);
         }

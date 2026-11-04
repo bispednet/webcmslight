@@ -51,7 +51,7 @@ final class PcComponentSpecExtractor
     public function syncCatalog(bool $dryRun = false): array
     {
         $stmt = $this->db->query(
-            "SELECT id, name, description, category, subcategory, subcategory_label, tags
+            "SELECT id, name, sku, description, category, subcategory, subcategory_label, tags
              FROM products
              WHERE category IN ('componenti','gaming','monitor','accessori','server')
                 OR subcategory IN ('cpu','mainboard','memorie-ram','ssd-interni','hard-disk-interni','schede-video')"
@@ -103,15 +103,25 @@ final class PcComponentSpecExtractor
         $memoryType = $this->memoryType($nameHaystack, $descriptionHaystack, $socket, $chipset, $type);
         $formFactor = $this->formFactor($haystack, $type);
         $wattage = $this->wattage($haystack, $type);
-        $capacity = $this->capacityGb($haystack, $type);
+        $capacity = in_array($type, ['ram', 'storage'], true) ? PcMemory::capacity($name, $description, $type === 'ram') : null;
         $interface = $this->interfaceType($haystack, $type);
         $platform = $this->platformBrand($haystack, $socket, $chipset);
         $metadata = [
+            'extraction_version' => 2,
             'supports_form_factors' => $type === 'case' ? $this->supportedFormFactors($formFactor) : [],
             'integrated_graphics' => $type === 'cpu' ? $this->integratedGraphics($haystack, $socket) : null,
             'raw_name' => $name,
             'runner_category' => $label ?: $subcategory,
         ];
+        if ($type === 'ram') $metadata = array_replace($metadata, PcMemory::ram($name, $description));
+        if ($type === 'motherboard') $metadata = array_replace($metadata, PcMemory::motherboard($name, $description));
+        $verified = require BASE_PATH . '/database/pc-verified-specs.php';
+        $correction = $verified[strtoupper(trim((string)($product['sku'] ?? '')))] ?? null;
+        if (is_array($correction) && preg_match($correction['title_pattern'], $name)) {
+            $metadata = array_replace($metadata, $correction['metadata'] ?? []);
+            $metadata['verified_source'] = $correction['source'];
+            $formFactor = $correction['specs']['form_factor'] ?? $formFactor;
+        }
 
         return [
             'component_type' => $type,
@@ -247,8 +257,8 @@ final class PcComponentSpecExtractor
     {
         // Product feeds commonly use compact forms such as "2DDR5" and "DIMMDDR5".
         // Do not treat GDDR graphics memory as system RAM.
-        if (preg_match('/(?<!g)ddr\s*5\b/u', $haystack)) return 'DDR5';
-        if (preg_match('/(?<!g)ddr\s*4\b/u', $haystack)) return 'DDR4';
+        if (preg_match('/(?<!g)ddr\s*5(?=\b|\d)/u', $haystack)) return 'DDR5';
+        if (preg_match('/(?<!g)ddr\s*4(?=\b|\d)/u', $haystack)) return 'DDR4';
 
         return null;
     }
@@ -283,20 +293,6 @@ final class PcComponentSpecExtractor
             if (preg_match('/\b(ryzen\s+5|core\s+(?:ultra\s+)?5|i5-)\b/u', $haystack)) return 95;
             if (preg_match('/\b(ryzen\s+3|core\s+(?:ultra\s+)?3|i3-)\b/u', $haystack)) return 75;
         }
-
-        return null;
-    }
-
-    private function capacityGb(string $haystack, string $type): ?int
-    {
-        if (!in_array($type, ['ram', 'storage'], true)) {
-            return null;
-        }
-        if ($type === 'ram' && preg_match('/\b(\d+)\s*[x×]\s*(\d+)\s*gb\b/u', $haystack, $m)) {
-            return (int)$m[1] * (int)$m[2];
-        }
-        if (preg_match('/\b(\d+)\s*tb\b/u', $haystack, $m)) return (int)$m[1] * 1024;
-        if (preg_match('/\b(\d+)\s*gb\b/u', $haystack, $m)) return (int)$m[1];
 
         return null;
     }

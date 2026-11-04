@@ -40,32 +40,38 @@ final class PcBuildPlanner
     /**
      * @return array{created:int, updated:int, skipped:int}
      */
-    public function generateDailyBuilds(bool $dryRun = false): array
+    public function generateDailyBuilds(bool $dryRun = false, bool $rebuild = false): array
     {
-        $this->commercialPolicy = $this->commercialPolicyService?->currentPolicy() ?? [];
-        $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0];
-        foreach (self::PROFILES as $profile) {
-            foreach ($profile['platforms'] as $platform) {
+        $lockName = 'bisped-pc-builds-' . substr(hash('sha256', (string)$this->db->query('SELECT DATABASE()')->fetchColumn()), 0, 24);
+        $lock = $this->db->prepare('SELECT GET_LOCK(?,0)'); $lock->execute([$lockName]);
+        if ((int)$lock->fetchColumn() !== 1) throw new \RuntimeException('Generazione PC gia in corso');
+        try {
+            $this->commercialPolicy = $this->commercialPolicyService?->currentPolicy() ?? [];
+            $stats = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'removed' => 0];
+            $planned = [];
+            foreach (self::PROFILES as $profile) foreach ($profile['platforms'] as $platform) {
                 $build = $this->planBuild($profile, $platform);
-                if ($build === null) {
-                    $stats['skipped']++;
-                    continue;
-                }
-
-                if ($dryRun) {
-                    $stats['updated']++;
-                    continue;
-                }
-
-                $result = $this->upsertBuildProduct($profile, $platform, $build);
-                $stats[$result]++;
+                if ($build === null) { $stats['skipped']++; continue; }
+                $planned[] = [$profile, $platform, $build];
             }
-        }
-        if (!$dryRun) {
-            $this->refreshStoredBuildProducts();
-        }
-
-        return $stats;
+            if ($planned === []) throw new \RuntimeException('Nessuna configurazione valida: catalogo PC precedente conservato');
+            if ($dryRun) { $stats['updated'] = count($planned); return $stats; }
+            $this->db->beginTransaction();
+            if ($rebuild) $stats['removed'] = $this->db->exec("DELETE p FROM products p INNER JOIN pc_builds b ON b.product_id=p.id WHERE p.sku LIKE 'BISBUILD-%'");
+            $kept = [];
+            foreach ($planned as [$profile, $platform, $build]) {
+                $stats[$this->upsertBuildProduct($profile, $platform, $build)]++;
+                $kept[] = 'BISBUILD-' . strtoupper($profile['key']) . '-' . strtoupper($platform);
+            }
+            $placeholders = implode(',', array_fill(0, count($kept), '?'));
+            $old = $this->db->prepare("DELETE p FROM products p INNER JOIN pc_builds b ON b.product_id=p.id WHERE p.sku LIKE 'BISBUILD-%' AND p.sku NOT IN ($placeholders)");
+            $old->execute($kept); $stats['removed'] += $old->rowCount();
+            $this->db->commit();
+            return $stats;
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        } finally { $this->db->prepare('SELECT RELEASE_LOCK(?)')->execute([$lockName]); }
     }
 
     /**
@@ -84,6 +90,7 @@ final class PcBuildPlanner
                 continue;
             }
             $selected = ['cpu' => (int)$cpu['id']];
+            $quantities = [];
 
             $motherboard = $this->cheapestOption('motherboard', $selected, $budget * 0.26);
             if ($motherboard === null) {
@@ -92,17 +99,9 @@ final class PcBuildPlanner
             $selected['motherboard'] = (int)$motherboard['id'];
 
             $entryOffice = $this->isEntryOfficeProfile($profile);
-            $ramAccept = static function (array $option) use ($rules): bool {
-                $name = mb_strtolower((string)($option['name'] ?? ''), 'UTF-8');
-                return (int)($option['specs']['capacity_gb'] ?? 0) >= $rules['min_ram_gb']
-                    && !preg_match('/\b(ddr2|ddr3l?|sodimm|so-dimm|registered|ecc)\b/u', $name);
-            };
-            $ram = $entryOffice
-                ? $this->cheapestAcceptedOption('ram', $selected, 130, $ramAccept)
-                : $this->balancedOption('ram', $selected, $budget < 1200 ? 180 : ($budget < 2500 ? 360 : 900), $ramAccept);
-            if ($ram === null) {
-                continue;
-            }
+            $ram = $this->ramOption($selected, $rules['min_ram_gb'], min(2000, $budget * 0.55));
+            if ($ram === null) continue;
+            $quantities['ram'] = $ram['quantity'];
             $selected['ram'] = (int)$ram['id'];
 
             $storageAccept = function (array $option) use ($rules): bool {
@@ -117,7 +116,7 @@ final class PcBuildPlanner
             $selected['storage'] = (int)$storage['id'];
 
             if ($requiresGpu || $this->cpuRequiresDiscreteGpu($cpu)) {
-                $baseTotal = (float)$this->compatibility->selectionSummary($selected)['total'];
+                $baseTotal = (float)$this->compatibility->selectionPrice($selected, $quantities);
                 $reserve = ($budget < 1200 ? 110 : ($budget < 2500 ? 270 : 420));
                 $headroom = $budget < 1200 ? 1.08 : 1.05;
                 $gpuMax = min($this->gpuCeiling($budget), max(0, ($budget * $headroom) - $baseTotal - $reserve));
@@ -168,30 +167,31 @@ final class PcBuildPlanner
             }
 
             if ($budget >= 1500) {
-                $selected = $this->addOptionalIfAffordable($selected, 'cooler', $budget < 3000 ? 120 : 280, $budget * 1.08);
+                $selected = $this->addOptionalIfAffordable($selected, 'cooler', $budget < 3000 ? 120 : 280, $budget * 1.08, $quantities);
             }
             if ($budget >= 3000) {
                 foreach (['monitor', 'keyboard', 'mouse', 'headset'] as $slot) {
-                    $selected = $this->addOptionalIfAffordable($selected, $slot, $slot === 'monitor' ? 700 : 220, $budget * 1.08);
+                    $selected = $this->addOptionalIfAffordable($selected, $slot, $slot === 'monitor' ? 700 : 220, $budget * 1.08, $quantities);
                 }
             }
 
-            if (!$this->compatibility->selectionIsValid($selected)) {
+            if (!$this->compatibility->selectionIsValid($selected, $quantities)) {
                 continue;
             }
 
-            $summary = $this->compatibility->selectionSummary($selected);
+            $summary = $this->compatibility->selectionSummary($selected, $quantities);
             $total = (float)$summary['total'];
             if ($total <= 0 || ($budget < 8000 && $total > $budget * 1.08)) {
                 continue;
             }
-            if (!$this->commercialBuildIsValid($selected, $profile)) {
+            if (!$this->commercialBuildIsValid($selected, $profile, $quantities)) {
                 continue;
             }
 
-            $score = $this->commercialScore($selected, $profile, $total);
+            $score = $this->commercialScore($selected, $profile, $total, $quantities);
             $candidates[] = [
                 'selected' => $selected,
+                'quantities' => $quantities,
                 'total' => $total,
                 'recommended_wattage' => $summary['recommended_wattage'],
                 'score' => $score,
@@ -214,6 +214,23 @@ final class PcBuildPlanner
     /**
      * @return array<int,array<string,mixed>>
      */
+    private function ramOption(array $selected, int $minimumGb, float $maxPrice): ?array
+    {
+        $choices = [];
+        foreach ($this->compatibility->optionsForSlot('ram', $selected, 2000) as $option) {
+            foreach ([1, 2, 4] as $quantity) {
+                $test = $selected + ['ram' => (int)$option['id']];
+                $memory = $this->compatibility->memorySelection($test, ['ram' => $quantity]);
+                if (!in_array($quantity, array_column($memory['choices'], 'quantity'), true) || $memory['total_gb'] < $minimumGb) continue;
+                $cost = (float)$option['price'] * $quantity;
+                if ($cost > $maxPrice) continue;
+                $choices[] = $option + ['quantity' => $quantity, 'cost' => $cost, 'modules' => $memory['modules']];
+            }
+        }
+        usort($choices, static fn($a, $b) => ($a['cost'] <=> $b['cost']) ?: ($a['quantity'] <=> $b['quantity']));
+        return $choices[0] ?? null;
+    }
+
     private function cpuCandidates(string $platform, float $budget): array
     {
         $limit = $budget < 700 ? 220 : ($budget < 1000 ? 280 : ($budget < 2000 ? 420 : ($budget < 4000 ? 680 : 1100)));
@@ -362,7 +379,7 @@ final class PcBuildPlanner
      * @param array<string,int> $selected
      * @return array<string,int>
      */
-    private function addOptionalIfAffordable(array $selected, string $slot, float $maxPrice, float $maxTotal): array
+    private function addOptionalIfAffordable(array $selected, string $slot, float $maxPrice, float $maxTotal, array $quantities = []): array
     {
         $option = $this->bestAffordableOption($slot, $selected, $maxPrice);
         if ($option === null) {
@@ -371,7 +388,7 @@ final class PcBuildPlanner
 
         $candidate = $selected;
         $candidate[$slot] = (int)$option['id'];
-        $summary = $this->compatibility->selectionSummary($candidate);
+        $summary = $this->compatibility->selectionSummary($candidate, $quantities);
         if (!empty($summary['valid']) && (float)$summary['total'] <= $maxTotal) {
             return $candidate;
         }
@@ -389,14 +406,15 @@ final class PcBuildPlanner
         $sku = 'BISBUILD-' . strtoupper((string)$profile['key']) . '-' . strtoupper($platform);
         $existing = $this->productBySku($sku);
         $title = $this->buildName($profile, $platform, $build);
-        $slug = $existing['slug'] ?? $this->uniqueSlug($title);
+        $slug = $this->uniqueSlug($title, (int)($existing['id'] ?? 0));
         $description = $this->description($title, $profile, $build);
         $content = $this->contentHtml($profile, $build);
         $image = $this->componentImage($build, 'case') ?: '/media/banners/pc-gaming-1.png';
         $price = number_format((float)$build['total'], 2, '.', '');
         $category = 'pc-custom';
         $typeLabel = isset($build['selected']['gpu']) || str_contains((string)$profile['use'], 'gaming') ? 'gaming' : 'workstation';
-        $stock = $this->buildStock($build['selected']);
+        $summary = $this->compatibility->selectionSummary($build['selected'], $build['quantities'] ?? []);
+        $stock = ['status' => $summary['stock']['available'] ? 'disponibile' : 'su richiesta', 'qty' => $summary['stock']['qty']];
 
         if ($existing === null) {
             $stmt = $this->db->prepare(
@@ -427,7 +445,7 @@ final class PcBuildPlanner
             $productId = (int)$existing['id'];
             $stmt = $this->db->prepare(
                 "UPDATE products
-                 SET name = :name, description = :description, price = :price, stock_status = :stock_status, stock_qty = :stock_qty,
+                 SET name = :name, slug = :slug, description = :description, price = :price, stock_status = :stock_status, stock_qty = :stock_qty,
                      sale_price = NULL,
                      image_url = :image,
                      category = :category, subcategory = 'pc-configurabili', subcategory_label = 'PC configurabili',
@@ -436,6 +454,7 @@ final class PcBuildPlanner
             );
             $stmt->execute([
                 'name' => $title,
+                'slug' => $slug,
                 'description' => $description,
                 'price' => $price,
                 'image' => $image,
@@ -450,68 +469,10 @@ final class PcBuildPlanner
         }
 
         $this->upsertBuildMetadata($productId, $profile, $platform, $build);
-        $this->syncBuildItems($productId, $build['selected']);
+        $this->syncBuildItems($productId, $build['selected'], $build['quantities'] ?? []);
         $this->syncFeatures($productId, $profile, $build);
 
         return $result;
-    }
-
-    private function refreshStoredBuildProducts(): void
-    {
-        $stmt = $this->db->query(
-            'SELECT product_id, profile_key, budget_ceiling, target_use, base_platform
-             FROM pc_builds'
-        );
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-            $selected = $this->selectedBuildItems((int)$row['product_id']);
-            if ($selected === []) {
-                continue;
-            }
-            $profile = [
-                'key' => (string)$row['profile_key'],
-                'budget' => (float)$row['budget_ceiling'],
-                'use' => (string)$row['target_use'],
-            ];
-            if (!$this->commercialBuildIsValid($selected, $profile)) {
-                $this->deleteGeneratedBuildProduct((int)$row['product_id']);
-                continue;
-            }
-            $summary = $this->compatibility->selectionSummary($selected);
-            $build = [
-                'selected' => $selected,
-                'total' => (float)$summary['total'],
-                'recommended_wattage' => (int)$summary['recommended_wattage'],
-            ];
-
-            $this->upsertBuildProduct($profile, (string)$row['base_platform'], $build);
-        }
-    }
-
-    /**
-     * @return array<string,int>
-     */
-    private function selectedBuildItems(int $productId): array
-    {
-        $stmt = $this->db->prepare(
-            'SELECT component_type, component_product_id
-             FROM pc_build_items
-             WHERE build_product_id = :id
-             ORDER BY sort_order ASC, id ASC'
-        );
-        $stmt->execute(['id' => $productId]);
-
-        $selected = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-            $selected[(string)$row['component_type']] = (int)$row['component_product_id'];
-        }
-
-        return $selected;
-    }
-
-    private function deleteGeneratedBuildProduct(int $productId): void
-    {
-        $stmt = $this->db->prepare("DELETE FROM products WHERE id = :id AND sku LIKE 'BISBUILD-%'");
-        $stmt->execute(['id' => $productId]);
     }
 
     /**
@@ -541,6 +502,8 @@ final class PcBuildPlanner
             'base_platform' => $platform,
             'metadata_json' => json_encode([
                 'selected' => $build['selected'],
+                'quantities' => $build['quantities'] ?? [],
+                'validation_version' => 2,
                 'recommended_wattage' => $build['recommended_wattage'],
                 'commercial_policy_summary' => $this->commercialPolicy['summary'] ?? null,
                 'commercial_policy_source' => $this->commercialPolicy['source'] ?? null,
@@ -552,23 +515,24 @@ final class PcBuildPlanner
     /**
      * @param array<string,int> $selected
      */
-    private function syncBuildItems(int $productId, array $selected): void
+    private function syncBuildItems(int $productId, array $selected, array $quantities = []): void
     {
         $this->db->prepare('DELETE FROM pc_build_items WHERE build_product_id = :id')->execute(['id' => $productId]);
         $stmt = $this->db->prepare(
             'INSERT INTO pc_build_items
                 (build_product_id, component_product_id, component_type, qty, is_required, is_user_configurable, sort_order)
              VALUES
-                (:build_product_id, :component_product_id, :component_type, 1, :is_required, :is_user_configurable, :sort_order)'
+                (:build_product_id, :component_product_id, :component_type, :qty, :is_required, :is_user_configurable, :sort_order)'
         );
         $order = 0;
         foreach ($selected as $type => $componentId) {
             $isRequired = in_array($type, ['cpu', 'motherboard', 'ram', 'storage', 'psu', 'case'], true)
-                || ($type === 'gpu' && (bool)($this->compatibility->selectionSummary($selected)['selected']['gpu'] ?? false));
+                || ($type === 'gpu' && isset($selected['gpu']));
             $stmt->execute([
                 'build_product_id' => $productId,
                 'component_product_id' => $componentId,
                 'component_type' => $type,
+                'qty' => (int)($quantities[$type] ?? 1),
                 'is_required' => $isRequired ? 1 : 0,
                 'is_user_configurable' => in_array($type, ['cpu', 'motherboard', 'ram', 'storage', 'gpu', 'psu', 'case', 'cooler', 'monitor', 'keyboard', 'mouse', 'headset'], true) ? 1 : 0,
                 'sort_order' => $order++,
@@ -653,14 +617,14 @@ final class PcBuildPlanner
      * @param array<string,int> $selected
      * @param array<string,mixed> $profile
      */
-    private function commercialBuildIsValid(array $selected, array $profile): bool
+    private function commercialBuildIsValid(array $selected, array $profile, array $quantities = []): bool
     {
         if (!$this->compatibility->selectionIsValid($selected)) {
             return false;
         }
 
         $rules = $this->commercialRules($profile);
-        $components = $this->selectedComponentRows($selected);
+        $components = $this->selectedComponentRows($selected, $quantities);
         $ram = $components['ram'] ?? null;
         $storage = $components['storage'] ?? null;
         if ($ram === null || (int)($ram['capacity_gb'] ?? 0) < $rules['min_ram_gb']) {
@@ -710,7 +674,7 @@ final class PcBuildPlanner
             return ['approved' => true, 'reason' => 'Policy service non configurato: fallback locale.'];
         }
 
-        $components = $this->selectedComponentRows($build['selected']);
+        $components = $this->selectedComponentRows($build['selected'], $build['quantities'] ?? []);
         return $this->commercialPolicyService->reviewBuild($profile, $components, (float)$build['total'], $this->commercialPolicy);
     }
 
@@ -718,9 +682,9 @@ final class PcBuildPlanner
      * @param array<string,int> $selected
      * @param array<string,mixed> $profile
      */
-    private function commercialScore(array $selected, array $profile, float $total): float
+    private function commercialScore(array $selected, array $profile, float $total, array $quantities = []): float
     {
-        $components = $this->selectedComponentRows($selected);
+        $components = $this->selectedComponentRows($selected, $quantities);
         $budget = (float)$profile['budget'];
         $score = $total;
         $score += (int)($components['ram']['capacity_gb'] ?? 0) * 12;
@@ -750,7 +714,7 @@ final class PcBuildPlanner
             }
         }
 
-        $components = $this->selectedComponentRows($build['selected']);
+        $components = $this->selectedComponentRows($build['selected'], $build['quantities'] ?? []);
         $hasGpu = isset($components['gpu']);
         $use = (string)($profile['use'] ?? '');
         if (str_contains($use, 'gaming')) {
@@ -763,20 +727,14 @@ final class PcBuildPlanner
             $class = 'OFFICE';
             $prefix = 'OF';
         }
-        $platformCode = $platform === 'amd' ? 'AM' : 'IN';
-        $cpuGen = $this->cpuGeneration((string)($components['cpu']['name'] ?? ''), $platform);
+        $cpuName = (string)($components['cpu']['name'] ?? '');
+        $cpuLabel = strtoupper($platform);
+        if (preg_match('/ryzen\s+([3579])\D+(\d{4}(?:x3d|xt|gt|ge|[xgf])?)/iu', $cpuName, $m)) $cpuLabel = 'Ryzen ' . $m[1] . ' ' . strtoupper($m[2]);
+        elseif (preg_match('/(?:core\s*)?i([3579])[-\s]*(\d{4,5}[a-z]*)/iu', $cpuName, $m)) $cpuLabel = 'Core i' . $m[1] . '-' . strtoupper($m[2]);
+        elseif (preg_match('/ultra\s+([3579])\D+(\d{3}[a-z]*)/iu', $cpuName, $m)) $cpuLabel = 'Core Ultra ' . $m[1] . ' ' . strtoupper($m[2]);
         $gpuCode = $hasGpu ? $this->gpuCode((string)$components['gpu']['name']) : '';
         $ramCode = $this->ramCode($components['ram'] ?? null);
-
-        return trim(preg_replace('/\s+/', ' ', sprintf(
-            'PC %s %s%s%s %s %s',
-            $class,
-            $prefix,
-            $platformCode,
-            $cpuGen,
-            $gpuCode,
-            $ramCode
-        )) ?? '');
+        return trim(preg_replace('/\s+/', ' ', 'PC ' . $class . ' ' . $cpuLabel . ' ' . $gpuCode . ' ' . $ramCode . 'GB') ?? '');
     }
 
     /**
@@ -799,7 +757,7 @@ final class PcBuildPlanner
      */
     private function contentHtml(array $profile, array $build): string
     {
-        $componentsHtml = $this->componentsHtml($build['selected']);
+        $componentsHtml = $this->componentsHtml($build['selected'], $build['quantities'] ?? []);
 
         return '<p>PC assemblato con componenti selezionati dal listino aggiornato. La configurazione viene proposta solo quando CPU, scheda madre, RAM, alimentatore e formato fisico risultano coerenti.</p>'
             . $componentsHtml
@@ -813,7 +771,7 @@ final class PcBuildPlanner
      * @param array<string,int> $selected
      * @return array<string,array<string,mixed>>
      */
-    private function selectedComponentRows(array $selected): array
+    private function selectedComponentRows(array $selected, array $quantities = []): array
     {
         if ($selected === []) {
             return [];
@@ -839,6 +797,10 @@ final class PcBuildPlanner
         foreach ($selected as $slot => $id) {
             if (isset($byId[(int)$id])) {
                 $out[$slot] = $byId[(int)$id];
+                $quantity = max(1, (int)($quantities[$slot] ?? 1));
+                $out[$slot]['qty'] = $quantity;
+                $out[$slot]['price'] = (float)$out[$slot]['price'] * $quantity;
+                if ($slot === 'ram') $out[$slot]['capacity_gb'] = (int)$out[$slot]['capacity_gb'] * $quantity;
             }
         }
 
@@ -857,9 +819,9 @@ final class PcBuildPlanner
     /**
      * @param array<string,int> $selected
      */
-    private function componentsHtml(array $selected): string
+    private function componentsHtml(array $selected, array $quantities = []): string
     {
-        $components = $this->selectedComponentRows($selected);
+        $components = $this->selectedComponentRows($selected, $quantities);
         $pcSlots = ['cpu', 'motherboard', 'ram', 'storage', 'gpu', 'psu', 'case', 'cooler', 'fan'];
         $peripheralSlots = ['monitor', 'keyboard', 'mouse', 'headset'];
         $labels = PcCompatibilityService::SLOT_LABELS;
@@ -870,7 +832,7 @@ final class PcBuildPlanner
                 if (empty($components[$slot])) {
                     continue;
                 }
-                $name = htmlspecialchars((string)$components[$slot]['name'], ENT_QUOTES, 'UTF-8');
+                $name = (int)($components[$slot]['qty'] ?? 1) . ' x ' . htmlspecialchars((string)$components[$slot]['name'], ENT_QUOTES, 'UTF-8');
                 $label = htmlspecialchars((string)($labels[$slot] ?? $slot), ENT_QUOTES, 'UTF-8');
                 $items .= '<li><strong>' . $label . ':</strong> ' . $name . '</li>';
             }
@@ -885,27 +847,6 @@ final class PcBuildPlanner
      * @param array<string,int> $selected
      * @return array{status:string,qty:int}
      */
-    private function buildStock(array $selected): array
-    {
-        $components = $this->selectedComponentRows($selected);
-        if ($components === []) {
-            return ['status' => 'su richiesta', 'qty' => 0];
-        }
-
-        $minQty = null;
-        foreach ($components as $component) {
-            $status = strtolower(trim((string)($component['stock_status'] ?? '')));
-            if (!in_array($status, ['instock', 'in-stock', 'disponibile', '1', 'true'], true)) {
-                return ['status' => 'su richiesta', 'qty' => 0];
-            }
-            $qty = max(0, (int)($component['stock_qty'] ?? 0));
-            $minQty = $minQty === null ? $qty : min($minQty, $qty);
-        }
-
-        $qty = max(0, (int)($minQty ?? 0));
-        return $qty > 0 ? ['status' => 'disponibile', 'qty' => $qty] : ['status' => 'su richiesta', 'qty' => 0];
-    }
-
     private function cpuGeneration(string $name, string $platform): string
     {
         $haystack = mb_strtolower($name, 'UTF-8');
@@ -965,7 +906,7 @@ final class PcBuildPlanner
     {
         $name = mb_strtolower((string)($ram['name'] ?? ''), 'UTF-8');
 
-        return !preg_match('/\b(ddr2|ddr3l?|sodimm|so-dimm|registered|ecc)\b/u', $name);
+        return !empty(PcMemory::ram($name, '')['desktop_ram']);
     }
 
     /**
@@ -1092,7 +1033,7 @@ final class PcBuildPlanner
         return $row ?: null;
     }
 
-    private function uniqueSlug(string $base): string
+    private function uniqueSlug(string $base, int $excludeId = 0): string
     {
         $slug = mb_strtolower($base, 'UTF-8');
         $slug = preg_replace('/[^a-z0-9]+/u', '-', $slug) ?? $slug;
@@ -1101,8 +1042,8 @@ final class PcBuildPlanner
         $seed = $slug;
         $n = 2;
         while (true) {
-            $stmt = $this->db->prepare('SELECT COUNT(*) FROM products WHERE slug = :slug');
-            $stmt->execute(['slug' => $slug]);
+            $stmt = $this->db->prepare('SELECT COUNT(*) FROM products WHERE slug = :slug AND id <> :exclude_id');
+            $stmt->execute(['slug' => $slug, 'exclude_id' => $excludeId]);
             if ((int)$stmt->fetchColumn() === 0) {
                 return $slug;
             }

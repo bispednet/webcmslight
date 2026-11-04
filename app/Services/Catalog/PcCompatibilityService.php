@@ -28,6 +28,8 @@ final class PcCompatibilityService
     ];
 
     private array $catalogConfig;
+    private array $specCache = [];
+    private array $optionRows = [];
     private string $catalogVisibility;
 
     public function __construct(private PDO $db)
@@ -39,7 +41,7 @@ final class PcCompatibilityService
     /**
      * @return array<string,mixed>|null
      */
-    public function configuratorForProduct(int $buildProductId): ?array
+    public function configuratorForProduct(int $buildProductId, bool $withOptions = true): ?array
     {
         $build = $this->build($buildProductId);
         if ($build === null) {
@@ -49,21 +51,20 @@ final class PcCompatibilityService
         $items = $this->buildItems($buildProductId);
         $selected = [];
         $components = [];
+        $quantities = [];
         foreach ($items as $item) {
             $type = (string)$item['component_type'];
             $selected[$type] = (int)$item['component_product_id'];
             $components[$type] = $item;
+            $quantities[$type] = max(1, (int)$item['qty']);
         }
 
-        return [
+        return $this->selectionSummary($selected, $quantities, $withOptions) + [
             'build' => $build,
             'slot_labels' => self::SLOT_LABELS,
             'selected' => $selected,
             'components' => $components,
-            'options' => $this->optionsForSelection($selected),
-            'total' => $this->selectionTotal($selected),
-            'recommended_wattage' => $this->recommendedPsuWattage($this->selectedSpecs($selected)),
-            'stock' => $this->selectionStock($selected),
+
         ];
     }
 
@@ -71,13 +72,13 @@ final class PcCompatibilityService
      * @param array<string,int> $selected
      * @return array<string,array<int,array<string,mixed>>>
      */
-    public function optionsForSelection(array $selected): array
+    public function optionsForSelection(array $selected, array $quantities = []): array
     {
         $options = [];
         foreach (self::SLOT_ORDER as $type) {
-            $slotOptions = $this->optionsForSlot($type, $selected, 80);
+            $slotOptions = $this->optionsForSlot($type, $selected, 500, $quantities);
             $selectedId = (int)($selected[$type] ?? 0);
-            $selectedOption = $selectedId > 0 ? $this->selectedOptionForSlot($type, $selectedId, $selected) : null;
+            $selectedOption = $selectedId > 0 ? $this->selectedOptionForSlot($type, $selectedId, $selected, $quantities) : null;
             if ($selectedOption !== null && !in_array($selectedId, array_column($slotOptions, 'id'), true)) {
                 $slotOptions[] = $selectedOption;
             }
@@ -92,24 +93,72 @@ final class PcCompatibilityService
      * @param array<string,int> $selected
      * @return array<string,mixed>
      */
-    public function selectionSummary(array $selected): array
+    public function selectionSummary(array $selected, array $quantities = [], bool $withOptions = true): array
     {
+        $valid = $this->selectionIsValid($selected, $quantities);
+        $memory = $this->memorySelection($selected, $quantities);
         return [
             'selected' => $selected,
-            'options' => $this->optionsForSelection($selected),
-            'total' => $this->selectionTotal($selected),
+            'quantities' => array_replace(array_fill_keys(array_keys($selected), 1), $quantities),
+            'memory' => $memory,
+            'options' => $withOptions ? $this->optionsForSelection($selected, $quantities) : [],
+            'total' => $valid ? $this->selectionTotal($selected, $quantities) : 0.0,
             'recommended_wattage' => $this->recommendedPsuWattage($this->selectedSpecs($selected)),
-            'stock' => $this->selectionStock($selected),
-            'valid' => $this->selectionIsValid($selected),
+            'stock' => $valid ? $this->selectionStock($selected, $quantities) : ['available' => false, 'qty' => 0, 'label' => 'Configurazione da verificare'],
+            'valid' => $valid,
         ];
+    }
+
+    /** Refresh saved PC quotes after every successful supplier sync. */
+    public function refreshBuildProducts(): array
+    {
+        $stats = ['updated' => 0, 'blocked' => 0];
+        $rows = $this->db->query("SELECT p.id FROM products p INNER JOIN pc_builds b ON b.product_id=p.id WHERE p.sku LIKE 'BISBUILD-%'")->fetchAll(PDO::FETCH_ASSOC);
+        $update = $this->db->prepare('UPDATE products SET price=:price,sale_price=NULL,stock_status=:status,stock_qty=:qty,updated_at=NOW() WHERE id=:id');
+        foreach ($rows as $row) {
+            $summary = $this->configuratorForProduct((int)$row['id'], false);
+            $available = $summary !== null && $summary['valid'] && $summary['stock']['available'];
+            $update->execute(['price' => $available ? $summary['total'] : null, 'status' => $available ? 'disponibile' : 'sospeso', 'qty' => $available ? $summary['stock']['qty'] : 0, 'id' => $row['id']]);
+            $stats[$available ? 'updated' : 'blocked']++;
+        }
+        return $stats;
+    }
+
+    public function selectionPrice(array $selected, array $quantities = []): float
+    {
+        return $this->selectionTotal($selected, $quantities);
+    }
+
+    public function memorySelection(array $selected, array $quantities = []): array
+    {
+        $board = $this->specForProduct((int)($selected['motherboard'] ?? 0)) ?? [];
+        $ram = $this->specForProduct((int)($selected['ram'] ?? 0)) ?? [];
+        $m = PcMemory::metadata($ram); $b = PcMemory::metadata($board);
+        $quantity = (int)($quantities['ram'] ?? 1);
+        $perUnit = (int)($m['ram_modules_per_unit'] ?? 1);
+        $choices = [];
+        foreach (PcMemory::allowedQuantities($board, $ram) as $q) {
+            if ($q > (int)($ram['stock_qty'] ?? 0)) continue;
+            $modules = $q * $perUnit; $capacity = $q * (int)($ram['capacity_gb'] ?? 0);
+            $choices[] = ['quantity' => $q, 'modules' => $modules, 'total_gb' => $capacity,
+                'price' => round($q * (float)(($ram['sale_price'] ?? null) ?: ($ram['price'] ?? 0)), 2),
+                'label' => $modules . ' banchi - ' . $modules . ' x ' . (int)($m['ram_module_capacity_gb'] ?? 0) . ' GB = ' . $capacity . ' GB' . ($perUnit > 1 ? ' (' . $q . ' kit)' : '')];
+        }
+        return ['quantity' => $quantity, 'modules' => $quantity * $perUnit,
+            'total_gb' => $quantity * (int)($ram['capacity_gb'] ?? 0), 'slots' => $b['memory_slots'] ?? null,
+            'modules_per_unit' => $perUnit, 'choices' => $choices];
     }
 
     /**
      * @param array<string,int> $selected
      */
-    public function selectionIsValid(array $selected): bool
+    public function selectionIsValid(array $selected, array $quantities = []): bool
     {
+        foreach (['cpu', 'motherboard', 'ram', 'storage', 'case'] as $required) if (empty($selected[$required])) return false;
+        foreach ($quantities as $slot => $qty) if (!isset($selected[$slot]) || !is_int($qty) || ($slot === 'ram' ? !in_array($qty, [1, 2, 4], true) : $qty !== 1)) return false;
         $selectedSpecs = $this->selectedSpecs($selected);
+        if (empty($selectedSpecs['psu']) && !preg_match('/con alimentatore|alimentatore incluso|psu\s*\d+w|\d{3,4}w\s*psu|with psu/iu', (string)($selectedSpecs['case']['name'] ?? ''))) return false;
+        if (!in_array((int)($quantities['ram'] ?? 1), PcMemory::allowedQuantities($selectedSpecs['motherboard'] ?? [], $selectedSpecs['ram'] ?? []), true)) return false;
         if (isset($selectedSpecs['cpu']) && empty($selectedSpecs['gpu']) && $this->cpuRequiresDiscreteGpu($selectedSpecs['cpu'])) {
             return false;
         }
@@ -126,6 +175,7 @@ final class PcCompatibilityService
             if ($spec === null || (string)$spec['component_type'] !== $type) {
                 return false;
             }
+            if ((int)($quantities[$type] ?? 1) > (int)($spec['stock_qty'] ?? 0)) return false;
             $other = $selected;
             unset($other[$type]);
             if (!$this->candidateCompatible($spec, $type, $this->selectedSpecs($other))) {
@@ -140,16 +190,13 @@ final class PcCompatibilityService
      * @param array<string,int> $selected
      * @return array<int,array<string,mixed>>
      */
-    public function optionsForSlot(string $type, array $selected, int $limit = 60): array
+    public function optionsForSlot(string $type, array $selected, int $limit = 60, array $quantities = []): array
     {
-        $baseRamCapacity = 0;
-        if ($type === 'ram' && !empty($selected['ram'])) {
-            $baseRamCapacity = (int)(($this->specForProduct((int)$selected['ram'])['capacity_gb'] ?? 0));
-        }
         $otherSelected = $selected;
         unset($otherSelected[$type]);
         $selectedSpecs = $this->selectedSpecs($otherSelected);
 
+        if (!isset($this->optionRows[$type])) {
         $stmt = $this->db->prepare(
             "SELECT p.id, p.name, p.slug, p.price, p.sale_price, p.stock_status, p.stock_qty, p.image_url,
                     s.component_type, s.platform_brand, s.socket, s.chipset, s.memory_type, s.form_factor,
@@ -165,17 +212,20 @@ final class PcCompatibilityService
              LIMIT :limit"
         );
         $stmt->bindValue(':type', $type);
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', 2000, PDO::PARAM_INT);
         $stmt->execute();
 
+            $this->optionRows[$type] = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
         $out = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        foreach ($this->optionRows[$type] as $row) {
             if ($type === 'ram' && $this->ramLooksUnsuitable((string)($row['name'] ?? ''))) {
                 continue;
             }
-            if ($type === 'ram' && $baseRamCapacity > 0 && (int)($row['capacity_gb'] ?? 0) < $baseRamCapacity) {
+            if ($type === 'ram' && !in_array(1, PcMemory::allowedQuantities($selectedSpecs['motherboard'] ?? [], $row), true)) {
                 continue;
             }
+            if ($type === 'motherboard' && isset($selectedSpecs['ram']) && !in_array((int)($quantities['ram'] ?? 1), PcMemory::allowedQuantities($row, $selectedSpecs['ram']), true)) continue;
             if ($type === 'gpu' && $this->gpuLooksUnsuitable((string)($row['name'] ?? ''))) {
                 continue;
             }
@@ -185,7 +235,7 @@ final class PcCompatibilityService
             $out[] = $this->formatOption($row);
         }
 
-        return $out;
+        return array_slice($out, 0, $limit);
     }
 
     /** @param array<int,array<string,mixed>> $options */
@@ -214,7 +264,7 @@ final class PcCompatibilityService
      * @param array<string,int> $selected
      * @return array<string,mixed>|null
      */
-    private function selectedOptionForSlot(string $type, int $productId, array $selected): ?array
+    private function selectedOptionForSlot(string $type, int $productId, array $selected, array $quantities = []): ?array
     {
         $row = $this->specForProduct($productId);
         if ($row === null || (string)$row['component_type'] !== $type) {
@@ -233,6 +283,7 @@ final class PcCompatibilityService
             return null;
         }
 
+        if ($type === 'ram' && !in_array((int)($quantities['ram'] ?? 1), PcMemory::allowedQuantities($this->selectedSpecs($otherSelected)['motherboard'] ?? [], $row), true)) return null;
         return $this->formatOption($row);
     }
 
@@ -258,6 +309,7 @@ final class PcCompatibilityService
      */
     private function specForProduct(int $productId): ?array
     {
+        if (array_key_exists($productId, $this->specCache)) return $this->specCache[$productId];
         $stmt = $this->db->prepare(
             "SELECT p.id, p.name, p.slug, p.price, p.sale_price, p.stock_status, p.stock_qty, p.image_url,
                     s.component_type, s.platform_brand, s.socket, s.chipset, s.memory_type, s.form_factor,
@@ -270,7 +322,7 @@ final class PcCompatibilityService
         $stmt->execute(['id' => $productId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $row ?: null;
+        return $this->specCache[$productId] = ($row ?: null);
     }
 
     /**
@@ -338,7 +390,7 @@ final class PcCompatibilityService
 
     private function ramLooksUnsuitable(string $name): bool
     {
-        return (bool)preg_match('/\b(ddr2|ddr3l?|sodimm|so-dimm|registered|ecc)\b/u', mb_strtolower($name, 'UTF-8'));
+        return empty(PcMemory::ram($name, '')['desktop_ram']);
     }
 
     private function gpuLooksUnsuitable(string $name): bool
@@ -378,7 +430,7 @@ final class PcCompatibilityService
     /**
      * @param array<string,int> $selected
      */
-    private function selectionTotal(array $selected): float
+    private function selectionTotal(array $selected, array $quantities = []): float
     {
         if ($selected === []) {
             return 0.0;
@@ -391,8 +443,8 @@ final class PcCompatibilityService
         $prices = $stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
         if (count($prices) !== count($ids)) return 0.0;
         $total = 0.0;
-        foreach ($selected as $id) {
-            $total += (float)($prices[$id] ?? 0);
+        foreach ($selected as $slot => $id) {
+            $total += (float)($prices[$id] ?? 0) * (int)($quantities[$slot] ?? 1);
         }
 
         return round($total, 2);
@@ -402,7 +454,7 @@ final class PcCompatibilityService
      * @param array<string,int> $selected
      * @return array{available:bool,qty:int,label:string}
      */
-    private function selectionStock(array $selected): array
+    private function selectionStock(array $selected, array $quantities = []): array
     {
         if ($selected === []) {
             return ['available' => false, 'qty' => 0, 'label' => 'Su richiesta'];
@@ -419,12 +471,12 @@ final class PcCompatibilityService
         }
 
         $minQty = null;
-        foreach ($selected as $id) {
+        foreach ($selected as $slot => $id) {
             $row = $byId[(int)$id] ?? null;
             if ($row === null || CatalogSaleGuard::reason($row, $this->catalogConfig) !== null) {
                 return ['available' => false, 'qty' => 0, 'label' => 'Su richiesta'];
             }
-            $qty = max(0, (int)($row['stock_qty'] ?? 0));
+            $qty = intdiv(max(0, (int)($row['stock_qty'] ?? 0)), max(1, (int)($quantities[$slot] ?? 1)));
             $minQty = $minQty === null ? $qty : min($minQty, $qty);
         }
 
@@ -480,7 +532,7 @@ final class PcCompatibilityService
     {
         $price = $row['sale_price'] ?? $row['price'] ?? null;
         $metadata = json_decode((string)($row['metadata_json'] ?? ''), true);
-        $integratedGraphics = is_array($metadata) && array_key_exists('integrated_graphics', $metadata)
+        $integratedGraphics = ($row['component_type'] ?? '') === 'cpu' && is_bool($metadata['integrated_graphics'] ?? null)
             ? (bool)$metadata['integrated_graphics']
             : null;
 
@@ -497,11 +549,14 @@ final class PcCompatibilityService
             'specs' => [
                 'socket' => $row['socket'] ?? null,
                 'memory_type' => $row['memory_type'] ?? null,
-                'form_factor' => $row['form_factor'] ?? null,
+                'form_factor' => ($row['component_type'] ?? '') === 'ram' ? ($metadata['ram_form_factor'] ?? null) : ($row['form_factor'] ?? null),
                 'wattage' => $row['wattage'] ?? null,
                 'capacity_gb' => $row['capacity_gb'] ?? null,
                 'interface_type' => $row['interface_type'] ?? null,
                 'integrated_graphics' => $integratedGraphics,
+                'modules_per_unit' => $metadata['ram_modules_per_unit'] ?? null,
+                'module_capacity_gb' => $metadata['ram_module_capacity_gb'] ?? null,
+                'memory_slots' => $metadata['memory_slots'] ?? null,
                 'confidence' => (int)($row['confidence'] ?? 0),
             ],
         ];

@@ -56,10 +56,10 @@ $appUrl = (string)($config['app']['url'] ?? '');
 diagnosticLine($database !== '' ? 'OK' : 'FAIL', 'Database configurato', $database ?: 'mancante');
 diagnosticLine($appUrl !== '' ? 'OK' : 'WARN', 'App URL', $appUrl ?: 'mancante');
 
-$geminiReady = GeminiClient::fromConfig($config, 'editorial') instanceof GeminiClient;
+$geminiReady = GeminiClient::fromConfig($config, 'pc_configurator') instanceof GeminiClient;
 diagnosticLine(
     $geminiReady ? 'OK' : 'WARN',
-    'Gemini editoriale',
+    'Modello configuratore PC',
     $geminiReady ? 'configurato' : 'assente: verra usata solo la policy fallback'
 );
 
@@ -106,7 +106,7 @@ foreach ($types as $type) {
     $typeCounts[(string)$type['component_type']] = (int)$type['total'];
 }
 $specCount = array_sum($typeCounts);
-foreach (['cpu', 'motherboard', 'ram', 'storage', 'gpu', 'psu', 'case', 'cpu_cooler'] as $type) {
+foreach (['cpu', 'motherboard', 'ram', 'storage', 'gpu', 'psu', 'case', 'cooler'] as $type) {
     $count = $typeCounts[$type] ?? 0;
     diagnosticLine($count > 0 ? 'OK' : 'FAIL', 'Specifiche ' . $type, $count);
 }

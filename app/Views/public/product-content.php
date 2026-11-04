@@ -38,7 +38,7 @@ $contentHtml = str_replace(
 $regularPrice = $product['price']      ?? null;
 $salePrice    = $product['sale_price'] ?? null;
 $isConfigurablePc = !empty($pcConfigurator);
-$displayPrice = $isConfigurablePc ? $regularPrice : ($salePrice ?: $regularPrice);
+$displayPrice = $isConfigurablePc ? (($pcConfigurator['valid'] ?? false) ? ($pcConfigurator['total'] ?? null) : null) : ($salePrice ?: $regularPrice);
 $isSale = !$isConfigurablePc && $salePrice && $regularPrice && (float)$salePrice < (float)$regularPrice;
 
 $priceFormatted = $displayPrice ? number_format((float)$displayPrice, 2, ',', '.') : null;
@@ -184,7 +184,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     <div class="text-xs font-bold uppercase tracking-widest text-muted mb-1">A partire da</div>
                 <?php endif; ?>
                 <div class="font-display text-4xl font-black" style="color:<?= $isSale ? 'var(--bisped-red)' : 'var(--c-acc)' ?>">
-                    <sup class="text-lg align-super">€</sup><?= htmlspecialchars($priceFormatted, ENT_QUOTES, 'UTF-8') ?>
+                    <sup class="text-lg align-super">€</sup><span<?= $isConfigurablePc ? ' data-pc-current-price' : '' ?>><?= htmlspecialchars($priceFormatted, ENT_QUOTES, 'UTF-8') ?></span>
                 </div>
                 <div class="text-xs text-muted mt-1">IVA inclusa — prezzo indicativo, conferma in negozio</div>
             <?php else: ?>
@@ -452,10 +452,10 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
             $hiddenPeripheralSlots = array_values(array_filter($peripheralSlots, static function (string $slot) use ($selected, $options): bool {
                 return !isset($selected[$slot]) && !empty($options[$slot]);
             }));
-            $renderConfigSlot = static function (string $slot, bool $isPeripheral, bool $isHidden = false) use ($slotLabels, $selected, $options, $optionalSlots): void {
+            $renderConfigSlot = static function (string $slot, bool $isPeripheral, bool $isHidden = false) use ($slotLabels, $selected, $options, $optionalSlots, $pcConfigurator): void {
                 $slotOptions = $options[$slot] ?? [];
                 $currentId = (int)($selected[$slot] ?? 0);
-                $isOptional = in_array($slot, $optionalSlots, true);
+                $isOptional = in_array($slot, $optionalSlots, true) || ($slot === 'psu' && empty($selected['psu']));
                 ?>
                 <div class="pc-configurator__row rounded-md border p-3<?= $isHidden ? ' hidden' : '' ?>"
                      style="border-color:var(--c-border);background:var(--c-surface)"
@@ -484,8 +484,11 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                             data-optional="<?= $isOptional ? '1' : '0' ?>">
                         <?php if ($isOptional): ?>
                             <option value="">Nessuno</option>
-                        <?php elseif (empty($slotOptions)): ?>
-                            <option value="<?= $currentId ?>">Componente attuale</option>
+                        <?php else: ?>
+                            <option value="">Seleziona componente</option>
+                            <?php if ($currentId > 0 && !in_array($currentId, array_column($slotOptions, 'id'), true)): ?>
+                            <option value="<?= $currentId ?>" selected>Componente non disponibile: scegli una alternativa</option>
+                            <?php endif; ?>
                         <?php endif; ?>
                         <?php foreach ($slotOptions as $option): ?>
                             <?php $optionId = (int)($option['id'] ?? 0); ?>
@@ -512,6 +515,16 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                                  data-options-slot="<?= htmlspecialchars($slot, ENT_QUOTES, 'UTF-8') ?>"></div>
                         </div>
                     </div>
+                    <?php if ($slot === 'ram'): ?>
+                    <label class="block mt-3 text-xs font-bold">Banchi RAM installati
+                        <select class="form-input w-full text-sm mt-1" data-ram-quantity>
+                            <?php foreach (($pcConfigurator['memory']['choices'] ?? []) as $choice): ?>
+                            <option value="<?= (int)$choice['quantity'] ?>" <?= (int)$choice['quantity'] === (int)($pcConfigurator['quantities']['ram'] ?? 1) ? 'selected' : '' ?>><?= htmlspecialchars($choice['label'], ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <div class="mt-2 text-xs text-muted" data-ram-summary></div>
+                    <?php endif; ?>
                     <div class="pc-configurator__meta mt-2 text-xs text-muted" data-slot-meta="<?= htmlspecialchars($slot, ENT_QUOTES, 'UTF-8') ?>"></div>
                 </div>
                 <?php
@@ -592,7 +605,10 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                 const latestOptions = {};
                 const baseOptions = {};
                 const selectedState = {};
-                let busy = false;
+                let requestSequence = 0;
+                const ramQuantity = root.querySelector('[data-ram-quantity]');
+                let installedRam = <?= json_encode($pcConfigurator['memory'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+                if (ramQuantity && !ramQuantity.value) ramQuantity.value = String(installedRam.quantity || 1);
 
                 function rows() {
                     return Array.from(root.querySelectorAll('.pc-configurator__row'));
@@ -619,6 +635,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                         // component from the server-side selection.
                         params.set(slot, value || '');
                     });
+                    if (ramQuantity) params.set('ram_quantity', ramQuantity.value || '1');
                     return params;
                 }
 
@@ -657,7 +674,8 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     if (specs.form_factor) bits.push(specs.form_factor);
                     if (specs.interface_type) bits.push(specs.interface_type);
                     if (specs.wattage) bits.push(specs.wattage + 'W');
-                    if (specs.capacity_gb) bits.push(specs.capacity_gb + 'GB');
+                    if (specs.capacity_gb) bits.push(specs.capacity_gb + 'GB' + (specs.modules_per_unit > 1 ? ' (kit ' + specs.modules_per_unit + ' x ' + specs.module_capacity_gb + 'GB)' : ''));
+                    if (specs.memory_slots) bits.push(specs.memory_slots + ' slot RAM');
                     if (typeof specs.integrated_graphics === 'boolean') bits.push(specs.integrated_graphics ? 'iGPU' : 'no iGPU');
                     return bits.join(' · ');
                 }
@@ -666,25 +684,19 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     const previous = serverSelected === undefined ? select.value : String(serverSelected || '');
                     const isOptional = select.dataset.optional === '1';
                     select.innerHTML = '';
-
-                    if (isOptional) {
-                        const empty = document.createElement('option');
-                        empty.value = '';
-                        empty.textContent = 'Nessuno';
-                        select.appendChild(empty);
-                    }
-
+                    const placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = isOptional ? 'Nessuno' : 'Seleziona componente';
+                    select.appendChild(placeholder);
                     (options || []).forEach(option => {
-                        const node = document.createElement('option');
-                        node.value = option.id;
-                        node.textContent = option.name + ' - ' + option.price_label;
-                        if (String(option.id) === String(previous)) node.selected = true;
-                        select.appendChild(node);
+                        const node = document.createElement('option'); node.value = option.id;
+                        node.textContent = option.name + ' - ' + option.price_label; select.appendChild(node);
                     });
-
-                    if (!select.value && !isOptional && options && options[0]) {
-                        select.value = options[0].id;
+                    if (previous && !(options || []).some(option => String(option.id) === previous)) {
+                        const unavailable = document.createElement('option'); unavailable.value = previous;
+                        unavailable.textContent = 'Componente non disponibile: scegli una alternativa'; select.appendChild(unavailable);
                     }
+                    select.value = previous;
                 }
 
                 function optionLabel(option, current) {
@@ -814,7 +826,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     const name = document.createElement('strong');
                     name.textContent = selectedLabel(row) + ': ';
                     item.appendChild(name);
-                    item.append(document.createTextNode(option.name || 'Componente'));
+                    item.append(document.createTextNode((slot === 'ram' ? (installedRam.quantity || 1) + ' x ' : '') + (option.name || 'Componente')));
                     list.appendChild(item);
                     return true;
                 }
@@ -865,6 +877,24 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                 }
 
                 function render(data) {
+                    installedRam = data.memory || {};
+                    if (ramQuantity) {
+                        ramQuantity.innerHTML = '';
+                        (installedRam.choices || []).forEach(choice => {
+                            const option = document.createElement('option'); option.value = choice.quantity;
+                            option.textContent = choice.label + ' - ' + formatPrice(choice.price); ramQuantity.appendChild(option);
+                        });
+                        const quantity = String((data.quantities || {}).ram || 1);
+                        if (!Array.from(ramQuantity.options).some(option => option.value === quantity)) {
+                            const invalid = document.createElement('option'); invalid.value = quantity; invalid.textContent = 'Quantita RAM da verificare'; ramQuantity.appendChild(invalid);
+                        }
+                        ramQuantity.value = quantity;
+                        ramQuantity.disabled = !(installedRam.choices || []).length;
+                    }
+                    const memorySummary = root.querySelector('[data-ram-summary]');
+                    if (memorySummary) memorySummary.textContent = installedRam.total_gb
+                        ? installedRam.total_gb + ' GB totali, ' + installedRam.modules + ' banchi installati. ' + (installedRam.slots ? 'Scheda madre: ' + installedRam.slots + ' slot.' : 'Numero di slot da verificare: espansione multipla disabilitata.')
+                        : 'Seleziona una memoria compatibile.';
                     Object.keys(selectedState).forEach(slot => delete selectedState[slot]);
                     Object.entries(data.selected || {}).forEach(([slot, value]) => setSelectedValue(slot, value));
                     Object.entries(data.options || {}).forEach(([slot, options]) => {
@@ -883,7 +913,9 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     });
 
                     updateAddControls();
-                    if (total) total.textContent = formatPrice(data.total || 0);
+                    if (total) total.textContent = data.valid ? formatPrice(data.total || 0) : 'Da verificare';
+                    const headlinePrice = document.querySelector('[data-pc-current-price]');
+                    if (headlinePrice) headlinePrice.textContent = data.valid ? Number(data.total || 0).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : 'Da verificare';
                     if (watt) watt.textContent = data.recommended_wattage ? 'PSU consigliato: ' + data.recommended_wattage + 'W+' : '';
                     if (stockBadge && data.stock) {
                         stockBadge.textContent = data.stock.label || (data.stock.available ? 'Disponibile' : 'Su richiesta');
@@ -903,23 +935,18 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                 }
 
                 function refresh() {
-                    if (busy) return;
-                    busy = true;
-                    status.textContent = 'Aggiorno compatibilità...';
+                    const sequence = ++requestSequence;
+                    status.textContent = 'Aggiorno compatibilita...';
                     fetch(endpoint + '?' + collect().toString(), {headers: {'Accept': 'application/json'}})
                         .then(response => response.json())
-                        .then(data => {
-                            if (!data.ok) throw new Error('configurator');
-                            render(data);
-                            if (status.textContent === 'Aggiorno compatibilità...') status.textContent = '';
-                        })
-                        .catch(() => { status.textContent = 'Configuratore non disponibile in questo momento.'; })
-                        .finally(() => { busy = false; });
+                        .then(data => { if (sequence !== requestSequence) return; if (!data.ok) throw new Error('configurator'); render(data); })
+                        .catch(() => { if (sequence === requestSequence) status.textContent = 'Configuratore non disponibile in questo momento.'; });
                 }
 
                 function chooseOption(slot, value) {
                     const select = root.querySelector('[data-slot="' + slot + '"]');
                     if (!select) return;
+                    if (ramQuantity && (slot === 'ram' || slot === 'motherboard')) ramQuantity.value = '1';
                     select.value = value || '';
                     setSelectedValue(slot, value || '');
                     closeMenus();
@@ -995,6 +1022,7 @@ window.BISPED_TRACKING_CONTEXT.product = <?= json_encode([
                     });
                 }
 
+                if (ramQuantity) ramQuantity.addEventListener('change', refresh);
                 refresh();
             })();
             </script>

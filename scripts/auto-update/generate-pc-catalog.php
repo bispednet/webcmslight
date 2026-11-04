@@ -20,7 +20,7 @@ use App\Services\Catalog\PcCommercialPolicyService;
 use App\Services\Catalog\PcCompatibilityService;
 use App\Services\Catalog\PcComponentSpecExtractor;
 
-$opts = getopt('', ['dry-run', 'no-llm']);
+$opts = getopt('', ['dry-run', 'no-llm', 'rebuild']);
 $dryRun = isset($opts['dry-run']);
 
 $db = Database::connection();
@@ -30,14 +30,15 @@ $specStats = (new PcComponentSpecExtractor($db))->syncCatalog($dryRun);
 
 $llm = isset($opts['no-llm']) ? null : GeminiClient::fromConfig(Container::get('config', []), 'pc_configurator');
 $policy = new PcCommercialPolicyService($db, $llm);
-$buildStats = (new PcBuildPlanner($db, new PcCompatibilityService($db), null, $policy))->generateDailyBuilds($dryRun);
+$buildStats = (new PcBuildPlanner($db, new PcCompatibilityService($db), null, $policy))->generateDailyBuilds($dryRun, isset($opts['rebuild']));
 
 fwrite(STDOUT, sprintf(
-    "%sPC catalog: specifiche=%d saltate=%d, build create=%d aggiornate=%d saltate=%d\n",
+    "%sPC catalog: specifiche=%d saltate=%d, build create=%d aggiornate=%d saltate=%d rimosse=%d\n",
     $dryRun ? '[DRY-RUN] ' : '',
     $specStats['synced'],
     $specStats['skipped'],
     $buildStats['created'],
     $buildStats['updated'],
-    $buildStats['skipped']
+    $buildStats['skipped'],
+    $buildStats['removed']
 ));
